@@ -5,6 +5,7 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 ## Beginner
 - [IBM Cybersecurity Analyst Professional Certificate](IBM-CySA/README.md) ([course link](https://www.coursera.org/professional-certificates/ibm-cybersecurity-analyst))
 - Red Hat Certified System Administrator (Path) ([course link](https://www.pluralsight.com/paths/rhcsa-red-hat-certified-system-administrator-ex200))
+- TCM Security OSINT Research Professional ([course link](https://certifications.tcm-sec.com/porp/))
 ## Intermediate
 - HackTheBox Certified Penetration Testing Specialist ([course link](https://academy.hackthebox.com/preview/certifications/htb-certified-penetration-testing-specialist))
 - Cisco Certified Network Associate (Path) ([course link](https://app.pluralsight.com/paths/skill/cisco-ccna-cisco-certified-network-associate-200-301))
@@ -19,4 +20,4 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 - Johns Hopkins Intrusion Detection Specialisation ([course link](https://www.coursera.org/specializations/intrusion-detection))
 
 > [!NOTE]
-> Detailed penetration testing instructions, terminal commands, and code are not included in the published notes as they are often flagged as violating content policies and guidelines.
+> Detailed security testing instructions, terminal commands, and code are not included in the published notes as they are often flagged as violating content policies and guidelines.
