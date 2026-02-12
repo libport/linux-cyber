@@ -20,3 +20,6 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 
 > [!NOTE]
 > Detailed security testing instructions, terminal commands, and code are not included in the published notes as they are often flagged as violating content policies and guidelines.
+
+> [!NOTE]
+> Assessment modules with no new content do not have corresponding notes

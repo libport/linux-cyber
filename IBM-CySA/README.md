@@ -27,6 +27,3 @@ Notes are supplemented with information from third-party sources, including:
 - [Cybersecurity Case Studies](Cybersecurity%20Case%20Studies.md)
 - [Generative AI: Boost Your Cybersecurity Career](Generative%20AI%20Boost%20Your%20Cybersecurity%20Career.md)
 - [Cybersecurity Job Search, Resume, and Interview Prep](Cybersecurity%20Job%20Search,%20Resume,%20and%20Interview%20Prep.md)
-
-> [!NOTE]
-> Assessment modules with no new content do not have corresponding notes
