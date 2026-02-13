@@ -286,15 +286,15 @@ command &> combined.txt
 ```
 
 Core behaviour:
-- > overwrites the destination file
-- >> appends to the destination file
-- 2> targets standard error, file descriptor 2
-- &> sends both streams to one destination
+- `>` overwrites the destination file
+- `>>` appends to the destination file
+- `2>` targets standard error, file descriptor 2
+- `&>` sends both streams to one destination
 
 A common operational pattern discards errors:
 
 ```bash
-command 2>/dev/null
+command 2> /dev/null
 ```
 ### Here-documents for input
 A here-document feeds multi-line input to a command:
@@ -356,21 +356,21 @@ vimtutor
 ```
 
 Common actions:
-- i inserts at the cursor
-- a appends after the cursor
-- I inserts at the start of the line
-- A appends at the end of the line
-- Esc returns to normal mode
-- :x writes and exits
-- :q! exits without saving
+- `i` inserts at the cursor
+- `a` appends after the cursor
+- `I` inserts at the start of the line
+- `A` appends at the end of the line
+- `Esc` returns to normal mode
+- `:x` writes and exits (so does `:wq`)
+- `:q!` exits without saving (`:q` will prompt you about unsaved changed)
 
 In normal mode, vim also supports fast navigation and recovery:
-- /pattern searches forward in the file
-- n moves to the next match
-- u undoes the last change
-- dd deletes the current line
-- yy copies the current line
-- p pastes after the cursor
+- `/pattern` searches forward in the file
+- `n` moves to the next match
+- `u` undoes the last change
+- `dd` deletes the current line
+- `yy` copies the current line
+- `p` pastes after the cursor
 ## Directories, paths, and file operations
 Accurate path handling prevents mistakes, especially around destructive commands.
 ### Working directory and path basics
