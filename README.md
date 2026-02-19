@@ -10,7 +10,7 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 - Pluralsight Red Hat Certified Engineer (Path) ([course link](https://www.pluralsight.com/paths/rhce-red-hat-certified-engineer-ex294))
 - Pluralsight Cisco Certified Network Associate (Path) ([course link](https://app.pluralsight.com/paths/skill/cisco-ccna-cisco-certified-network-associate-200-301))
 - Pluralsight Automating Networks with Ansible (Path) ([course link](https://www.pluralsight.com/paths/automating-networks-with-ansible))
-- HackTheBox Penetration Tester ([course link]([https://academy.hackthebox.com/preview/certifications/htb-certified-penetration-testing-specialist](https://academy.hackthebox.com/path/preview/penetration-tester)))
+- HackTheBox Penetration Tester ([course link](https://academy.hackthebox.com/path/preview/penetration-tester))
 ## Advanced
 - Pluralsight Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting (Path) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342))
 - Pluralsight Red Hat Certified Specialist in Performance Tuning (Path) ([course link](https://www.pluralsight.com/courses/red-hat-certified-specialist-in-performance-tuning-ex442))
