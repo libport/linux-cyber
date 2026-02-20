@@ -1,5 +1,5 @@
 # Linux and Cybersecurity Programme
-Course notes and project files related to Linux and cybersecurity courses from IBM, HackTheBox, Codecademy, and Pluralsight.
+Course notes and project files related to Linux and cybersecurity courses from IBM, TCM, Pluralsight, and Johns Hopkins University.
 
 Programme designed for mastery in real-time intelligence informed, responsively threat modelled, defensive cybersecurity of high-performance and reliable on-prem and cloud architectures of Linux systems.
 ## Beginner
@@ -11,6 +11,7 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 - Pluralsight Cisco Certified Network Associate (Path) ([course link](https://app.pluralsight.com/paths/skill/cisco-ccna-cisco-certified-network-associate-200-301))
 - Pluralsight Automating Networks with Ansible (Path) ([course link](https://www.pluralsight.com/paths/automating-networks-with-ansible))
 - Pluralsight CompTIA CySA+ (Path) ([course link](https://www.pluralsight.com/paths/comptia-cysa-cs0-003))
+- Pluralsight CompTIA Cloud+ (Path) ([course link](https://www.pluralsight.com/paths/comptia-cloud-cvo-004))
 ## Advanced
 - Pluralsight Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting (Path) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342))
 - Pluralsight Red Hat Certified Specialist in Performance Tuning (Path) ([course link](https://www.pluralsight.com/courses/red-hat-certified-specialist-in-performance-tuning-ex442))
