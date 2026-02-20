@@ -10,18 +10,15 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 - Pluralsight Red Hat Certified Engineer (Path) ([course link](https://www.pluralsight.com/paths/rhce-red-hat-certified-engineer-ex294))
 - Pluralsight Cisco Certified Network Associate (Path) ([course link](https://app.pluralsight.com/paths/skill/cisco-ccna-cisco-certified-network-associate-200-301))
 - Pluralsight Automating Networks with Ansible (Path) ([course link](https://www.pluralsight.com/paths/automating-networks-with-ansible))
-- HackTheBox Penetration Tester ([course link](https://academy.hackthebox.com/path/preview/penetration-tester))
+- Pluralsight CompTIA CySA+ (Path) ([course link](https://www.pluralsight.com/paths/comptia-cysa-cs0-003))
 ## Advanced
 - Pluralsight Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting (Path) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342))
 - Pluralsight Red Hat Certified Specialist in Performance Tuning (Path) ([course link](https://www.pluralsight.com/courses/red-hat-certified-specialist-in-performance-tuning-ex442))
 - Pluralsight Red Hat Certified Specialist in Containers (Path) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-containers-ex188))
 - Pluralsight LPIC-3 Exam 303: Security (Path) ([course link](https://www.pluralsight.com/courses/lpic-3-exam-303-security))
 - Red Hat Certified Specialist in Security: Linux ([RH Doc](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html-single/security_hardening/index))
-- Codecademy CompTIA SecurityX (Path) ([course link](https://www.codecademy.com/learn/ext-paths/cas-005-comptia-securityx))
+- Pluralsight Secure Coding (Path) ([course link](https://www.pluralsight.com/paths/secure-coding))
 - Johns Hopkins Intrusion Detection Specialisation ([course link](https://www.coursera.org/specializations/intrusion-detection))
-
-> [!NOTE]
-> Detailed security testing instructions, terminal commands, and code are not included in the published notes as they are often flagged as violating content policies and guidelines.
 
 > [!NOTE]
 > Assessment modules with no new content do not have corresponding notes
