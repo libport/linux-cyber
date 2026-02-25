@@ -12,11 +12,11 @@ Scripts offer advantages over ad hoc commands:
 - reduced typing errors
 - improved operational speed
 ## Exit Codes and Basic Logic
-Linux commands return an exit status. A value of 0 indicates success. Any non-zero value indicates failure. The shell stores the most recent exit code in the variable $?.
+Linux commands return an exit status. A value of 0 indicates success. Any non-zero value indicates failure. The shell stores the most recent exit code in the variable `$?`.
 
 Administrators use exit codes to drive conditional behaviour. Two common operators provide simple logic:
-- && runs the next command only if the previous command succeeds
-- || runs the next command only if the previous command fails
+- `&&` runs the next command only if the previous command succeeds
+- `||` runs the next command only if the previous command fails
 
 These operators allow efficient one line workflows without full if statements.
 ## Looping at the Command Line
@@ -31,37 +31,41 @@ Key points:
 
 Practising these constructs at the command line builds confidence before scripting.
 ### Practical Automation Example
-Creating multiple users illustrates the value of scripting syntax at the command line. A loop can call useradd and passwd for each username in a list. Piping a predefined password to passwd --stdin avoids repeated interactive prompts.
+Creating multiple users illustrates the value of scripting syntax at the command line. A loop can call `useradd` and `passwd` for each username in a list. Piping a predefined password to `passwd --stdin` avoids repeated interactive prompts.
 
-This method significantly reduces administrative time compared with creating each user manually. The same looping logic can also remove users with userdel, demonstrating reversible automation.
+This method significantly reduces administrative time compared with creating each user manually. The same looping logic can also remove users with `userdel`, demonstrating reversible automation.
 ## Working with Command Logic
 Exit codes enable dynamic behaviour. For example:
-- mkdir dir && cd dir changes directory only if creation succeeds
-- cd dir || mkdir dir creates a directory only if navigation fails
+- `mkdir dir && cd dir` changes directory only if creation succeeds
+- `cd dir || mkdir dir` creates a directory only if navigation fails
 
-Administrators can combine operators to handle expected failures. Redirecting errors to /dev/null suppresses unnecessary messages. Grouping commands with braces ensures multiple commands execute together when conditions are met.
+Administrators can combine operators to handle expected failures. Redirecting errors to `/dev/null` suppresses unnecessary messages. Grouping commands with braces ensures multiple commands execute together when conditions are met.
 
 These techniques provide lightweight alternatives to full conditional blocks.
 ## Recording Commands in Scripts
 Although interactive logic is useful, scripts provide reliability and reuse. A script is simply a text file saved with executable permissions. Once tested, it can run repeatedly without retyping commands.
 ## The Shebang
 The first line of a script typically contains the shebang, for example:
+
+```
 #!/bin/bash
+```
+
 This line specifies the interpreter that should execute the script. Although treated as a comment by the shell, the operating system uses it to determine how to run the file.
 
 Without a shebang, a script executes in the user’s current shell, which can lead to inconsistent behaviour. Including the shebang guarantees the correct interpreter regardless of the user environment.
 ## Making Scripts Executable
 Scripts can run in two main ways:
-- invoking the interpreter explicitly, such as bash script.sh
+- invoking the interpreter explicitly, such as `bash script.sh`
 - executing the script directly after setting execute permission
 
-The chmod command controls permissions. Using chmod a+x ensures execute permission applies to all users. Relying on chmod +x may fail to update every permission class depending on the umask.
+The chmod command controls permissions. Using `chmod a+x` ensures execute permission applies to all users. Relying on `chmod +x` may fail to update every permission class depending on the umask.
 ## Using the PATH Environment Variable
-When a user runs a command, the shell searches directories listed in the PATH variable. By default, RHEL 8 includes a personal bin directory inside the user’s home directory.
+When a user runs a command, the shell searches directories listed in the `PATH` variable. By default, RHEL 8 includes a personal bin directory inside the user’s home directory.
 
-Placing scripts in ~/bin allows execution from any location without specifying a path. The which command confirms which executable the shell will run.
+Placing scripts in `~/bin` allows execution from any location without specifying a path. The which command confirms which executable the shell will run.
 
-Understanding PATH behaviour is essential for predictable script execution.
+Understanding `PATH` behaviour is essential for predictable script execution.
 ## Vim Abbreviations
 Vim supports abbreviations through the .vimrc configuration file. Administrators can create shortcuts such as _sh that automatically expand to the Bash shebang.
 
@@ -85,9 +89,9 @@ Important examples include:
 
 These variables enable flexible, reusable scripts that respond to user input.
 ## Working with Positional Parameters
-Replacing hard coded values with positional parameters increases script usefulness. For example, using $1 allows a script to accept a process ID at runtime.
+Replacing hard coded values with positional parameters increases script usefulness. For example, using `$1` allows a script to accept a process ID at runtime.
 
-However, scripts must handle missing arguments. If a required parameter is absent, commands such as ps may fail. A common solution assigns a default value using parameter expansion, ensuring predictable behaviour even when users omit inputs.
+However, scripts must handle missing arguments. If a required parameter is absent, commands such as `ps` may fail. A common solution assigns a default value using parameter expansion, ensuring predictable behaviour even when users omit inputs.
 ## Building a Robust Script
 A reliable script should:
 - validate required arguments
@@ -99,9 +103,9 @@ These practices improve maintainability and user experience.
 ## Automating User Creation
 The course demonstrates a script that creates user accounts efficiently. The workflow includes several safeguards.
 
-First, the script checks whether a username argument was supplied by testing $#. If no username is present, the script prints usage instructions and exits with a non-zero status.
+First, the script checks whether a username argument was supplied by testing `$#`. If no username is present, the script prints usage instructions and exits with a non-zero status.
 
-Second, the script verifies that the user does not already exist. The getent passwd command searches the account database. If the user exists, the script reports the conflict and exits with a different error code.
+Second, the script verifies that the user does not already exist. The `getent passwd` command searches the account database. If the user exists, the script reports the conflict and exits with a different error code.
 
 Third, the script prompts securely for a password using the read command rather than exposing credentials on the command line.
 
