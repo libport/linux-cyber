@@ -4,7 +4,7 @@ Course notes and project files related to Linux and cybersecurity courses from I
 Programme designed for mastery in real-time intelligence informed, responsively threat modelled, defensive cybersecurity of high-performance and reliable on-prem and cloud architectures of Linux systems.
 ## Beginner
 - [IBM Cybersecurity Analyst Professional Certificate](IBM-CySA/README.md) ([course link](https://www.coursera.org/professional-certificates/ibm-cybersecurity-analyst))
-- Pluralsight Red Hat Certified System Administrator (Path) ([course link](https://www.pluralsight.com/paths/rhcsa-red-hat-certified-system-administrator-ex200))
+- [Pluralsight Red Hat Certified System Administrator (Path)](RHCSA/README.md) ([course link](https://www.pluralsight.com/paths/rhcsa-red-hat-certified-system-administrator-ex200))
 - TCM Security OSINT Research Professional ([course link](https://certifications.tcm-sec.com/porp/))
 ## Intermediate
 - Pluralsight Red Hat Certified Engineer (Path) ([course link](https://www.pluralsight.com/paths/rhce-red-hat-certified-engineer-ex294))
