@@ -1,3 +1,6 @@
+# Managing Users and Groups
+> [!NOTE]
+> This file is a practical RHEL administration guide that explains how to manage local users, groups, passwords, account ageing, and delegated privileges safely using core account files and tools such as `useradd`, `usermod`, `passwd`, `chage`, `su`, and `sudo`.
 ## RHEL user, group and privilege management
 RHEL manages local access through four linked areas: user accounts, password policy, group membership and delegated privilege. The system stores identity data in plain text databases, applies account defaults from configuration files, and enforces access rules through ownership, group membership and `sudo`. Effective administration depends on reading those data stores accurately, choosing the right command for each task and avoiding shortcuts that weaken security.
 

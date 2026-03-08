@@ -1,4 +1,6 @@
 # Creating Shell Scripts
+> [!NOTE]
+> This file is a practical Bash scripting guide that shows how to turn tested command-line patterns into reusable scripts using shebangs, permissions, arguments, conditionals, loops, functions, and a staged user-creation example with input validation and secure password handling.
 ## Core Bash principles
 Shell scripting builds on command-line behaviour rather than replacing it. If a command or control structure works in the shell, the same logic can usually move into a script with only minor formatting changes. This makes the command line the fastest place to test ideas before they become part of a reusable tool.
 ### Using loop syntax at the command line

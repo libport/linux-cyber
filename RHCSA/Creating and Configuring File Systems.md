@@ -1,4 +1,6 @@
 # Creating and Configuring File Systems
+> [!NOTE]
+> This file is a practical RHEL storage administration guide that covers creating and managing local file systems and mounts, extending LVM-backed storage, setting collaborative directory permissions, exporting NFS shares, and using VDO and Stratis for optimised and layered storage management.
 ## Core commands and working habits
 RHEL exposes block devices and file systems clearly through `lsblk`. The `lsblk -f` view shows device names, file system types, labels, UUIDs, and mount points in one place. `blkid` complements that view by reading UUIDs and labels directly from devices. These identifiers matter because a stable UUID or label survives device name changes better than `/dev/sdb` or `/dev/sdc`.
 

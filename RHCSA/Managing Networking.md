@@ -1,4 +1,6 @@
 # Managing Networking
+> [!NOTE]
+> This file is a practical RHEL networking administration guide that explains how to inspect and route live network state with `ip`, persist connections and DNS with NetworkManager/`nmcli`, enforce traffic policy with `firewalld` and `nftables`, and harden exposed services with Fail2Ban.
 ## Networking essentials
 Networking administration centers on four linked tasks. Administrators inspect and change live network state with the `ip` command. They persist interface settings with NetworkManager and `nmcli`. They filter traffic with `firewalld`, which manages the underlying `nftables` framework. They add tighter controls with direct `nft` rules or with Fail2Ban for repeated login abuse.
 

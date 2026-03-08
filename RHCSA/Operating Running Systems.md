@@ -1,4 +1,6 @@
 # Operating Running Systems
+> [!NOTE]
+> This file is a practical RHEL/Linux systems administration guide that explains safe shutdown and login lockout procedures, root password recovery with SELinux label repair, service management with systemd, performance monitoring and tuning, and logging, rotation, journaling, and secure log transfer workflows.
 ## Shutdown and restart
 Shared systems need predictable shutdowns. `shutdown` is the preferred command because it schedules the event, warns logged-in users and can block new logins shortly before the system goes down. `reboot` and `poweroff` suit isolated lab work, but they provide no useful warning and give users no time to save work.
 

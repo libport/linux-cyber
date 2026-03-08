@@ -1,4 +1,6 @@
 # Configuring Local Storage
+> [!NOTE]
+> This file is a practical RHEL local storage administration guide that explains how to inspect block devices, use loop-backed disks and partitions, create persistent file systems with stable identifiers, manage LVM for flexible online growth, and configure swap safely.
 ## Linux block storage
 A Linux block storage path starts with hardware or a disk image and ends with a device file in `/dev`. The kernel presents storage through device drivers, and user space works with the resulting block device like any other file. Common examples include SATA, SCSI, USB, SSD, iSCSI, and loop-backed devices.
 

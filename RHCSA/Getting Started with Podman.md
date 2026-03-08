@@ -1,3 +1,6 @@
+# Getting Started with Podman
+> [!NOTE]
+> This file is a practical introduction to Podman that explains container isolation, image and container lifecycle management, networking, storage, systemd integration, custom image building, Compose-based multi-container labs, and the operational habits that keep container workflows predictable.
 ## Podman, container isolation and the host environment
 Containers isolate workloads, but the isolation comes from the kernel rather than the container engine. Podman exposes those Linux primitives in a consistent interface. A process inside one container sees a limited view of the system, its own process tree, its own network interfaces and its own filesystem content. That isolation keeps applications from colliding over package versions, ports, libraries or service state.
 

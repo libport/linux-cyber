@@ -1,4 +1,6 @@
 # Deploying, Configuring and Maintaining Systems
+> [!NOTE]
+> This file is a practical RHEL administration guide that covers software and repository management with YUM/DNF and AppStream modules, time configuration with Chrony, systemd targets and boot behaviour, and job scheduling with `at`, `cron`, and systemd timers.
 ## Software Management in RHEL
 RHEL uses YUM as the familiar front end for software management, but YUM is backed by DNF technology. In practice, administrators can use either `yum` or `dnf` for common package tasks. The important point is consistency rather than command tribalism. Package work is repository-driven, transaction-based, and closely tied to system subscriptions.
 

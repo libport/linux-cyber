@@ -1,4 +1,6 @@
 # Using Essential Tools
+> [!NOTE]
+> This document is a practical introduction to essential RHEL/Linux command-line administration, covering lab setup, SSH access, shell help, redirection, text editing, file navigation and manipulation, `grep`, permissions and ownership, links and identity changes, special permission patterns, and archiving/compression workflows with `tar`, `gzip`, and `bzip2`.
 ## Building a lab environment
 A practical RHEL lab can start in two ways. The first uses a fresh virtual machine and a minimal RHEL installation. The second uses a prebuilt image managed by Vagrant. Both approaches work. The best choice depends on whether the goal is to practise the installer itself or to start using the shell quickly.
 
