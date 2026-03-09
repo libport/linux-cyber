@@ -14,7 +14,7 @@ ip neigh
 ip link
 ```
 
-Short forms matter because they make day to day administration faster without changing meaning. `ip a` shows addresses because `show` is the default action. `ip r` shows the route table. `ip neigh` shows the neighbour cache, which replaces the older ARP display tools for IPv4 and also covers IPv6 neighbour discovery. The command family stays readable even when abbreviated.
+`ip a` shows addresses because `show` is the default action. `ip r` shows the route table. `ip neigh` shows the neighbour cache, which replaces the older ARP display tools for IPv4 and also covers IPv6 neighbour discovery.
 
 Runtime changes apply immediately and disappear when the interface resets or the system restarts, unless another service persists them. A live address can be added like this:
 

@@ -2,9 +2,6 @@
 The RHEL 9 edition of EX294 focuses on the Ansible features that differ from the earlier RHEL 8-based exam. It assumes the broader RHCE syllabus is already in place and concentrates on platform changes, collection-based content, stronger playbook design, and the execution environment used by `ansible-navigator`.
 
 The course is treated as an update path rather than a full beginner course. It therefore concentrates on what changed, why those changes matter in practice, and how the working habits around Ansible should change with them. The recurring themes are explicit configuration, repeatable packaging, predictable recovery from failure, and safe testing inside containerised execution environments.
-
-> [!NOTE]
-> Notes for the official cert guide will supplement these course notes.
 ## Preparing the RHEL 9 lab
 RHEL 9 includes `ansible-core` in the standard repositories. That simplifies a basic lab build because no extra repository is required for an initial install. In practice, `ansible-core` supplies the core engine and builtin content, but it leaves the system on Python 3.9. That combination works for many builtin modules and simple ad hoc checks such as `ansible localhost -m ping`, yet it can limit compatibility with newer collections and plugins.
 
