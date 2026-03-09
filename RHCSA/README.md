@@ -1,6 +1,6 @@
 # Pluralsight Red Hat Certified System Administrator Path
 ## Course Description
-This 30 hour, self-paced program teaches Linux system administration with Red Hat Enterprise Linux. This series which will cover tools and scripting, deploying systems, daily operations and tasks, networking, security, and much more. Additionally, for those interested in certification, these courses cover the topics presented by the Red Hat Certified System Administrator (RHCSA) certification and can help you prepare for the exam.
+This 30 hour, self-paced programme teaches Linux system administration with Red Hat Enterprise Linux. This series which will cover tools and scripting, deploying systems, daily operations and tasks, networking, security, and much more. Additionally, for those interested in certification, these courses cover the topics presented by the Red Hat Certified System Administrator (RHCSA) certification and can help you prepare for the exam.
 ## Module Notes
 - [What's New in RHEL 9](What's%20New%20in%20RHEL%209.md)
 - [Using Essential Tools](Using%20Essential%20Tools.md)

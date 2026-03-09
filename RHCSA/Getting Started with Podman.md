@@ -271,7 +271,7 @@ podman rm -f controller ubuntu
 podman network rm my-net
 ```
 
-Good network design starts simple. One named network for the lab is often enough. Extra networks only help when there is a real need to separate traffic classes. The main value lies in predictability, name resolution and repeatable connectivity between otherwise isolated workloads.
+One named network for the lab is often enough. Extra networks only help when there is a real need to separate traffic classes. The main value lies in predictability, name resolution and repeatable connectivity between otherwise isolated workloads.
 ## Compose workflows and an Ansible lab
 Once several containers, volumes, networks and build contexts exist, manual commands become noisy. Compose solves that by describing the desired state in YAML. Podman supports Compose workflows through `podman compose`, which delegates to an external Compose provider. The YAML still expresses the design clearly and remains the most effective way to stand up and tear down a multi-container lab reliably.
 
@@ -299,11 +299,11 @@ podman compose start
 podman compose down
 ```
 
-This declarative model is the natural culmination of the earlier sections. Images define base systems. Containers define runtime state. Networks define connectivity. Volumes define persistence. Compose pulls those pieces into a repeatable bundle.
+Images define base systems. Containers define runtime state. Networks define connectivity. Volumes define persistence. Compose pulls those pieces into a repeatable bundle.
 
-SELinux remains relevant here. A bind-mounted playbooks directory on a Red Hat compatible host needs a container-readable label. That can be handled with relabel flags in the volume definition or by prelabelling the directory. Either approach is valid as long as the policy remains enforced and the container can read the files it needs.
+A bind-mounted playbooks directory on a Red Hat compatible host needs a container-readable label. That can be handled with relabel flags in the volume definition or by prelabelling the directory. Either approach is valid as long as the policy remains enforced and the container can read the files it needs.
 
-The Ansible demonstration shows why the lab matters. The controller container can hold `ansible.cfg`, an inventory file, variables and playbooks in a mounted directory. From inside the controller, Ansible can connect to the Ubuntu target over the shared network or published SSH port, gather facts, install packages and validate idempotence. The environment stays disposable. If the lab drifts or fails, rebuilding the images and recreating the services returns it to a known state.
+The controller container can hold `ansible.cfg`, an inventory file, variables and playbooks in a mounted directory. From inside the controller, Ansible can connect to the Ubuntu target over the shared network or published SSH port, gather facts, install packages and validate idempotence. The environment stays disposable. If the lab drifts or fails, rebuilding the images and recreating the services returns it to a known state.
 
 A compact sequence inside the controller might include:
 
@@ -316,7 +316,7 @@ ansible-playbook site.yml
 
 The exact package names vary by distribution, but the principle is stable. Containers stand in for managed hosts. The controller applies configuration repeatedly until the target reaches the desired state. Re-running the same playbook should converge cleanly. This demonstrates both Podman's value as a lab substrate and Ansible's value as a configuration tool.
 
-Cleanup matters once the exercise ends. Podman can remove stopped containers, unused images, networks and build cache through pruning commands. A careful cleanup returns the host to a lean state without manual hunting:
+Podman can remove stopped containers, unused images, networks and build cache through pruning commands. A careful cleanup returns the host to a lean state without manual hunting:
 
 ```bash
 podman system prune -a
