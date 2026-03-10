@@ -1,4 +1,7 @@
 # What's New In RHEL 9
+> [!NOTE]
+> RHEL 9 updates EX294 by shifting Ansible practice towards collection-based content, fully qualified names, reusable roles and collections, stronger error-handling and idempotent playbook design, and consistent testing through containerised execution environments with `ansible-navigator`.
+
 The RHEL 9 edition of EX294 focuses on the Ansible features that differ from the earlier RHEL 8-based exam. It assumes the broader RHCE syllabus is already in place and concentrates on platform changes, collection-based content, stronger playbook design, and the execution environment used by `ansible-navigator`.
 
 The course is treated as an update path rather than a full beginner course. It therefore concentrates on what changed, why those changes matter in practice, and how the working habits around Ansible should change with them. The recurring themes are explicit configuration, repeatable packaging, predictable recovery from failure, and safe testing inside containerised execution environments.
