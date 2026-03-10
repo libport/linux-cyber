@@ -1,10 +1,10 @@
 # Pluralsight Red Hat Certified Engineer Path and *Red Hat RHCE 8 (EX294) Cert Guide* Notes
 
-These notes cover material from *Red Hat RHCE 8 (EX294) Cert Guide* by Sander van Vugt and Pluralsight's 16 hour, self-paced video course. The notes cover how to automate Linux administration with the Red Hat Ansible Automation Platform. In addition, these notes cover the objectives and competencies of the Red Hat Certified Engineer (RHCE) exam and can help you prepare.
+These notes cover material from *Red Hat RHCE 8 (EX294) Cert Guide* by Sander van Vugt and Pluralsight's 16 hour, self-paced RHCE video course. The notes cover how to automate Linux administration with the Red Hat Ansible Automation Platform. In addition, these notes cover the objectives and competencies of the Red Hat Certified Engineer (RHCE) exam and can help you prepare.
 ## Red Hat RHCE 8 (EX294) Cert Guide Notes
 ### Part I: Introduction to Ansible
-- [Understanding Configuration Management](Understanding%20Configuration%20Management.md)
-- Installing Ansible
+- [[Understanding Configuration Management]]
+- [Installing Ansible](Installing%20Ansible.md)
 - Setting Up an Ansible Managed Environment
 - Using Ad Hoc Commands
 - Getting Started with Playbooks

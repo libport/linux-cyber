@@ -1,55 +1,24 @@
 # Understanding Configuration Management
-## Ansible project foundation
-Ansible relies on two core project files: an inventory source and an `ansible.cfg` file. The inventory defines managed hosts and groups. A project can store a single static inventory file or point to a directory of inventory sources. Static files can sit beside dynamic sources, provided executable scripts have execute permission. Modern Ansible prefers inventory plugins over legacy scripts, but external scripts still need to answer the `--list` and `--host <hostname>` arguments when used as inventory sources.
+## Ansible and automation
+Ansible is an automation platform for managing systems at scale. It grew beyond traditional configuration management because large estates of servers, virtual machines and cloud instances are too numerous for manual administration. Ad hoc shell scripts can automate isolated tasks, but they scale poorly across mixed environments and do not reliably deliver the same outcome every time.
+## DevOps and infrastructure as code
+Modern software delivery links development and operations across the full application lifecycle. Teams write and review code, build and test it, package and release it, configure the supporting infrastructure and monitor the result in production. Ansible supports this workflow most strongly through infrastructure as code.
 
-The project configuration file stores default behaviour for routine administration. A typical configuration sets the remote user, the default inventory path, SSH host key checking, and privilege escalation. The main escalation settings are `become`, `become_method`, `become_user`, and `become_ask_pass`. These values establish how Ansible reaches a target host and how it gains administrative access when required. More specific settings override broader ones, so playbook settings override `ansible.cfg`.
+Infrastructure as code defines the desired state of systems in machine-readable files and applies that definition consistently. Teams store those files in version control, usually Git, so they can review changes, track history and roll back when needed. This practice strengthens collaboration because developers can inspect infrastructure changes and operators can enforce the required state.
+## Core Ansible components
+Ansible uses a controller node running Linux to manage remote systems listed in an inventory. It usually connects over SSH on Linux, WinRM on Windows and SSH or APIs on network devices. Unlike agent-based tools, Ansible can manage many targets without installing extra software on each node.
 
-```ini
-[defaults]
-remote_user = ansible
-inventory = inventory
-host_key_checking = false
+Playbooks written in YAML define plays and tasks. Modules perform the work on managed nodes, and plugins extend Ansible’s capabilities. Effective playbooks are idempotent and self-contained so repeated runs leave systems in the same intended state.
 
-[privilege_escalation]
-become = true
-become_method = sudo
-become_user = root
-become_ask_pass = false
-```
+Python underpins Ansible and many of its components, which helps integration with custom scripts. Administrators do not need to write Python to use Ansible well.
+## Positioning and working style
+Ansible sits alongside tools such as Puppet, Chef and SaltStack, but it emphasises readable YAML playbooks and agentless operation. That combination can lower the learning curve and simplify deployment.
 
-This layout supports predictable project behaviour. It also removes the need to pass the inventory file on every command line. A project can then confirm the active inventory with `ansible-inventory --list` or inspect group structure with `ansible-inventory --graph`.
-## Ad hoc commands
-Ad hoc commands let administrators run one-off tasks against managed hosts without writing a playbook. They suit quick setup work, validation after a change, and discovery checks. They do not replace playbooks for larger repeatable workflows, but they provide a fast operational tool.
+Good Ansible practice stays simple, readable and declarative. Playbooks should describe the end state rather than spell out every step. Teams should use the most specific module available instead of generic command execution because specialised modules express intent more clearly and produce more predictable results.
+## Common uses
+Ansible is widely used for:
+- configuration management
+- provisioning in virtual and cloud environments
+- automation within continuous delivery pipelines
 
-An ad hoc command follows a simple pattern:
-
-```bash
-ansible <host-pattern> -m <module> -a "<arguments>"
-```
-
-In `ansible all -m user -a "name=lisa"`, `all` selects the target hosts, `user` selects the module, and the argument string defines the desired state. Ansible then compares that desired state with the host's current state and applies change only when needed. That idempotent design helps modules return `SUCCESS` when nothing changes and `CHANGED` when a host required modification.
-
-Modules that express state clearly, such as `user`, `copy`, `package`, and `service`, usually behave predictably. Arbitrary command execution through `command`, `shell`, or `raw` can still run successfully without proving that the target now matches a declared state.
-## Core modules
-The most useful ad hoc work relies on a small set of modules:
-- `command` runs a command directly on the target without a shell. It is safer and more predictable than shell execution, but shell metacharacters such as `|`, `>`, `<`, and `&` do not work.
-- `shell` runs a command through the remote shell. It supports pipes, redirects, and shell expansion, but it increases quoting risk and reduces predictability.
-- `raw` sends a low-level command over the remote connection without requiring Python on the target. It is useful for bootstrapping new hosts and for devices that do not provide a normal Python environment.
-- `copy` transfers a file or writes literal content to a remote path. It works well for small configuration files, banners, or message-of-the-day content.
-- `package` manages software through the target's native package manager and suits mixed Linux estates. On Red Hat-family systems, `dnf` provides a more specific package-management interface.
-- `service` manages service state across several init systems. On hosts that use systemd, `systemd_service` offers more precise control when systemd-specific features matter.
-- `ping` checks manageability rather than network reachability. It verifies that Ansible can connect and run a basic module on the host. It is not ICMP ping.
-
-`command` fails for piped package queries such as `rpm -qa | grep httpd` because no shell interprets the pipe. `shell` handles that syntax, while `package` or `dnf` usually provides a cleaner and more reliable way to inspect or install packages. Service management follows the same principle. `state=started` starts a service now, while `enabled=true` ensures it also starts after reboot.
-## Module discovery and documentation
-`ansible-doc -l` lists installed modules, and command-line filtering helps narrow the result set. Searching for a platform or feature, such as `ansible-doc -l | grep vmware`, quickly exposes relevant modules.
-
-Detailed module help comes from `ansible-doc <module>`. The output usually includes the module name, a short description, maintainership, parameters, related modules, examples, and return values. That structure helps administrators judge whether a module fits the task, which arguments are mandatory, and what output to expect.
-
-For playbook work, `ansible-doc -s <module>` often provides the most efficient view. It shows a concise, playbook-style parameter structure with short descriptions. That format helps when a task needs the right arguments quickly without reading the full manual page.
-
-Running the script directly with `--list` exposes the JSON inventory, and piping that output through a formatter makes group membership easier to inspect. When a project uses several inventory files, placing them in one directory lets Ansible compose a broader inventory without repeating long command lines.
-## Practical operating pattern
-A sound operating pattern starts with inventory and configuration, verifies reachability with `ping`, then uses the most specific stateful module available. Arbitrary shell commands remain useful for edge cases, but they should not be the first choice when a purpose-built module exists.
-
-This approach keeps automation readable, reduces avoidable change, and improves confidence in results. Ansible works best when project settings are explicit, inventory sources are organised, and module choice reflects the target state rather than the operator's preferred shell syntax.
+A command-line deployment uses Ansible Engine. Tower adds web-based management, role-based access control, scheduling, security controls and centralised logging.
