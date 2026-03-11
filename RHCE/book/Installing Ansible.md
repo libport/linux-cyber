@@ -26,4 +26,4 @@ Privilege escalation normally uses `sudo`. Drop-in files under `/etc/sudoers.d` 
 - Configure sudo access for the ansible user on the managed hosts.
 - Test the setup with direct SSH access and a simple Ansible command.
 ## Outcome
-A sound Ansible lab keeps the controller simple, keeps managed hosts agentless, and relies on SSH, Python compatibility, and controlled privilege escalation. The core design still holds, but the platform and packaging choices must reflect current supported releases.
+A straightforward Ansible lab keeps the controller simple, keeps managed hosts agentless, and relies on SSH, Python compatibility, and controlled privilege escalation. The core design still holds, but the platform and packaging choices must reflect current supported releases.
