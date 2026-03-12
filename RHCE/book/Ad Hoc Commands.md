@@ -1,4 +1,4 @@
-# Ad-hoc commands
+# Ad Hoc commands
 Ad hoc commands apply a single task to managed hosts without a playbook. They suit one-off setup, quick validation after a change, and short discovery tasks. A typical command specifies the Ansible executable, a host pattern, a module, and module arguments.
 
 ```bash
@@ -19,7 +19,7 @@ Ansible depends on modules:
 - `ping` tests whether a host is manageable through Ansible, not whether it answers ICMP echo
 
 Use the most specific module available. That choice improves readability, supports idempotent behaviour where possible, and makes results easier to audit. Package installation belongs in `yum` rather than `shell`, and a service that must survive reboot needs both `state=started` and `enabled=yes`.
-## Module discovery and documentation\
+## Module discovery and documentation
 `ansible-doc` is the main on-system reference for modules. It supports three common workflows.
 
 - `ansible-doc -l` lists available modules
