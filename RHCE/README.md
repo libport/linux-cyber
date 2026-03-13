@@ -7,8 +7,8 @@ These notes cover material from *Red Hat RHCE 8 (EX294) Cert Guide* by Sander va
 - [Installing Ansible](book/Installing%20Ansible.md)
 - [Setting Up an Ansible Managed Environment](book/Setting%20Up%20an%20Ansible%20Managed%20Environment.md)
 - [Using Ad Hoc Commands](book/Ad%20Hoc%20Commands.md)
-- Getting Started with Playbooks
-- Working with Variables and Facts
+- [Getting Started with Playbooks](book/Getting%20Started%20with%20Playbooks.md)
+- [Working with Variables and Facts](book/Working%20with%20Variables%20and%20Facts.md)
 ### Part II: Common Ansible Management Tasks
 - Using Task Control
 - Deploying Files
