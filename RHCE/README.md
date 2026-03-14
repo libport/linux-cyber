@@ -10,7 +10,7 @@ These notes cover material from *Red Hat RHCE 8 (EX294) Cert Guide* by Sander va
 - [Getting Started with Playbooks](book/Getting%20Started%20with%20Playbooks.md)
 - [Working with Variables and Facts](book/Working%20with%20Variables%20and%20Facts.md)
 ### Part II: Common Ansible Management Tasks
-- Using Task Control
+- [Using Task Control](book/Using%20Task%20Control.md)
 - Deploying Files
 - Using Ansible Roles
 - Using Ansible in Large Environments
