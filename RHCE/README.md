@@ -11,7 +11,7 @@ These notes cover material from *Red Hat RHCE 8 (EX294) Cert Guide* by Sander va
 - [Working with Variables and Facts](book/Working%20with%20Variables%20and%20Facts.md)
 ### Part II: Common Ansible Management Tasks
 - [Using Task Control](book/Using%20Task%20Control.md)
-- Deploying Files
+- [Deploying Files](book/Deploying%20Files.md)
 - Using Ansible Roles
 - Using Ansible in Large Environments
 - Troubleshooting Ansible
