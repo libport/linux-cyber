@@ -1,30 +1,85 @@
 # Using Ansible Roles
-Ansible roles package reusable automation components into a standard structure. They reduce duplication, keep common tasks consistent across environments, and make playbooks easier to maintain. Roles may come from local development, Ansible Galaxy, or Red Hat's supported RHEL System Roles.
-## Role structure and storage
-A role stores related content in predictable directories. `tasks` holds the task entry point, `handlers` stores handlers, `templates` contains Jinja2 templates, `files` stores static files, `defaults` holds low-precedence variables, `vars` holds higher-precedence variables that usually stay fixed, and `meta` records metadata and dependencies. Optional `tests` content supports validation.
+Ansible roles package related automation into reusable units. They standardise common tasks, reduce duplication, and keep playbooks concise. A role separates tasks, variables, handlers, templates, files, and metadata into a fixed directory layout, so Ansible can load each component automatically.
+## Role structure
+A conventional role includes these directories:
+- `defaults` for low-precedence variables that other variables may override
+- `vars` for variables that should not normally be overridden
+- `tasks` for the main task list
+- `handlers` for triggered actions such as service restarts
+- `files` for static files
+- `templates` for Jinja2 templates
+- `meta` for metadata and role dependencies
+- `tests` for optional inventory and test playbooks
 
-Ansible searches for roles in a defined order. Project roles in `./roles` take precedence, followed by `~/.ansible/roles`, then `/etc/ansible/roles`. Packaged roles in `/usr/share/ansible/roles` usually come from RPM installation and suit vendor-provided content better than custom development.
+Each of these directories commonly contains a `main.yml` entry point.
+## Role locations and execution order
+Roles are commonly stored in a project `roles/` directory, a user role directory such as `~/.ansible/roles`, or a system role path such as `/etc/ansible/roles` or `/usr/share/ansible/roles`. Project roles take precedence over user and system roles.
 
-`ansible-galaxy init` creates the base directory tree for a new role. That scaffold speeds development and encourages a consistent layout.
-## Using roles in playbooks
-A playbook includes roles in a `roles` list. Ansible runs included roles before the playbook's normal `tasks` section. When the playbook must prepare a system first, `pre_tasks` runs before roles. `post_tasks` runs after roles, regular tasks, and any triggered handlers.
+Within a play, Ansible runs `pre_tasks`, then roles, then regular `tasks`, then `post_tasks`. Handlers run at the end of the play unless a playbook flushes them earlier. This order matters when a role depends on preparation work or when follow-up tasks must run after the role.
+## Creating and using a custom role
+`ansible-galaxy init <role_name>` creates the standard role skeleton. A focused role should do one job well and accept input through variables instead of hard-coded values.
 
-Custom roles stay most effective when they stay narrow in scope. A simple message-of-the-day role, for example, can manage `/etc/motd` through a template and a default contact variable, while the playbook overrides that variable for a specific host or environment.
-## Dependencies and file organisation
-Roles may depend on other roles. Dependencies belong in `meta/main.yml`. Ansible runs dependent roles before the role that requires them, and it runs a shared dependency only once even when multiple roles request it. Dependencies may also receive variables and conditional `when` clauses. A web application role may depend on Apache and MariaDB roles rather than duplicate that setup.
+A simple message-of-the-day role can render `/etc/motd` from a template and expose a default contact variable. A playbook can then include the role and override that variable for a specific host.
 
-Large Ansible estates benefit from project directories with a local `ansible.cfg`, inventory, playbooks, `group_vars`, `host_vars`, and a top-level `site.yml`. Roles should live in version control, avoid embedded secrets, and stay generic enough for reuse. Sensitive data belongs in Ansible Vault, not inside the role itself.
-## Ansible Galaxy
-Ansible Galaxy publishes community content, including roles and collections. Collections bundle several content types such as roles, modules, plug-ins, and playbooks. When a playbook only needs reusable task sets, the role often remains the most direct unit to install and include.
+```yaml
+---
+- name: Apply the motd role
+  hosts: ansible2
+  roles:
+    - role: motd
+      system_manager: bob@example.com
+```
 
-Galaxy helps administrators assess community content through tags, download counts, and quality indicators. The `ansible-galaxy` command supports the same workflow from the shell. `ansible-galaxy search` filters by keywords, platform, author, and Galaxy tags. `ansible-galaxy info` shows details for a selected role. `ansible-galaxy install` installs a role, and `ansible-galaxy list` and `ansible-galaxy remove` manage installed roles.
+A well-designed role stays generic, keeps secrets out of the role itself, and stores sensitive data in Ansible Vault. Version control supports review, reuse, and consistent change management.
+## Dependencies and project organisation
+A role can declare dependencies in `meta/main.yml`. Ansible runs dependent roles before the parent role and avoids running the same dependency more than once in a play. Dependencies can also receive variables and conditional logic.
 
-A requirements file simplifies repeatable installation. It lists each role, its source, and an optional version. Roles may come from Galaxy, a Git repository, or another downloadable archive. When a role comes from Git, the source and SCM settings must match that repository.
+```yaml
+dependencies:
+  - role: apache
+    port: 8080
+  - role: mariadb
+    when: environment == 'production'
+```
+
+Larger environments benefit from project directories that keep `ansible.cfg`, inventory, playbooks, and variables together. Common practice uses `site.yml` as the top-level playbook, `group_vars/` and `host_vars/` for host-specific data, and separate inventories for staging and production.
+## Using Ansible Galaxy
+Ansible Galaxy provides community-maintained roles and collections. A collection is a broader distribution format that may include roles, playbooks, modules, and plugins. For most playbooks, the role is the main reusable unit.
+
+Useful Galaxy commands include:
+- `ansible-galaxy search` to find roles
+- `ansible-galaxy info` to inspect a role
+- `ansible-galaxy install` to install a role
+- `ansible-galaxy list` to list installed roles
+- `ansible-galaxy remove` to remove a role
+
+Search results become more useful when filtered by platform, author, or Galaxy tags. Download counts, quality signals, and tags help distinguish mature roles from less established ones.
+
+A requirements file supports repeatable installs and version pinning.
+
+```yaml
+- src: geerlingguy.nginx
+  version: "2.7.0"
+```
+
+Installing from a requirements file uses `ansible-galaxy install -r <file>`. Roles may also come from Git repositories or tarballs when the source URL and, for Git, `scm: git` are specified.
 ## RHEL System Roles
-RHEL System Roles provide supported automation for common operating system configuration tasks such as networking, storage, SELinux, time synchronisation, Postfix, and kdump. They give administrators a consistent interface across supported RHEL releases and install into the standard Ansible role path with the `rhel-system-roles` package. Their documentation and example playbooks also install locally.
+RHEL System Roles provide supported roles for common operating system configuration tasks such as networking, storage, SELinux, time synchronisation, Postfix, and kdump. They install into the standard Ansible role path and include local documentation and sample playbooks.
 
-These roles rely on variables rather than long custom task lists. The SELinux role uses variables for policy, mode, booleans, file contexts, restore paths, ports, and login mappings. When a change requires a reboot, the playbook can wrap the role in a block, reboot the managed host, wait for reconnection, and apply the role again.
+The SELinux role uses variables to describe the desired state, including policy, mode, booleans, file contexts, restore paths, ports, and login mappings. File-context changes usually require both `selinux_fcontexts` and `selinux_restore_dirs`.
 
-The TimeSync role configures NTP sources through `timesync_ntp_servers` and can work alongside a separate timezone task. The role handles the underlying implementation for the relevant RHEL version, which reduces version-specific branching in playbooks.
-## Practical outcome
-Roles turn repeated automation into maintainable building blocks. Custom roles standardise local practice, Galaxy roles accelerate common deployments, and RHEL System Roles provide supported operating system management. Together they help Ansible environments stay consistent, reusable, and easier to scale.
+```yaml
+vars:
+  selinux_policy: targeted
+  selinux_state: enforcing
+  selinux_fcontexts:
+    - { target: '/web(/.*)?', setype: 'httpd_sys_content_t', ftype: 'd' }
+  selinux_restore_dirs:
+    - /web
+```
+
+Some SELinux changes require a reboot. A robust playbook handles that case explicitly, reboots the managed host, waits for reconnection, and reapplies the role.
+
+The TimeSync role configures time sources through `timesync_ntp_servers`. It abstracts underlying implementation differences so the same role can manage supported RHEL systems consistently. Time zone configuration remains a separate task in the playbook.
+## Practical guidance
+Effective roles remain small, composable, documented, and broadly reusable. They avoid embedding secrets, prefer clear variable names, and expose only the configuration surface that administrators are expected to change. That approach keeps playbooks shorter, promotes consistent system state, and makes Ansible automation easier to test and maintain.
