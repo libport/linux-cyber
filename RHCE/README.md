@@ -12,8 +12,8 @@ These notes cover material from *Red Hat RHCE 8 (EX294) Cert Guide* by Sander va
 ### Part II: Common Ansible Management Tasks
 - [Using Task Control](book/Using%20Task%20Control.md)
 - [Deploying Files](book/Deploying%20Files.md)
-- Using Ansible Roles
-- Using Ansible in Large Environments
+- [Using Ansible Roles](book/Using%20Ansible%20Roles.md)
+- [Using Ansible in Large Environments](book/Using%20Ansible%20in%20Large%20Environments.md)
 - Troubleshooting Ansible
 ### Part III: Managing Systems with Ansible
 - Managing Software with Ansible
