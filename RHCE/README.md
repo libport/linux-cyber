@@ -14,7 +14,7 @@ These notes cover material from *Red Hat RHCE 8 (EX294) Cert Guide* by Sander va
 - [Deploying Files](book/Deploying%20Files.md)
 - [Using Ansible Roles](book/Using%20Ansible%20Roles.md)
 - [Using Ansible in Large Environments](book/Using%20Ansible%20in%20Large%20Environments.md)
-- Troubleshooting Ansible
+- [Troubleshooting Ansible](book/Troubleshooting%20Ansible.md)
 ### Part III: Managing Systems with Ansible
 - Managing Software with Ansible
 - Managing Users
