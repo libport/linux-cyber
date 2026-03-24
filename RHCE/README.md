@@ -18,8 +18,8 @@ These notes cover material from *Red Hat RHCE 8 (EX294) Cert Guide* by Sander va
 ### Part III: Managing Systems with Ansible
 - [Managing Software with Ansible](book/Managing%20Software%20with%20Ansible.md)
 - [Managing Users](book/Managing%20Users.md)
-- Managing Services and the Boot Process
-- Managing Storage
+- [Managing Services and the Boot Process](book/Managing%20Services%20and%20the%20Boot%20Process.md)
+- [Managing Storage](book/Managing%20Storage.md)
 ## Pluralsight Red Hat Certified Engineer Path Notes
 - [What's New In RHEL 9](videos/What's%20New%20In%20RHEL%209.md)
 - Linux Administration with Ansible: Getting Started with Ansible Automation
