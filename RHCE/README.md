@@ -22,7 +22,7 @@ These notes cover material from *Red Hat RHCE 8 (EX294) Cert Guide* by Sander va
 - [Managing Storage](book/Managing%20Storage.md)
 ## Pluralsight Red Hat Certified Engineer Path Notes
 - [What's New In RHEL 9](videos/What's%20New%20In%20RHEL%209.md)
-- Linux Administration with Ansible: Getting Started with Ansible Automation
+- [Linux Administration with Ansible: Getting Started with Ansible Automation](videos/Linux%20Administration%20with%20Ansible%20Getting%20Started%20with%20Ansible%20Automation)
 - Linux Administration with Ansible: Advanced Ansible Automation
 - Linux Administration with Ansible: Writing Ansible Playbooks
 ## Further Reading
