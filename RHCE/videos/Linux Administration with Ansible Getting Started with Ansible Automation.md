@@ -1,4 +1,8 @@
 # Linux Administration with Ansible: Getting Started with Ansible Automation
+
+> [!NOTE]
+> These notes introduce Ansible as a lightweight, SSH-based framework for automating Linux administration across mixed distributions, using a small lab to explain controller setup, inventory and variable management, SSH bootstrapping, core commands and modules, and the shift from ad-hoc tasks to idempotent, repeatable playbooks.
+
 Ansible provides a lightweight way to automate Linux administration from a controller node. It relies on SSH, Python on the managed host, and a human-readable model that separates configuration, inventory, and execution. A practical starter workflow spans a small multi-distribution lab, Ansible installation, the main command-line tools, inventory design, and ad-hoc automation across Red Hat Enterprise Linux, CentOS Stream, and Ubuntu.
 
 The material assumes basic Linux administration skills and routine command-line work. An administrator does not need a large estate to benefit from Ansible. The value appears as soon as repeated work begins to spread across multiple hosts, especially when those hosts do not all use the same package manager, repository layout, service names, or configuration file locations. Ansible reduces that variation to a smaller set of modules, variables, and inventory data.

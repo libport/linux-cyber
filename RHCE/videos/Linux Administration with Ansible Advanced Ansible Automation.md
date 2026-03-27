@@ -1,4 +1,8 @@
 # Linux Administration with Ansible: Advanced Ansible Automation
+
+> [!NOTE]
+> These notes explain that advanced Ansible automation becomes safer, more maintainable, and more reusable when it is built around disciplined use of Jinja templating, roles, collections, Vault, execution controls, and structured network resource modules.
+
 Advanced Ansible automation relies on a small set of disciplined practices. Jinja templates render configuration from data instead of copying static files. Roles split large playbooks into small, reusable units. Collections package modules, plugins, and roles in a form that can move independently of `ansible-core`. Vault protects secrets without removing them from the repository that uses them. Execution controls such as `forks`, `serial`, `strategy`, and `throttle` keep large runs predictable. Network resource modules apply the same design principle to routers and switches by treating configuration as structured data instead of long command strings.
 
 The result is not just faster automation. It is safer change, lower drift, clearer review, and easier reuse across environments.
