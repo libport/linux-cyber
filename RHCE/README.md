@@ -24,7 +24,7 @@ These notes cover material from *Red Hat RHCE 8 (EX294) Cert Guide* by Sander va
 - [What's New In RHEL 9](videos/What's%20New%20In%20RHEL%209.md)
 - [Linux Administration with Ansible: Getting Started with Ansible Automation](videos/Linux%20Administration%20with%20Ansible%20Getting%20Started%20with%20Ansible%20Automation.md)
 - [Linux Administration with Ansible: Advanced Ansible Automation](/RHCE/videos/Linux%20Administration%20with%20Ansible%20Advanced%20Ansible%20Automation.md)
-- Linux Administration with Ansible: Writing Ansible Playbooks
+- [Linux Administration with Ansible: Writing Ansible Playbooks](/RHCE/videos/Linux%20Administration%20with%20Ansible%20Writing%20Ansible%20Playbooks.md)
 ## Further Reading
 Notes are supplemented with information from third-party sources, including:
 - [Red Hat RHCE 8 (EX294) Cert Guide](https://www.oreilly.com/library/view/red-hat-rhce/9780136872481/pref06.xhtml) by Sander van Vugt
