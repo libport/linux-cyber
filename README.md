@@ -13,7 +13,7 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 - Pluralsight CompTIA CySA+ Path ([course link](https://www.pluralsight.com/paths/comptia-cysa-cs0-003))
 - Pluralsight CompTIA Cloud+ Path ([course link](https://www.pluralsight.com/paths/comptia-cloud-cvo-004))
 ## Advanced
-- Pluralsight Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting Path ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342))
+- [Pluralsight Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting Path](RHCSLDT/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342))
 - Pluralsight Red Hat Certified Specialist in Performance Tuning Path ([course link](https://www.pluralsight.com/courses/red-hat-certified-specialist-in-performance-tuning-ex442))
 - Pluralsight Red Hat Certified Specialist in Containers Path ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-containers-ex188))
 - Pluralsight LPIC-3 Exam 303: Security Path ([course link](https://www.pluralsight.com/courses/lpic-3-exam-303-security))
