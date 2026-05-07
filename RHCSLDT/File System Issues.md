@@ -1,73 +1,43 @@
 # File System Issues
-## File system recovery
-File system repair must protect data. The administrator should identify the device, confirm whether it is mounted, and avoid writing to a damaged file system unless the repair path requires it. `lsblk -f`, `blkid`, `mount`, and `/etc/fstab` help identify file systems, devices, UUIDs, labels, and mount points.
+## Diagnose and troubleshoot file system issues
+Red Hat Enterprise Linux 8 administrators diagnose file system issues by separating storage faults from configuration faults. The work commonly involves XFS and ext4 repair, Logical Volume Manager metadata recovery, Linux Unified Key Setup recovery and iSCSI target or initiator faults. Administrators should attach the required training disks before building the lab, then confirm device names with `lsblk` rather than assuming a fixed NVMe name. Cloud platforms can assign different names across servers, so every destructive command should target a verified device.
+### Prepare storage safely
+A useful lab separates the disk layout from the file system test. `fdisk` creates partitions, not file systems. `mkfs.xfs` and `mkfs.ext4` create the file systems on those partitions. Mount points such as `/store1` and `/store2` allow each file system to be tested independently. Sample files should be written before damage is introduced, because the administrator needs visible evidence that recovery preserved usable data.
 
-XFS and ext file systems use different repair tools. For XFS, `xfs_repair -n DEVICE` performs a no-write check. `xfs_repair DEVICE` repairs the file system. If the log is corrupt and prevents repair, `xfs_repair -L DEVICE` clears the log, which may lose recent metadata changes. Use `-L` only when necessary.
+Deliberate corruption can help test repair tools, but it must stay inside disposable lab storage. Commands such as `dd` and `mkswap` can overwrite metadata or replace the recognised file system signature. They should never run against production devices, boot volumes or unverified paths.
+### Repair XFS and ext4 file systems
+A damaged file system should be unmounted before repair. Administrators should capture useful evidence first where the situation allows, because repair tools change metadata and can remove the original fault pattern.
 
-Ext file systems use `e2fsck`. `e2fsck -n DEVICE` checks without writing. `e2fsck -p DEVICE` automatically repairs safe problems. `dumpe2fs DEVICE` shows detailed metadata, including superblock locations. Alternate superblocks can rescue an ext file system when the primary superblock is damaged.
+XFS repair uses `xfs_repair`. The `-n` option performs a no-modify check, which helps assess damage before changing metadata. A normal repair can then run without `-n`. The `-L` option clears the log and should remain a last resort, because it can discard pending metadata changes. XFS normally replays a cleanable log at mount time, so administrators should not use `-L` merely because a repair command reports a dirty log.
 
-The safest pattern is:
-- Identify the correct device.
-- Unmount the file system.
-- Run a non-writing check where possible.
-- Repair with the tool that matches the file system type.
-- Mount the file system and verify the expected data.
-- Correct `/etc/fstab` if the boot-time mount configuration caused the failure.
+ext2, ext3 and ext4 repair uses `e2fsck`. The `-n` option opens the file system read-only and makes no repairs. The `-p` option performs safe automatic repairs. Without automatic repair, `e2fsck` prompts for confirmation as it checks inodes, directories, connectivity, reference counts and group summaries. After repair, the administrator should remount the file system and verify expected files, including the normal ext `lost+found` directory.
 
-Storage diagnosis should follow the stack from bottom to top. First confirm the kernel sees the disk. Next confirm partitions or block mappings. Then confirm LVM, encryption, or iSCSI layers. After that, inspect the file system. Finally check mount configuration and service paths. Repairing the top layer before proving the lower layers can hide the real fault.
+ext file systems store recovery metadata in superblocks. `dumpe2fs` shows the primary superblock and backup superblocks. These values are block locations, not inode numbers. If the primary superblock fails, `e2fsck -b <backup-superblock> <device>` can repair the file system from a chosen backup. The chosen backup should come from the same file system, not from another partition with a similar layout.
+### Restore LVM metadata
+Logical Volume Manager storage uses physical volumes, volume groups and logical volumes. Administrators can create a physical volume with `pvcreate`, create a volume group with `vgcreate`, create a logical volume with `lvcreate`, then create a file system on the logical volume. Mounting through `/etc/fstab` should use a stable identifier, such as the UUID reported by `blkid`, rather than a device path that might change.
 
-The `/etc/fstab` file can stop a system during boot when it references a missing device, a wrong UUID, a wrong file system type, or invalid mount options. Rescue mode or emergency mode can repair the file. The administrator should prefer UUIDs or stable mapper paths where suitable and should test with `mount -a` before rebooting. A successful manual mount does not always prove that the boot-time fstab entry is correct because credentials, network ordering, and device activation may differ during boot.
+LVM keeps metadata backups and archives under `/etc/lvm/backup` and `/etc/lvm/archive`. The `archive = 1` setting in `/etc/lvm/lvm.conf` enables archive creation. RHEL commonly enables this setting by default, but administrators should verify it before relying on archives. Each archive records the volume group layout at a point in time, so it can reverse harmful metadata changes when the underlying data still exists.
 
-For file system repair, the device must be correct. Running a repair tool on the wrong logical volume or raw disk can damage data. `lsblk -f` and labels reduce the risk. When LVM or encryption creates mapper devices, the repair tool should target the file system-bearing mapped device, not the encrypted raw device or the physical disk underneath.
-## LVM recovery
-Logical Volume Manager faults add another layer between disks and file systems. The administrator must confirm physical volumes, volume groups, logical volumes, activation state, and file system health.
+Accidental resizing can make a logical volume's file system inaccessible even when the volume still exists. `vgcfgrestore -l <volume-group>` lists available archives and describes the operation that created each archive. The administrator should choose an archive from before the damaging command, then restore it with `vgcfgrestore -f <archive-file> <volume-group>`. After restoring metadata, the logical volume may need to be deactivated and reactivated with `lvchange -an` and `lvchange -ay` before mounting.
 
-Useful LVM commands include:
-- `pvs`, `vgs`, and `lvs` for concise status.
-- `pvdisplay`, `vgdisplay`, and `lvdisplay` for detail.
-- `pvscan`, `vgscan`, and `lvscan` for discovery.
-- `vgchange -ay` to activate volume groups.
-- `lvchange -ay` to activate logical volumes.
-- `vgcfgbackup` to back up metadata.
-- `vgcfgrestore` to restore metadata.
+LVM restoration fixes volume group metadata. It does not replace a file system backup, and it does not guarantee recovery after data blocks have been overwritten. Entries added to `/etc/fstab` for lab storage should be removed when the lab ends. A stale boot-time mount can stop the system from starting cleanly after the underlying storage changes.
+### Recover LUKS encrypted volumes
+Linux Unified Key Setup encrypts block devices through `cryptsetup`. A common lab path creates an LVM logical volume, formats it as LUKS with `cryptsetup luksFormat`, opens it with `cryptsetup luksOpen`, creates a file system on the mapped device and mounts that mapped device. The file system belongs on the unlocked mapping, such as `/dev/mapper/luks`, not on the still-encrypted backing volume.
 
-Broken LVM configurations often involve missing devices, inactive volume groups, renamed logical volumes, bad `/etc/fstab` entries, or damaged metadata. Once the volume becomes visible under `/dev/mapper` or `/dev/VG/LV`, repair shifts back to the file system layer.
-## Encrypted file systems
-Linux Unified Key Setup, or LUKS, protects block devices with encryption. The `cryptsetup` command manages LUKS headers and mapped devices. It does not offer the same tab completion for subcommands as many other tools, so the administrator should know the main verbs and where to find documentation.
+Persistent encrypted mounts require two configuration layers. `/etc/fstab` mounts the unlocked mapped device. `/etc/crypttab` defines how the system unlocks the encrypted source. A typical entry names the mapping, identifies the encrypted backing device and supplies a key file path. Administrators should create the key file before rebooting, restrict its permissions and add it with `cryptsetup luksAddKey`. The passphrase requested during `luksAddKey` authorises the change to the LUKS device.
 
-Key operations include:
-- `cryptsetup luksFormat DEVICE` to initialise a LUKS container.
-- `cryptsetup open DEVICE NAME` to create a decrypted mapping under `/dev/mapper/NAME`.
-- `cryptsetup close NAME` to close a mapping.
-- `cryptsetup luksDump DEVICE` to inspect header information.
-- `cryptsetup luksAddKey DEVICE` to add a passphrase or key.
-- `cryptsetup luksRemoveKey DEVICE` to remove a passphrase or key.
+`cryptsetup luksDump` shows LUKS metadata and keyslots. Before changing keys, administrators should back up the LUKS header and keyslot area with `cryptsetup luksHeaderBackup --header-backup-file <file> <device>`. If a keyslot or header change removes needed access, `cryptsetup luksHeaderRestore --header-backup-file <file> <device>` restores the saved header. Restoring a header replaces the current keyslot area, so only the keys contained in the backup work afterwards.
 
-Data recovery from encrypted volumes depends on an intact LUKS header and a valid key. If the system should mount the volume at boot, `/etc/crypttab` must map the encrypted device and `/etc/fstab` must mount the resulting mapper device. A failure in either file can stop boot or leave data inaccessible.
+After a LUKS fault, recovery should close the unlocked mapping with `cryptsetup luksClose <mapping-name>`, refresh any underlying logical volume if needed, restore the header and test access with the intended key file. The administrator should mount the recovered mapping and confirm that expected files remain available. Lab entries in `/etc/fstab` and `/etc/crypttab` should be cleaned up before the storage is reused.
+### Troubleshoot iSCSI
+iSCSI troubleshooting starts by separating target, network and initiator faults. A RHEL target uses `targetcli` to create backstores, targets, target portal groups, LUNs and access control lists. The target service should run, and the target should listen on TCP port 3260 unless the configuration uses another port. Firewalls, routing and private addressing should also allow the initiator to reach that port.
 
-The administrator should open the LUKS device, inspect the file system on the mapped device, mount it, verify data, and then repair boot-time configuration. Repairing the encrypted layer and repairing the file system layer are separate tasks.
+The initiator uses `iscsi-initiator-utils`, which provides `iscsiadm`. Its initiator name appears in `/etc/iscsi/initiatorname.iscsi`. The target must allow that initiator IQN through an ACL unless the environment deliberately uses another access model. A mismatch between the target ACL and the initiator IQN prevents login even when basic network connectivity works.
 
-LVM metadata backups can save a broken volume group after accidental changes. Before restoring metadata, the administrator should inspect available backups and confirm the correct timestamp. Restoring the wrong metadata version may remove recent logical volume changes. After metadata repair, activate the volume group and verify logical volumes before mounting any file systems.
+Connectivity checks should confirm that the initiator can reach the target on port 3260. Discovery uses `iscsiadm -m discovery -t sendtargets -p <target-address>`. Login uses `iscsiadm -m node -T <target-iqn> -l`. Active sessions appear with `iscsiadm -m session`. The target IQN and initiator IQN serve different purposes, so they should not be copied into the wrong command or ACL.
 
-Encrypted storage adds another critical rule: protect the LUKS header. A damaged header can make data unrecoverable even when the encrypted payload still exists. Backups of LUKS headers matter in real environments. In the exam, the candidate should avoid running format or header-changing commands unless the objective clearly requires them. `luksDump` is safe for inspection. `luksFormat` is destructive.
+Authentication faults often arise after target Challenge-Handshake Authentication Protocol settings change. On the target, `get attribute` shows whether authentication is enabled, and `get auth` shows configured user names and passwords. On the initiator, `/etc/iscsi/iscsid.conf` defines node session authentication settings, including `node.session.auth.authmethod`, `node.session.auth.username` and `node.session.auth.password`.
 
-Boot-time encrypted volumes require the correct relationship between `/etc/crypttab` and `/etc/fstab`. Crypttab opens the encrypted device and names the mapper device. Fstab mounts the decrypted mapper device. If the mapper name changes in one file and not the other, boot-time mounting fails even though manual opening and mounting may work.
-## iSCSI diagnosis
-iSCSI presents remote block storage over the network. Diagnosis must cover both the target and the initiator. The target exports storage, while the initiator discovers and logs into that storage.
-
-A basic target configuration uses targetcli. The administrator creates a backstore, creates an iSCSI qualified name, maps the backstore as a LUN, configures access control, and opens TCP port 3260. The initiator uses `iscsiadm` to discover and log in.
-
-Useful initiator commands include:
-- `systemctl enable --now iscsid` to start the initiator service.
-- `iscsiadm -m discovery -t sendtargets -p TARGET_IP` to discover targets.
-- `iscsiadm -m node -T IQN -p TARGET_IP -l` to log in.
-- `iscsiadm -m session` to list active sessions.
-- `iscsiadm -m node -T IQN -p TARGET_IP -u` to log out.
-
-Troubleshooting should prove each layer in order. Confirm the network path with `ping`, `telnet TARGET_IP 3260`, `nc`, firewall rules, and listening sockets. Confirm the target exports the correct IQN and LUN. Confirm the initiator used the correct IQN. After login, confirm the new block device with `lsblk`. Then create or repair the file system, LVM layer, or mount configuration as needed.
-
-iSCSI faults can look like local disk faults after login succeeds. A remote LUN may appear in `lsblk`, but the file system, LVM, or mount configuration can still be broken. Conversely, a perfect local file system repair cannot help if the initiator never logs into the target. The administrator should separate target export, network access, session login, block-device appearance, and file system use.
-
-Persistence requires more than a successful manual login. The initiator database must contain the node record, the service must start at boot, and any dependent mounts must wait for the network and iSCSI session. Where fstab mounts iSCSI-backed storage, `_netdev` or appropriate systemd ordering prevents the system from treating the device like a local disk during early boot.
-
-Target-side access control must match the initiator. A wrong initiator IQN in the access control list can allow discovery but prevent login, or block the initiator from seeing the expected LUN. Firewalld and SELinux can also affect target access. Start with the service state and listening port on the target, then test from the initiator.
+Changing `iscsid.conf` does not automatically repair an existing node database entry. If a login still fails after correcting CHAP settings, the administrator should log out, delete the stale node record with `iscsiadm -m node -o delete`, rediscover the target and log in again. Debug output, such as `iscsiadm -d 8`, helps confirm whether the initiator still attempts login with `authmethod = None` or with outdated credentials.
+### Core recovery habits
+Administrators should verify device names, unmount before repair, preserve evidence where practical and choose the least destructive repair first. File system tools, LVM metadata archives, LUKS header backups and iSCSI node records solve different problems. Correct diagnosis depends on matching the symptom to the right layer of the storage stack.

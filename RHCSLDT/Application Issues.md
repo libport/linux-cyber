@@ -1,40 +1,98 @@
 # Application Issues
-## Application library and memory faults
-Third-party and first-party programs depend on shared libraries. When a binary fails to start, the administrator should check whether required libraries exist, whether the dynamic linker can find them, and whether a package must be installed or restored.
+## Diagnosing Linux application issues
+Linux administrators diagnose application failures by checking shared libraries, memory behaviour, trace output and SELinux policy. The work usually separates system faults from application faults. Administrators can repair missing packages, incorrect labels, port mappings and SELinux booleans. They usually report application memory leaks or code defects to the application owner with clear diagnostic evidence.
+### Shared library dependencies
+Applications often reuse shared libraries instead of carrying common functions in each binary. The runtime linker-loader, such as `ld-linux.so`, loads the required shared objects into a process when the program starts. `ldconfig` maintains the runtime linker cache, and `ldconfig -p` prints the candidate libraries stored in that cache. This cache is not a list of libraries currently running in memory.
 
-`ldconfig -p` lists libraries in the linker cache. `ldd /path/to/program` lists shared library dependencies for a binary and reports missing libraries. A missing library may require installing the package that owns it, refreshing the linker cache with `ldconfig`, correcting a library path, or replacing a damaged file.
+Administrators inspect a trusted binary with `ldd` to print its shared object dependency tree:
 
-Memory leaks require observation over time. Valgrind provides a direct way to analyse memory use for a process during a test run. `valgrind PROGRAM` runs the default memcheck tool. `valgrind --tool=memcheck PROGRAM` makes the tool explicit. `valgrind --leak-check=full PROGRAM` performs fuller leak analysis. `valgrind --log-file=FILE PROGRAM` writes results to a file. Valgrind slows execution, so it suits reproduction and analysis more than normal production operation.
+```bash
+ldd $(which httpd)
+```
 
-Tracing tools reveal what an application does before it fails. `ltrace` traces library calls. `strace` traces system calls. Both support similar workflows: `-o FILE` writes output, `-p PID` attaches to a running process, and `-e EXPRESSION` filters events. Use `ltrace` when library interaction seems relevant, and use `strace` when file access, permissions, signals, sockets, or kernel calls seem relevant.
+Missing libraries appear without a resolved path. After identifying the library name, `dnf whatprovides` can find the owning package. Quoting the wildcard prevents the shell from expanding it too early:
 
-Application debugging should start with the smallest reproducible command. If a program fails only under systemd, compare the systemd environment, working directory, user, SELinux context, limits, and permissions with a manual run. If it fails manually as the same user, tracing and library checks become simpler.
+```bash
+dnf whatprovides '*/liblzma.so*'
+dnf reinstall xz-libs
+```
 
-Shared library errors may also come from architecture mismatch or wrong library versions. A binary built for one architecture or linked against a missing soname will not run merely because a similarly named package exists. `file PROGRAM` identifies the binary type. `rpm -qf LIBRARY` identifies the owning package for installed libraries. `dnf provides '*/LIBRARY'` locates a package for a missing library path or soname.
+`ldd` must not be run against untrusted executables because some implementations can execute code while resolving dependency information. Safer static inspection can start with `objdump -p /path/to/program | grep NEEDED`, although that shows only direct dependencies.
+### Memory leak reports
+Valgrind provides a suite of debugging and profiling tools. Its default tool, Memcheck, detects memory errors and leaks in native executables. A basic run identifies leaks when the program exits:
 
-Tracing output can be large. Filters make it useful. For file and permission problems, `strace -e trace=file PROGRAM` can reveal missing paths and denied access. For network problems, socket-related traces may show connection attempts. For library behaviour, `ltrace` can show repeated calls or failed library functions. The trace should answer the hypothesis rather than collect every possible event.
-## SELinux context and policy faults
-SELinux enforces access through labels, policy, booleans, and port mappings. A service can have correct Unix permissions and still fail when SELinux blocks access. Diagnosis should prove SELinux involvement before changing policy.
+```bash
+valgrind ./memleak_test_app
+```
 
-The `ls -Z` option shows SELinux context. A context contains user, role, type, and level. The type field drives many access decisions. For example, Apache configuration files, log files, and web content use different expected types. Copying or moving files into service paths can leave them with unsuitable labels.
+More useful reports add a full leak check and include all leak kinds:
 
-Useful SELinux discovery commands include:
-- `semanage login -l` to list SELinux user mappings.
-- `semanage user -l` to list SELinux users and roles.
-- `semanage fcontext -l` to list file context rules.
-- `semanage port -l` to list labelled ports.
-- `seinfo -u`, `seinfo -r`, `seinfo -t`, and `seinfo -p` for policy information where setools is installed.
+```bash
+valgrind --leak-check=full --show-leak-kinds=all ./memleak_test_app
+```
 
-The `chcon` command changes a label immediately, but it does not change the persistent labelling rule. It suits tests. The `restorecon -Rv PATH` command restores labels from policy and persistent file context rules. Persistent custom file labels use `semanage fcontext -a -t TYPE 'PATH_REGEX'` followed by `restorecon`.
+Memcheck classifies leak results by severity. `definitely lost` and `possibly lost` need the closest attention. `still reachable` usually means the program retained allocated memory until exit, which may or may not indicate a real defect. Administrators who need to send evidence to developers can write the output to a file:
 
-SELinux troubleshooting starts with proof. Temporarily setting permissive mode with `setenforce 0` and repeating the failing action can show whether SELinux caused the block. Restore enforcing mode with `setenforce 1` after the test. Do not leave the system permissive as a fix.
+```bash
+valgrind --leak-check=full --show-leak-kinds=all --log-file=memcheck ./memleak_test_app
+```
+### Runtime tracing
+`ltrace` and `strace` help diagnose applications when source code is unavailable. `ltrace` runs a command and records the dynamic library calls and signals associated with that process. It can also print system calls. `strace` focuses on system calls and signals at the user-kernel boundary, so it often produces more detail than `ltrace`.
 
-SELinux denial evidence appears in `/var/log/audit/audit.log` when auditd is active. `ausearch -m avc -ts recent` finds recent Access Vector Cache denials. `sealert -a /var/log/audit/audit.log` gives interpreted messages and often suggests commands. Apply suggestions only after confirming they match the service and path.
+Both tools support practical filters:
+- `-o file` writes trace output to a file.
+- `-p pid` attaches to an existing process.
+- `-e expression` limits the trace to selected calls.
 
-SELinux booleans enable supported policy behaviour without custom policy. `getsebool -a` lists booleans. `getsebool httpd_enable_homedirs` checks one boolean. `setsebool httpd_enable_homedirs on` changes it at runtime. `setsebool -P httpd_enable_homedirs on` makes it persistent. Booleans are the right fix when the policy already supports the behaviour, such as allowing httpd to serve content from home directories.
+For example, tracing `cat` against a test file can show calls that open, read and close the file. Filtering with `-e read` reduces noise:
 
-A common SELinux pattern involves web content outside the default document root. The service may need the correct file type, suitable Unix permissions, and an enabled boolean. Changing only one layer can leave the service broken. For Apache serving content from a home directory, the administrator must consider the content label, directory execute permissions, and the `httpd_enable_homedirs` boolean.
+```bash
+ltrace -e read $(which cat) empty
+strace -e read $(which cat) empty
+```
 
-Another common pattern involves ports. A service configured to listen on a non-standard port may fail under SELinux even when the firewall allows the port. `semanage port -l` shows which types own which ports. If policy supports the service on that port type, `semanage port -a -t TYPE -p tcp PORT` adds a persistent mapping. If the port already exists under another type, use `-m` to modify it only when that change is correct.
+Administrators often start with `ltrace` when library interactions seem likely, then move to `strace` when the failure involves files, permissions, sockets, signals or other kernel-facing operations. `strace` is a system-call trace, not a stack trace.
+### SELinux context and policy checks
+SELinux enforces mandatory access control through labels and policy. File and process labels contain four parts: SELinux user, role, type and level. In `system_u:object_r:httpd_log_t:s0`, the type `httpd_log_t` usually drives the access decision, while `s0` represents the MLS or MCS level in the targeted policy.
 
-SELinux denials can include suggestions that are technically valid but conceptually too broad. Generating a custom policy from every denial may grant more access than needed. Prefer the smallest supported fix: restore labels, set a documented boolean, or add a proper file context or port mapping. Custom policy belongs after those options fail and after the denial clearly matches the intended behaviour.
+Administrators view labels with `ls -Z`, which comes from SELinux-aware core utilities rather than SETools. SETools supplies policy query tools such as `seinfo`, while `policycoreutils-python-utils` supplies `semanage` on RHEL 8. Useful queries include:
+
+```bash
+semanage login -l
+semanage user -l
+semanage fcontext -l
+semanage port -l
+seinfo -u
+seinfo -r
+seinfo -t
+seinfo --portcon
+```
+
+`semanage port -l` shows SELinux port type mappings. For example, `http_port_t` covers the standard HTTP and HTTPS ports that policy already permits for Apache. Non-standard ports need an added mapping, such as `semanage port -a -t http_port_t -p tcp 3131`.
+
+File labels also matter when services use non-standard paths. `chcon` can change a label immediately, but it does not change the persistent file context rules. Durable fixes use `semanage fcontext` followed by `restorecon`. `restorecon -Rv /var/log/httpd` restores labels under that path from policy and local file context mappings. Apache content outside `/var/www` should receive an appropriate HTTP content type, such as `httpd_sys_content_t`, before the service can read it under enforcing policy.
+### SELinux troubleshooting sequence
+Administrators first confirm whether SELinux causes the failure. Temporarily switching to permissive mode with `setenforce 0`, repeating the failed action, and returning to enforcing mode with `setenforce 1` can separate SELinux denials from ordinary Linux permissions, service configuration and application errors.
+
+SELinux denials usually appear in `/var/log/audit/audit.log` as AVC records. Focused searches reduce noise:
+
+```bash
+ausearch -m AVC,USER_AVC,SELINUX_ERR,USER_SELINUX_ERR -ts recent
+sealert -a /var/log/audit/audit.log
+```
+
+`sealert` often explains the source context, target context, denied operation and recommended fix. `ausearch` gives raw audit evidence, which can be matched to an inode with `find / -inum <number>` when the path is unclear.
+
+SELinux booleans enable defined policy variations without writing a custom module. Administrators list and verify booleans with `getsebool -a` or `semanage boolean -l`, then test a change with `setsebool name on`. The `-P` option makes the change persistent:
+
+```bash
+getsebool httpd_enable_homedirs
+setsebool httpd_enable_homedirs on
+setsebool -P httpd_enable_homedirs on
+```
+
+The strongest fixes keep SELinux enforcing and adjust labels, ports or booleans to match the intended service design. Disabling SELinux hides the problem and weakens the host.
+### Repair and reporting priorities
+A reliable investigation follows the observable failure. Missing shared objects point to package ownership and reinstall checks. Valgrind output points to application code, so administrators preserve the report rather than guessing at a fix. Trace output shows whether the program reaches the expected file, socket, library or permission boundary. SELinux evidence shows whether policy, labels or booleans block an otherwise valid service action.
+
+Each command should answer a narrow question. `ldd` asks which libraries a trusted executable needs. `valgrind` asks how the process handles memory during execution and at exit. `ltrace` asks which library calls the program makes. `strace` asks which system calls reach the kernel and how the kernel responds. SELinux tools ask whether policy allows the source context to access the target context for the requested operation.

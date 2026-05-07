@@ -1,21 +1,25 @@
 # Authentication Issues
-## PAM and authentication faults
-Pluggable Authentication Modules, or PAM, control authentication, account checks, password updates, and session setup. PAM configuration lives under `/etc/pam.d`. Each service file contains ordered rules. A rule includes a module type, control value, module path or name, and module arguments.
+## PAM and identity management troubleshooting in RHEL 8
+Red Hat Enterprise Linux 8 manages most host authentication through authselect, Pluggable Authentication Modules (PAM), Name Service Switch (NSS), and the System Security Services Daemon (SSSD). Administrators should treat older authconfig habits as legacy practice. Authselect selects a tested profile and generates the PAM and NSS configuration that supports that profile.
+### Authentication configuration
+Authselect profiles describe how PAM and NSS should behave. The selected profile appears with `authselect current`. A new profile can be selected with `authselect select sssd`, and profile changes can be applied with `authselect apply-changes`.
 
-The four major PAM module types are:
-- `auth`, which authenticates credentials.
-- `account`, which checks account validity and access.
-- `password`, which manages password changes.
-- `session`, which sets up and tears down session state.
+Administrators should inspect `/etc/nsswitch.conf` to confirm which sources resolve users, groups, services, and hosts. When authselect manages the system, administrators should not edit `/etc/nsswitch.conf` directly. They should change the authselect profile or the appropriate authselect NSS template, then apply the profile changes.
+### PAM service files
+PAM stores per-service configuration in `/etc/pam.d/`. Each rule normally contains a PAM type, a control value, a module, and optional module arguments.
 
-Control values determine how PAM reacts to success or failure. Common values include `required`, `requisite`, `sufficient`, and `optional`. More detailed bracket syntax can make decisions based on exact return codes. A missing, reordered, or damaged PAM rule can block a service even when users and passwords are correct.
+The four PAM types have distinct purposes:
+- `auth` verifies identity and credentials.
+- `account` checks whether the account may access the service.
+- `password` manages password changes.
+- `session` creates and closes the login session, including related limits, logging, and environment setup.
 
-RHEL 8 uses authselect rather than the old authconfig workflow. Authselect manages selected authentication profiles and generates related PAM configuration. Manual changes to generated files may be overwritten or may place the system outside a supported profile. `authselect current` shows the selected profile. `authselect list` lists available profiles. `authselect select PROFILE` changes profile. `authselect apply-changes` applies updates.
+The control value tells PAM how to handle a module result. `required` records failure but continues through the stack. `requisite` stops immediately on failure. `sufficient` can allow success when earlier required modules have not failed. `optional` usually affects the result only when no stronger rule decides it. `include` and `substack` both pull in rules from another PAM file, but `substack` confines `done` and `die` actions to the included stack.
+### Troubleshooting PAM faults
+A broken PAM file can prevent a service from authenticating or authorising users. Logs such as `/var/log/secure` may help, but they can contain noisy or misleading authentication messages. Package verification often gives a clearer starting point when a packaged PAM file has changed.
 
-A service-specific PAM problem often shows in that service's file under `/etc/pam.d`. If a package-owned PAM file has been damaged, move the broken file aside and reinstall the owning package. For example, a damaged Samba PAM file can be restored by reinstalling the relevant Samba package after preserving the faulty file for comparison. Then restart the service and retest authentication with the client utility.
+For Samba, `obey pam restrictions = yes` tells Samba to honour PAM account and session management. It does not make PAM handle SMB password authentication when encrypted passwords are enabled. If `/etc/pam.d/samba` has lost required rules, administrators can preserve the damaged file for comparison, verify the package, and reinstall the package that owns the file. After restoration, they should retest with a known Samba user and remove the broken backup only after confirming the service works.
+### SSSD, LDAP, and Kerberos
+RHEL 8 commonly uses SSSD to connect a local client to remote identity and authentication providers, including LDAP directories and Kerberos realms. The main SSSD file is `/etc/sssd/sssd.conf`. Domain sections define providers and connection details such as LDAP URI, search base, TLS settings, Kerberos realm, and server names.
 
-Authentication failures should be split into identity, authentication, account authorisation, and session setup. A user absent from `getent passwd` has an identity lookup problem. A user present in `getent passwd` but unable to authenticate may have a password, Kerberos, PAM auth, or SSSD issue. A user who authenticates but cannot access a service may fail account rules. A user who starts login but receives a session error may hit session modules, home directory problems, SELinux, or resource limits.
-
-PAM order matters because modules run in sequence. A `sufficient` success can short-circuit later modules when no prior required module has failed. A `required` failure may allow later modules to run but still fail the stack. A `requisite` failure stops immediately. These control values explain why adding one misplaced line can change the whole authentication result.
-
-Authselect should be treated as the owner of generated authentication configuration. If a task requires SSSD, select an SSSD-capable profile. If local custom PAM changes are required, use an authselect custom profile rather than editing generated files in a way that future authselect operations overwrite. In a repair scenario, comparing generated files to the active profile can reveal manual damage.
+When LDAP or Kerberos authentication fails, administrators should verify that authselect uses the expected profile, that SSSD is active, that `/etc/sssd/sssd.conf` contains the correct domain values, and that NSS lists `sss` where remote identity lookup is required.

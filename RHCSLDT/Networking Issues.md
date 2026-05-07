@@ -1,29 +1,85 @@
 # Networking Issues
-## Network connectivity
-Network diagnosis should move from reachability to service access and then to configuration. The administrator should identify the interface, address, route, DNS servers, firewall state, and listening service.
+## Troubleshooting Linux Network Connectivity
+Linux network troubleshooting starts with a clear path through the stack. Applications such as HTTPD and SSH generate data. The transport layer splits that data into segments and carries it with TCP or UDP. The network layer routes packets between networks. The data link and physical layers move frames through interfaces, MAC addresses, cables, switches, and virtual network devices. The TCP/IP model compresses these functions into application, transport, internet, and network access layers.
 
-Basic verification tools include:
-- `ip addr` to show addresses.
-- `ip route` to show routes.
-- `ping HOST` to test ICMP reachability.
-- `telnet HOST PORT` to test a TCP port.
-- `nc -vz HOST PORT` to test TCP more flexibly.
-- `curl URL` to test HTTP services.
-- `ss -lntp` to show listening TCP ports.
-- `ss -antp` to show TCP connections.
+A useful diagnosis asks where traffic fails. The administrator should first confirm basic reachability, then test the required protocol and port, then inspect the service, firewall, name resolution, routes, and interface configuration.
+## Verify Connectivity
+`ping` checks IP reachability with ICMP echo requests. It reports response times and packet loss, but it does not test application ports. Useful options include:
+- `ping -c 5 <host>` to send five probes
+- `ping -s 1024 <host>` to set the ICMP payload size
+- `ping -f <host>` to flood a host where privileges and policy allow it
 
-DNS diagnosis uses bind-utils. `dig NAME`, `host NAME`, and related commands show whether name resolution works and which servers answer. The resolver configuration normally appears through `/etc/resolv.conf`, often managed by NetworkManager. Do not edit generated resolver files without checking NetworkManager state.
+Port checks need tools that speak transport protocols. `telnet <host> <port>` can confirm whether a TCP service accepts a connection, although it does not validate application correctness or encryption. `ncat` or `nc` provides broader testing because it can connect over TCP or UDP and can also listen on a chosen port.
 
-NetworkManager configuration uses `nmcli`. `nmcli device status` shows device state. `nmcli connection show` lists connection profiles. `nmcli connection modify NAME ipv4.addresses ADDRESS ipv4.gateway GATEWAY ipv4.dns DNS ipv4.method manual` updates a profile. `nmcli connection up NAME` activates it. For temporary tests, `ip addr add`, `ip route add`, and related `ip` commands may be faster, but they do not persist unless saved in the connection profile.
+A simple TCP test can use one host as a listener and another as a client:
 
-Firewalld commonly blocks services that work locally. `firewall-cmd --list-all` shows the active zone configuration. `firewall-cmd --add-service=http --permanent` or `firewall-cmd --add-port=80/tcp --permanent` adds persistent access. `firewall-cmd --reload` applies permanent changes. Always check the active zone and interface before assuming the rule applies.
+```bash
+nc -l 443
+nc <server-ip> 443
+```
 
-Packet capture clarifies ambiguous network faults. `tcpdump` and `tshark` both capture packets through libpcap style filters. Common options include `-i INTERFACE` for interface, `-w FILE` to write a capture, `-c COUNT` to stop after a number of packets, and `-r FILE` to read a capture. Captures show whether packets leave, arrive, receive replies, or fail during handshake.
+Traffic that passes between these sessions shows that the network path and port can work. If the test succeeds but the real application still fails, the service configuration, service state, firewall rules, or security controls need closer review.
+## Diagnose and Fix Connectivity Failures
+A failed connection should prompt several checks:
+- Can the host reach the network at all?
+- Can it reach another host on the same network?
+- Can it reach the destination host?
+- Can it reach the required TCP or UDP port?
+- Does the target service listen on the expected address and port?
+- Does a firewall or security policy block the traffic?
 
-Network troubleshooting should distinguish local service failure from path failure. A successful `curl localhost` proves the application can answer locally. A failed remote connection may still come from firewall rules, binding to loopback only, routing, DNS, or cloud security controls. A failed `curl localhost` points back to the service, application configuration, SELinux, file permissions, or the listening socket.
+On Red Hat Enterprise Linux 8, `firewalld` commonly manages firewall policy. The service status shows whether it runs:
 
-Name resolution deserves a separate test. A hostname failure with a successful IP connection usually means DNS or `/etc/hosts`. An IP failure means DNS is not the main problem. `dig` output shows the server queried, the answer section, and timing. If `/etc/resolv.conf` contains the wrong server but NetworkManager owns the file, update the NetworkManager connection rather than making a temporary edit.
+```bash
+systemctl status firewalld
+```
 
-Routing faults often show through asymmetry. The client may reach the server, but replies leave through the wrong gateway or interface. `ip route get DESTINATION` shows the chosen route. `tcpdump` on both sides can prove whether packets arrive and whether replies leave. This evidence prevents unnecessary service changes when the real issue is path selection.
+`firewall-cmd --list-all` shows the active zone, interfaces, services, and ports. If HTTPD works locally but not from another host, the firewall may allow SSH but block HTTP. The administrator can open HTTP at runtime with either a service or a port rule:
 
-Firewall repair should use services where possible because firewalld service definitions capture standard ports and protocols. Custom ports require `--add-port`. Runtime rules disappear after reload or reboot unless made permanent. Permanent rules do not affect the current runtime until reload. The administrator should verify both the runtime state and the persistence requirement.
+```bash
+firewall-cmd --zone=public --add-service=http
+firewall-cmd --zone=public --add-port=80/tcp
+```
+
+Runtime changes disappear when `firewalld` reloads or the system restarts. Use `firewall-cmd --runtime-to-permanent` to save the current runtime policy. Alternatively, add the rule with `--permanent` and reload `firewalld`.
+
+Name resolution and routing also cause failures. `bind-utils` provides `dig` and `host`, which help test DNS lookups and identify the resolver in use. Resolver configuration normally appears in `/etc/resolv.conf`, although NetworkManager or system resolver services may manage that file.
+
+Interface and route checks should rely on live system state, not old persistent udev naming files. Useful commands include:
+
+```bash
+ip link show
+ip addr show
+ip addr show dev eth0
+ip route show
+ip route show default
+nmcli device status
+nmcli connection show
+nmcli device show eth0
+```
+
+`ip` can apply immediate address and route changes, such as `ip route add default via <gateway> dev <interface>`. These changes usually do not survive a restart. Persistent Red Hat Enterprise Linux network configuration should use NetworkManager connection profiles through `nmcli`, `nmtui`, or another supported NetworkManager interface.
+## Inspect Network Traffic
+Packet capture confirms what actually crosses an interface. `tcpdump`, Wireshark, and TShark work with packet capture files and libpcap-style capture filters. TShark is the command line form of Wireshark. Modern Wireshark tools commonly write pcapng by default, while tcpdump commonly writes pcap.
+
+A capture can print packets directly, write them to a file, or read a saved capture:
+
+```bash
+tcpdump -i eth0
+tshark -i eth0 -c 5 -w /tmp/file.pcap
+tcpdump -r /tmp/file.pcap
+tshark -r /tmp/file.pcap
+```
+
+The `-i` option selects the interface, `-c` limits the packet count, `-w` writes a capture file, and `-r` reads a saved capture. Capture filters reduce noise before packets enter the file. For example, `port 80` captures traffic involving TCP or UDP port 80. More precise filters, such as `tcp port 80`, avoid unrelated UDP traffic.
+
+Traffic inspection helps distinguish network failure from service failure. If captures show incoming HTTP requests and no reply, the service or host policy needs investigation. If captures show no incoming requests, routing, firewall policy, source traffic, or an upstream network device may block the path.
+## Key Commands
+- `ping` tests ICMP reachability.
+- `telnet` tests basic TCP connection attempts.
+- `nc` or `ncat` tests TCP or UDP paths and can create listeners.
+- `firewall-cmd` reads and changes `firewalld` policy.
+- `dig` and `host` test DNS behaviour.
+- `ip` inspects and changes live interface and route state.
+- `nmcli` inspects and changes NetworkManager configuration.
+- `tcpdump` and `tshark` capture and read network traffic.
