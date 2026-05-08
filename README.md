@@ -5,7 +5,7 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 ## Beginner
 - [IBM Cybersecurity Analyst Professional Certificate](IBM-CySA/README.md) ([course link](https://www.coursera.org/professional-certificates/ibm-cybersecurity-analyst))
 - [Pluralsight Red Hat Certified System Administrator Path](RHCSA/README.md) ([course link](https://www.pluralsight.com/paths/rhcsa-red-hat-certified-system-administrator-ex200))
-- TCM Security OSINT Research Professional ([course link](https://certifications.tcm-sec.com/porp/))
+- TCM Security Practical OSINT Research Professional ([course link](https://certifications.tcm-sec.com/porp/))
 ## Intermediate
 - [Pluralsight Red Hat Certified Engineer Path](RHCE/README.md) ([course link](https://www.pluralsight.com/paths/rhce-red-hat-certified-engineer-ex294))
 - Pluralsight Cisco Certified Network Associate Path ([course link](https://app.pluralsight.com/paths/skill/cisco-ccna-cisco-certified-network-associate-200-301))
