@@ -18,7 +18,6 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 - Pluralsight Red Hat Certified Specialist in Containers Path ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-containers-ex188))
 - Pluralsight LPIC-3 Exam 303: Security Path ([course link](https://www.pluralsight.com/courses/lpic-3-exam-303-security))
 - Red Hat Certified Specialist in Security: Linux ([RH Doc](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html-single/security_hardening/index))
-- Pluralsight Secure Coding Path ([course link](https://www.pluralsight.com/paths/secure-coding))
 - Johns Hopkins Intrusion Detection Specialisation ([course link](https://www.coursera.org/specializations/intrusion-detection))
 
 > [!NOTE]
