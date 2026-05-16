@@ -15,7 +15,7 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 ## Advanced
 - [Pluralsight Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting Path](RHCSLDT/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342))
 - [Pluralsight Red Hat Certified Specialist in Performance Tuning Path](RHCSPT/README.md) ([course link](https://www.pluralsight.com/courses/red-hat-certified-specialist-in-performance-tuning-ex442))
-- Pluralsight Red Hat Certified Specialist in Containers Path ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-containers-ex188))
+- [Pluralsight Red Hat Certified Specialist in Containers Path](RHCSC/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-containers-ex188))
 - Pluralsight LPIC-3 Exam 303: Security Path ([course link](https://www.pluralsight.com/courses/lpic-3-exam-303-security))
 - Red Hat Certified Specialist in Security: Linux ([RH Doc](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html-single/security_hardening/index))
 - Johns Hopkins Intrusion Detection Specialisation ([course link](https://www.coursera.org/specializations/intrusion-detection))
