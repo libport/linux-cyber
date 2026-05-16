@@ -8,11 +8,6 @@ The IBM Cybersecurity Analyst Professional Certificate is a 4-month, self-paced 
 - Database fundamentals and vulnerabilities, cybersecurity architecture, compliance frameworks, standards, and regulations
 - How to use generative AI for cybersecurity
 - Tools and strategies for job search, resume building, and interview preparation to kickstart your career
-
-Notes are supplemented with information from third-party sources, including:
-- [CompTIA Cybersecurity Analyst (CySA+)Cert Guide](https://www.amazon.com/CompTIA-Cybersecurity-Analyst-CS0-002-Certification/dp/0136747167), 2nd Edition, by Troy McMillan
-- [Foundations of Information Security](https://www.oreilly.com/library/view/foundations-of-information/9781098122546/), by Jason Andress
-- [How Cybersecurity Really Works](https://www.oreilly.com/library/view/how-cybersecurity-really/9781098128999/), by Sam Grubb
 ## Module Notes
 - [Introduction to Cybersecurity Careers](Introduction%20to%20Cybersecurity%20Careers.md)
 - [Introduction to Cybersecurity Essentials](Introduction%20to%20Cybersecurity%20Essentials.md)
@@ -27,3 +22,8 @@ Notes are supplemented with information from third-party sources, including:
 - [Cybersecurity Case Studies](Cybersecurity%20Case%20Studies.md)
 - [Generative AI: Boost Your Cybersecurity Career](Generative%20AI%20Boost%20Your%20Cybersecurity%20Career.md)
 - [Cybersecurity Job Search, Resume, and Interview Prep](Cybersecurity%20Job%20Search,%20Resume,%20and%20Interview%20Prep.md)
+## Further Reading
+Notes are supplemented with information from third-party sources, including:
+- [CompTIA Cybersecurity Analyst (CySA+)Cert Guide](https://www.pearsonitcertification.com/store/comptia-cybersecurity-analyst-cysa-plus-cs0-002-cert-9780136747123), 2nd Edition, by Troy McMillan
+- [Foundations of Information Security](https://www.oreilly.com/library/view/foundations-of-information/9781098122546/), by Jason Andress
+- [How Cybersecurity Really Works](https://www.oreilly.com/library/view/how-cybersecurity-really/9781098128999/), by Sam Grubb
