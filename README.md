@@ -8,7 +8,7 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 - TCM Security Practical OSINT Research Professional ([course link](https://certifications.tcm-sec.com/porp/))
 ## Intermediate
 - [Pluralsight Red Hat Certified Engineer Path](RHCE/README.md) ([course link](https://www.pluralsight.com/paths/rhce-red-hat-certified-engineer-ex294))
-- Pluralsight Cisco Certified Network Associate Path ([course link](https://app.pluralsight.com/paths/skill/cisco-ccna-cisco-certified-network-associate-200-301))
+- Pluralsight Cisco Certified Network Associate Path ([course link](https://www.pluralsight.com/paths/cisco-ccna-cisco-certified-network-associate-200-301))
 - Pluralsight Certified Kubernetes Administrator Path ([course link](https://www.pluralsight.com/paths/certified-kubernetes-administrator))
 - Pluralsight CompTIA CySA+ Path ([course link](https://www.pluralsight.com/paths/comptia-cysa-cs0-003))
 - Pluralsight CompTIA Cloud+ Path ([course link](https://www.pluralsight.com/paths/comptia-cloud-cvo-004))
