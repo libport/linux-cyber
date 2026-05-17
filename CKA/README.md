@@ -1,7 +1,7 @@
 # Certified Kubernetes Administrator Course Notes
 These notes cover material from Pluralsight's 29-hour, self-paced course. The notes cover basic administration tasks and understanding the capabilities that the Kubernetes platform provides. The content in this path aligns with the objectives for the Certified Kubernetes Administrator exam and can help prepare for the test.
 ## Cluster Architecture, Installation & Configuration
-- Certified Kubernetes Administrator: Kubernetes Foundations
+- [Certified Kubernetes Administrator: Kubernetes Foundations](Certified%20Kubernetes%20Administrator%20Kubernetes%20Foundations.md)
 - Kubernetes Installation and Configuration Fundamentals
 - Certified Kubernetes Administrator: Using kubeadm to Install a Basic Cluster
 - Certified Kubernetes Administrator: Working with Your Cluster
