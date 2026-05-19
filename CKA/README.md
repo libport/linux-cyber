@@ -3,7 +3,7 @@ These notes cover material from Pluralsight's 29-hour, self-paced course. The no
 ## Cluster Architecture, Installation & Configuration
 - [Certified Kubernetes Administrator: Kubernetes Foundations](Certified%20Kubernetes%20Administrator%20Kubernetes%20Foundations.md)
 - [Kubernetes Installation and Configuration Fundamentals](Kubernetes%20Installation%20and%20Configuration%20Fundamentals.md)
-- Certified Kubernetes Administrator: Using kubeadm to Install a Basic Cluster
+- [Certified Kubernetes Administrator Using kubeadm to Install a Basic Cluster](Certified%20Kubernetes%20Administrator%20Using%20kubeadm%20to%20Install%20a%20Basic%20Cluster.md)
 - Certified Kubernetes Administrator: Working with Your Cluster
 - Cluster Architecture, Installation, and Configuration for CKA: Cluster Management and Lifecycle
 - Certified Kubernetes Administrator: Performing Cluster Version Upgrades
