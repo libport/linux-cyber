@@ -3,7 +3,7 @@
 Containerisation works best when the application already runs correctly outside Docker. A developer should first confirm the complete local workflow: clone the repository, install Python, install dependencies, compile assets where required, then start the application.
 
 For the Flask example, the source contains `app/main.py`, `requirements.txt`, static assets and templates. A local virtual environment isolates the Python packages during development. After activating the environment, `pip install -r requirements.txt` installs the dependencies, and `python app/main.py` starts the web server. Successful local execution proves that later Docker errors relate to the image, container configuration or runtime environment rather than the application itself.
-### Build the image
+## Build the image
 A Dockerfile turns the local workflow into repeatable image build steps. The base image supplies Python and `pip`, while later instructions set a working directory, copy dependency files, install dependencies, copy source code and define the command that starts the application.
 
 ```Dockerfile
@@ -19,7 +19,7 @@ CMD ["python", "app/main.py"]
 A container runs as an isolated process with its own filesystem, networking and process tree, so a separate virtual environment is usually unnecessary inside this simple image. Copying `requirements.txt` before the rest of the source also improves build caching. Docker can reuse the dependency layer when application files change but dependencies stay the same. Image layers hold filesystem changes and image configuration. Later Dockerfile instructions can override defaults from the base image, so the Flask app replaces the Python image's generic startup command.
 
 `EXPOSE 3000` records port metadata only. It does not publish the port on the host. The `docker container run` command must still map a host port to the container port, such as `-p 3001:3000`.
-### Run and manage containers
+## Run and manage containers
 A developer builds the image from the directory that contains the Dockerfile:
 
 ```bash
