@@ -3,7 +3,7 @@ These notes cover material from Pluralsight's 30-hour, self-paced course. The no
 ## Notes:
 - [Docker Basic Concepts and Configuration](Docker%20Basic%20Concepts%20and%20Configuration.md)
 - [Deploying a Containerized Application with Docker](Deploying%20a%20Containerized%20Application%20with%20Docker.md)
-- Managing Container Images
+- [[Managing Container Images]]
 - Microservices with Docker
 - Docker Security Implementation
 - Managing Docker on Windows Servers
