@@ -1,0 +1,23 @@
+# Docker security implementation
+## Secure image selection
+Container automation lowers deployment effort, but it does not remove supply-chain risk. Teams should start with trusted base images and treat popularity as a signal rather than proof. Docker Official Images, Verified Publisher images, Hardened Images and sponsored open-source images provide stronger provenance than anonymous or unmaintained repositories. Download counts and stars can help triage choices, but they do not prove that an image is safe. Administrators should prefer minimal, maintained images and avoid importing images they cannot explain, update or replace.
+
+The Common Vulnerabilities and Exposures program identifies, defines and catalogues publicly disclosed security vulnerabilities. Docker Scout and Trivy use vulnerability data to report known issues in images, filesystems and other artefacts. Their results change as package versions and vulnerability databases change, so an image that looks clean during a demonstration may not stay clean. Teams should scan base images, application images and deployed images as part of build and release pipelines.
+## Vulnerability scanning and SBOMs
+Docker Scout can report CVEs by severity and generate a software bill of materials. An SBOM lists packages in an image and helps teams decide whether the image contains unnecessary tools, libraries or services. Trivy provides a separate open-source scanner for container images, filesystems, repositories and Kubernetes targets. Severity filters help security teams focus remediation on exploitable high-risk issues before lower-priority fixes.
+
+Low-CVE images from providers such as Chainguard can reduce starting risk, but they do not replace scanning, patching or operational controls. Security depends on the whole container lifecycle.
+## Safer Dockerfiles
+Dockerfiles should minimise the attack surface. Smaller base images reduce the number of packages that can contain vulnerabilities, but teams must still confirm that the image contains all required runtime components. Dockerfiles should use COPY rather than ADD unless ADD's extra functions are needed. They should pin base images by digest where reproducibility matters and avoid relying on moving latest tags. Package installs should use explicit versions when appropriate and suppress unnecessary recommended packages, for example with apt --no-install-recommends or DNF's --setopt=install_weak_deps=False.
+
+Containers should not run applications as root unless the design requires it. A Dockerfile can create an unprivileged user, copy application files into that user's home directory and switch to that user before execution. This reduces the effect of a compromise.
+## Host security and encrypted access
+Docker host security should follow established benchmarks rather than ad hoc hardening. The CIS Docker Benchmark and Docker Bench for Security provide structured checks for host configuration, daemon settings, container settings and file permissions. Administrators should investigate warnings, confirm that critical Docker directories remain root-owned and inaccessible to ordinary users, and enable user namespace remapping where it fits the workload. User namespace remapping maps container root to a less privileged host user.
+
+Remote Docker API access requires encryption and authentication. TLS should protect the Docker daemon socket when administrators expose it over TCP. Clients should use docker --tlsverify with trusted certificates. Docker Swarm also uses mutual TLS for node communication and stores Swarm secrets through encrypted manager state.
+## Secrets, runtime controls and logging
+Applications should not store passwords in Dockerfiles, images or unprotected environment variables. Docker Compose can mount secrets as files under /run/secrets and grants access per service. Docker Swarm mounts service secrets into an in-memory filesystem and supports adding or revoking access during service updates. Secret files on the host still need strong permissions and rotation processes.
+
+Containers should run with only the Linux capabilities they need. Docker supports --cap-drop and --cap-add, so administrators can drop broad capability sets and restore only specific privileges. Compose files can apply the same policy.
+
+Logs support troubleshooting, detection and forensic review. Docker can show container logs with docker logs and service logs with docker service logs. Daemon logging defaults can be set in daemon.json, and logging drivers can send records to JSON files, syslog, Fluentd, Splunk, AWS CloudWatch Logs or other supported back ends. Logging policy should define retention, severity, routing and review responsibilities.
