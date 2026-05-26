@@ -6,8 +6,7 @@ These notes cover material from Pluralsight's 30-hour, self-paced course. The no
 - [Managing Container Images](Managing%20Container%20Images.md)
 - [Microservices with Docker](Microservices%20with%20Docker.md)
 - [Docker Security Implementation](Docker%20Security%20Implementation.md)
-- Managing Docker on Windows Servers
-- Preparing Docker Apps for Production
+- [Preparing Docker Apps for Production](Preparing%20Docker%20Apps%20for%20Production.md)
 - Getting Started with Docker Swarm
 - Tactics and Tools for Troubleshooting Docker
 - Getting Started with Docker and AI
