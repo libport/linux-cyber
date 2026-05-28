@@ -8,7 +8,7 @@ These notes cover material from Pluralsight's 30-hour, self-paced course. The no
 - [Docker Security Implementation](Docker%20Security%20Implementation.md)
 - [Preparing Docker Apps for Production](Preparing%20Docker%20Apps%20for%20Production.md)
 - [Getting Started with Docker Swarm](Getting%20Started%20with%20Docker%20Swarm.md)
-- Tactics and Tools for Troubleshooting Docker
+- [Tactics and Tools for Troubleshooting Docker](Tactics%20and%20Tools%20for%20Troubleshooting%20Docker.md)
 - Getting Started with Docker and AI
 ## Further Reading
 Notes are supplemented with information from third-party sources, including:

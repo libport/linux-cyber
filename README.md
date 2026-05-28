@@ -13,6 +13,7 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 - [Pluralsight Certified Kubernetes Administrator Path](CKA/README.md) ([course link](https://www.pluralsight.com/paths/certified-kubernetes-administrator))
 - Pluralsight CompTIA CySA+ Path ([course link](https://www.pluralsight.com/paths/comptia-cysa-cs0-003))
 - Pluralsight CompTIA Cloud+ Path ([course link](https://www.pluralsight.com/paths/comptia-cloud-cvo-004))
+- Hack
 ## Advanced
 - [Pluralsight Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting Path](RHCSLDT/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342))
 - [Pluralsight Red Hat Certified Specialist in Performance Tuning Path](RHCSPT/README.md) ([course link](https://www.pluralsight.com/courses/red-hat-certified-specialist-in-performance-tuning-ex442))
