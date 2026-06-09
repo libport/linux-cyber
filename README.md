@@ -2,17 +2,21 @@
 Course notes and project files related to Linux and cybersecurity courses from IBM, TCM, Pluralsight, and Johns Hopkins University.
 
 Programme designed for mastery in real-time intelligence informed, responsively threat modelled, defensive cybersecurity of high-performance and reliable on-prem and cloud architectures of Linux systems.
-## Beginner
+## Courses
+### Beginner
 - [IBM Cybersecurity Analyst Professional Certificate](IBM-CySA/README.md) ([course link](https://www.coursera.org/professional-certificates/ibm-cybersecurity-analyst))
 - [Pluralsight Red Hat Certified System Administrator Path](RHCSA/README.md) ([course link](https://www.pluralsight.com/paths/rhcsa-red-hat-certified-system-administrator-ex200))
-## Intermediate
+### Intermediate
 - [Pluralsight Red Hat Certified Engineer Path](RHCE/README.md) ([course link](https://www.pluralsight.com/paths/rhce-red-hat-certified-engineer-ex294))
 - Pluralsight Cisco Certified Network Associate Path ([course link](https://www.pluralsight.com/paths/cisco-ccna-cisco-certified-network-associate-200-301))
 - [Pluralsight Docker Path](docker/README.md) ([course link](https://www.pluralsight.com/paths/managing-docker-in-production))
 - [Pluralsight Certified Kubernetes Administrator Path](CKA/README.md) ([course link](https://www.pluralsight.com/paths/certified-kubernetes-administrator))
 - Pluralsight CompTIA CySA+ Path ([course link](https://www.pluralsight.com/paths/comptia-cysa-cs0-003))
 - Pluralsight CompTIA Cloud+ Path ([course link](https://www.pluralsight.com/paths/comptia-cloud-cvo-004))
-## Advanced
+- [Hack The Box Certified Defensive Security Analyst](HTB-CDSA/README.md) ([course link](https://academy.hackthebox.com/preview/certifications/htb-certified-defensive-security-analyst))
+- [OffSec Defense Analyst](OS-OSDA/README.md) ([course link](https://www.offsec.com/courses/soc-200/))
+- [TCM Security Practical OSINT Research Professional](TCM-PORP/README.md) ([course link](https://certifications.tcm-sec.com/porp/))
+### Advanced
 - [Pluralsight Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting Path](RHCSLDT/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342))
 - [Pluralsight Red Hat Certified Specialist in Performance Tuning Path](RHCSPT/README.md) ([course link](https://www.pluralsight.com/courses/red-hat-certified-specialist-in-performance-tuning-ex442))
 - [Pluralsight Red Hat Certified Specialist in Containers Path](RHCSC/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-containers-ex188))
@@ -20,5 +24,5 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 - Red Hat Certified Specialist in Security: Linux ([RH Doc](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html-single/security_hardening/index))
 - Johns Hopkins Intrusion Detection Specialisation ([course link](https://www.coursera.org/specializations/intrusion-detection))
 
-> [!NOTE]
+ > [!NOTE]
 > Assessment modules with no new content do not have corresponding notes
