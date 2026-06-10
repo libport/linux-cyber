@@ -1,5 +1,5 @@
 # Linux and Cybersecurity Programme
-Course notes and project files related to Linux and cybersecurity courses from IBM, TCM, Pluralsight, and Johns Hopkins University.
+Course notes and project files related to Linux and cybersecurity courses from IBM, TCM Security, Pluralsight, and Johns Hopkins University.
 
 Programme designed for mastery in real-time intelligence informed, responsively threat modelled, defensive cybersecurity of high-performance and reliable on-prem and cloud architectures of Linux systems.
 ## Courses

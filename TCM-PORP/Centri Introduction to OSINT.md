@@ -1,1 +1,0 @@
-# Centri Introduction to OSINT
