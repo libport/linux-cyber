@@ -6,7 +6,7 @@ The notes include:
 - Methods for data analysis and collection relevant to today's dynamic intelligence environment
 - Tools for protecting your own data and information against bad actors and potential adversaries
 ## Notes
-- [Chapter 1: Open Source Intelligence](Chapter%201%20Open%20Source%20Intelligence)
+- [Chapter 1: Open Source Intelligence](Chapter%201%20Open%20Source%20Intelligence.md)
 - [Chapter 2 The Intelligence Cycle](Chapter%202%20The%20Intelligence%20Cycle.md)
 - [Chapter 3 The Adversarial Mindset](Chapter%203%20The%20Adversarial%20Mindset.md)
 - [Chapter 4 Operational Security](Chapter%204%20Operational%20Security.md)
