@@ -13,8 +13,6 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 - [Pluralsight Certified Kubernetes Administrator Path](CKA/README.md) ([course link](https://www.pluralsight.com/paths/certified-kubernetes-administrator))
 - Pluralsight CompTIA CySA+ Path ([course link](https://www.pluralsight.com/paths/comptia-cysa-cs0-003))
 - Pluralsight CompTIA Cloud+ Path ([course link](https://www.pluralsight.com/paths/comptia-cloud-cvo-004))
-- [Hack The Box Certified Defensive Security Analyst](HTB-CDSA/README.md) ([course link](https://academy.hackthebox.com/preview/certifications/htb-certified-defensive-security-analyst))
-- [OffSec Defense Analyst](OS-OSDA/README.md) ([course link](https://www.offsec.com/courses/soc-200/))
 - [TCM Security Practical OSINT Research Professional](TCM-PORP/README.md) ([course link](https://certifications.tcm-sec.com/porp/))
 ### Advanced
 - [Pluralsight Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting Path](RHCSLDT/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342))

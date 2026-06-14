@@ -8,8 +8,8 @@ The certification course covers the following:
 - Improving personal OPSEC
 ## Books
 - [Deep Dive: Exploring the Real-World Value of Open Source Intelligence](deep-dive/README.md), by Rae Baker ([publisher catalogue page](https://www.wiley.com/en-us/shop/general-introductory-computer-science/deep-dive-exploring-the-real-world-value-of-open-source-intelligence-p-9781119933250))
-- [OSINT Techniques: Resources for Uncovering Online Information](OSINT-techniques/OSINT%20Techniques.md): Resources for Uncovering Online Information, 11th ed., by Michael Bazzell ([publisher catalogue page](https://inteltechniques.com/book1.html))
 - [Open Source Intelligence Methods and Tools](OSIMT/Open%20Source%20Intelligence%20Methods%20and%20Tools.md), by Nihad A. Hassan and Rami Hijazi ([publisher catalogue page](https://link.springer.com/book/10.1007/978-1-4842-3213-2))
+- [OSINT Techniques: Resources for Uncovering Online Information](OSINT-techniques/OSINT%20Techniques.md), 11th ed., by Michael Bazzell ([publisher catalogue page](https://inteltechniques.com/book1.html))
 ## Further Reading
-- Hunting Cyber Criminals: A Hacker's Guide to Online Intelligence Gathering Tools and Techniques, by Vinny Troia (publisher catalogue page)
-- Cyber Investigations, edited by Andre Arnes (publisher catalogue page)
+- Hunting Cyber Criminals: A Hacker's Guide to Online Intelligence Gathering Tools and Techniques, by Vinny Troia ([publisher catalogue page](https://www.wiley.com/en-us/shop/general-introductory-computer-science/hunting-cyber-criminals-a-hacker's-guide-to-online-intelligence-gathering-tools-and-techniques-p-9781119540991))
+- Cyber Investigations, edited by Andre Arnes ([publisher catalogue page](https://www.wiley.com/en-us/shop/general-chemistry/cyber-investigations-p-9781119582137))
