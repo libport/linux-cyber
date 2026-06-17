@@ -18,4 +18,3 @@ The notes include:
 - [Chapter 10: Financial Intelligence](Chapter%2010%20Financial%20Intelligence.md)
 - [Chapter 11: Cryptocurrency](Chapter%2011%20Cryptocurrency.md)
 - [Chapter 12: Non-fungible Tokens](Chapter%2012%20Non-fungible%20Tokens.md)
-- [Chapter 13: What’s Next?](Chapter%2013%20What’s%20Next?.md)
