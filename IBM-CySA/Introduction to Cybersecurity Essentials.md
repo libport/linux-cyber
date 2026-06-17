@@ -8,9 +8,9 @@
 - An information asset is data or information that has value to an organisation, such as patient records, customer details, and intellectual property.
 - Data is raw facts. Information summarises data. Insights are conclusions from analysis that support decisions.
 - Data-driven decisions depend on:
- - data capture from sources such as logs, IoT sensors, and surveys
- - data correlation to find patterns and relationships
- - reporting that presents analysed results for interpretation
+	 - data capture from sources such as logs, IoT sensors, and surveys
+	 - data correlation to find patterns and relationships
+	 - reporting that presents analysed results for interpretation
 #### Intellectual property and digital products
 - Intellectual property covers creations of the mind, including designs, trade secrets, industrial designs, and research discoveries. Protection can involve copyright, trade marks, patents, and non-disclosure agreements.
 - Digital products include software, online courses, e-books, and website themes. Risks include piracy, licence misuse, and reverse engineering.
