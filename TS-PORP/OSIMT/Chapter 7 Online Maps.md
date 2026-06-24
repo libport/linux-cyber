@@ -1,0 +1,32 @@
+# Chapter 7: Online Maps
+## Core principle
+Location-aware devices, online maps and public digital records can turn ordinary activity into location evidence. Smartphones, wearables, vehicle trackers, cameras and apps may record coordinates, place names, timestamps and movement patterns. Open-source intelligence work can use that public material to narrow a search, verify a claim, reconstruct a route or test whether a location-based assertion is plausible. The work must stay within lawful access, platform rules and the limits of the available evidence.
+
+A geographic coordinate identifies a point through latitude and longitude. Latitude measures north-south position and longitude measures east-west position. GPS remains the best-known satellite navigation system, but it sits within the broader global navigation satellite system environment, which includes Galileo, GLONASS, BeiDou, NavIC and QZSS. A receiver calculates position from satellite signals, then apps and mapping services display that position against map data, satellite imagery or street-level imagery. The coordinate does not, by itself, prove who was present. Analysts must connect it to a device, account, image, post, vehicle or other evidence.
+## Working with map evidence
+Online maps support several basic tasks:
+- Convert a place or address into latitude and longitude.
+- Convert coordinates into an approximate address or named place.
+- Compare satellite imagery, street-level imagery and historical map sources.
+- Measure distance, radius, travel routes and visible lines of movement.
+- Check place names, alternate spellings, postal codes and administrative boundaries.
+
+Google Maps, Bing Maps, OpenStreetMap, USGS EarthExplorer, NASA Worldview, GeoNames, Mapillary and national map libraries can each answer different questions. Commercial satellite providers, including Maxar, can supply high-resolution imagery, but licensing, cost, date of capture and coverage vary. Analysts should treat map layers as evidence with limits. Imagery may be old, obscured by cloud, affected by perspective, edited for privacy or rendered differently across providers.
+
+A sound workflow starts with a precise question, collects the least intrusive public sources needed, then records the reasoning that links each source to the conclusion. Strong evidence usually combines independent signals, such as a coordinate, a visible landmark, a timestamp, weather records and a transport trace. Weak evidence relies on a single self-reported profile location or an unverified caption. Analysts should also note when a source has disappeared, changed ownership, moved behind an API limit or stopped operating, because many map and social search tools from older guides no longer work as described.
+## Social media and public activity
+Location-based social media can reveal where people, events or objects were publicly reported. Photos, videos, livestreams, check-ins, hashtags, captions and account histories can all carry location clues. Exact coordinates now appear less often than older OSINT guides suggest. Many platforms reduced public geolocation features, restricted APIs or removed older search tools. X, formerly Twitter, still supports location metadata in its data model, but exact coordinates usually require the user to share them explicitly and many public searches return only place-level or inferred context. Facebook Graph Search URL techniques from older guides no longer provide the same access.
+
+Strava shows the value and risk of aggregated location data. Its Global Heatmap displays activity patterns from public and eligible user activities, updated monthly and aggregated across users. Such data can help analyse routes and infrastructure, but it can also expose sensitive patterns when users in protected or remote locations share activity carelessly. Analysts should avoid overstating what heatmaps prove. A line on a heatmap shows repeated activity, not identity.
+## Automated tools and verification
+OSINT platforms such as Maltego and SpiderFoot can collect, correlate and visualise public data from many sources. They do not replace judgement. Automated output can include stale links, duplicated data, false positives, spoofed metadata and platform artefacts. Every location claim should be tested against independent sources, timestamps, time zones, weather, shadows, landmarks, road signs, language, terrain and known platform behaviour.
+
+Metadata deserves careful handling. Digital images and videos may include EXIF or other embedded fields that record GPS coordinates, camera settings and creation time. Many apps strip this data on upload, while original files may retain it. Analysts should distinguish file metadata from platform metadata and should preserve originals where lawful and authorised.
+## Transport, parcels and public sensors
+Public tracking services can help trace aircraft, vessels, trains, buses, parcels and visible conditions. Flight-tracking sites usually rely on ADS-B, MLAT, satellite and radar-derived feeds. Coverage may fail over oceans, remote areas, blocked aircraft or aircraft without compatible broadcasts. Maritime tracking relies heavily on AIS, which broadcasts vessel identity, position, course, speed and status to other ships and coastal authorities. AIS improves safety, but public AIS feeds can contain gaps, delays, errors or spoofing.
+
+Parcel tracking can confirm shipment progress when a valid tracking number exists. Public webcam directories, weather cameras and traffic cameras can help verify conditions at a location and time. These sources should support verification, not surveillance of private life.
+## Country and context research
+Country profiles, postal data, place-name databases, traffic-sign comparisons and historical maps help analysts interpret unfamiliar geography. They can explain naming conventions, administrative divisions, language variants, border changes and transport infrastructure. This context reduces the risk of confusing similar places or accepting a misleading caption.
+## Legal and ethical boundary
+Passive OSINT relies on public material and ordinary viewing of accessible sources. Technical footprinting and active reconnaissance cross a different threshold when an analyst sends probes, bypasses controls or interacts with target infrastructure beyond normal public access. Those activities require clear authority. Good geolocation work records sources, preserves uncertainty, avoids unnecessary identification of private people and separates observation from inference.

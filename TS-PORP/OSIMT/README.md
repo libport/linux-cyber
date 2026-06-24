@@ -1,4 +1,4 @@
-# Open Source Intelligence Methods and Tools Book Notes
+# *Open Source Intelligence Methods and Tools* Book Notes
 These notes cover material from [*Open Source Intelligence Methods and Tools*](https://link.springer.com/book/10.1007/978-1-4842-3213-2), by Nihad A. Hassan and Rami Hijazi. The notes cover applying Open Source Intelligence (OSINT) techniques, methods, and tools to acquire information from publicly available online sources to support your intelligence analysis. The notes also cover using the harvested data in different scenarios such as financial, crime, and terrorism investigations as well as performing business competition analysis and acquiring intelligence about individuals and other entities.
 
 The notes cover:

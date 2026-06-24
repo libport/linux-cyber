@@ -1,4 +1,4 @@
-# Deep Dive: Exploring the Real-World Value of Open Source Intelligence Book Notes
+# *Deep Dive: Exploring the Real-World Value of Open Source Intelligence* Book Notes
 These notes cover material from [*Deep Dive: Exploring the Real-World Value of Open Source Intelligence*](https://www.wiley.com/en-us/shop/general-introductory-computer-science/deep-dive-exploring-the-real-world-value-of-open-source-intelligence-p-9781119933250) by Rae Baker. The notes cover using publicly available data to advance your investigative OSINT skills and how your adversaries are most likely to use publicly accessible data against you.
 
 The notes include:
