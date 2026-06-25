@@ -1,8 +1,8 @@
 # *Private Security and the Investigative Process* Book Notes
 These notes cover material from [*Private Security and the Investigative Process*](https://www.taylorfrancis.com/books/mono/10.4324/9781351037266/private-security-investigative-process-fourth-edition-charles-nemeth), Fourth Edition, by Charles P. Nemeth. The notes cover the investigative process for private investigations by both individuals and in corporate security environments. The notes cover concepts and techniques that can be applied to a variety of investigations including fraud, insurance, private, and criminal. The notes details the collection and preservation of evidence, the handling of witnesses, surveillance techniques, background investigations, and report writing.
 ## Notes
-- Chapter 1: Introduction to the Private Security Industry and the Investigative Process
-- Chapter 2: General Characteristics of a Competent Investigator
+- [Chapter 1: Introduction to the Private Security Industry and the Investigative Process](Chapter%201%20Introduction%20to%20the%20Private%20Security%20Industry%20and%20the%20Investigative%20Process.md)
+- [Chapter 2: General Characteristics of a Competent Investigator](Chapter%202%20General%20Characteristics%20of%20a%20Competent%20Investigator.md)
 - Chapter 3: Interview and Case Evaluation
 - Chapter 4: Witness Testimony and Evidence in the Private Security Industry
 - Chapter 5: Collection of Information
