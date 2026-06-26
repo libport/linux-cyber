@@ -3,7 +3,7 @@ These notes cover material from [*Private Security and the Investigative Process
 ## Notes
 - [Chapter 1: Introduction to the Private Security Industry and the Investigative Process](Chapter%201%20Introduction%20to%20the%20Private%20Security%20Industry%20and%20the%20Investigative%20Process.md)
 - [Chapter 2: General Characteristics of a Competent Investigator](Chapter%202%20General%20Characteristics%20of%20a%20Competent%20Investigator.md)
-- Chapter 3: Interview and Case Evaluation
+- [Chapter 3: Interview and Case Evaluation](Chapter%203%20Interview%20and%20Case%20Evaluation.md)
 - Chapter 4: Witness Testimony and Evidence in the Private Security Industry
 - Chapter 5: Collection of Information
 - Chapter 6: Collection of Evidence and Preservation of the Scene

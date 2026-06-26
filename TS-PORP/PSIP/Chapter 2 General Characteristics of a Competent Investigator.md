@@ -1,6 +1,6 @@
 # Chapter 2: General Characteristics of a Competent Investigator
 ## Purpose and professional stance
-Competent investigators combine curiosity, discipline, legal awareness, practical judgement, accurate note-taking and resilience. They do not merely collect information. They decide what information matters, test it, preserve it and explain its significance in a form that other people can rely on.
+Competent investigators combine curiosity, discipline, legal awareness, practical judgement, accurate note-taking and resilience. They do not just collect information. They decide what information matters, test it, preserve it and explain its significance in a form that other people can rely on.
 
 A sound investigation begins with a clear understanding of role and authority. Public police and private investigators may use similar skills, including interviewing, surveillance, document review and evidence handling. Their powers and purposes differ. Police investigate crime for public purposes, including arrest, prosecution, public safety and prevention. Private investigators and private security practitioners usually act for clients or organisations. They may investigate internal misconduct, insurance claims, employment issues, due diligence, asset protection, missing persons, background matters, workplace incidents, civil disputes or evidence relevant to litigation.
 
@@ -26,15 +26,15 @@ A theory of the case remains provisional. Investigators may form hypotheses, but
 
 The same discipline applies to interviews. Investigators should not treat demeanour as proof of truth or deception. Nervousness, hesitation, eye contact, posture and tone can reflect fear, trauma, culture, disability, language difficulty or the pressure of being questioned. Interviewers should prefer open questions, careful listening, accurate summaries and later verification against independent evidence. Apparent inconsistency should prompt further inquiry, not instant accusation.
 ## Perseverance and judgement
-Investigations rarely move in a straight line. They involve missing records, reluctant witnesses, false leads, incomplete memories, poor systems and long periods of routine work. Surveillance, audit, inventory checks, title searches, tax searches, file reviews and background inquiries may appear dull, yet they often produce the decisive detail.
+Investigations rarely move in a straight line. They involve missing records, reluctant witnesses, false leads, incomplete memories, unreliable systems and long periods of routine work. Surveillance, audit, inventory checks, title searches, tax searches, file reviews and background inquiries may appear dull, yet they often produce the decisive detail.
 
 Perseverance matters because important evidence often appears only after repeated, lawful and methodical effort. Unknown witnesses, overlooked documents and small inconsistencies seldom emerge by chance. They emerge because an investigator keeps following leads after the easy inquiries have ended.
 
-Perseverance is not stubbornness. A determined investigator still changes direction when the evidence requires it. They do not continue a weak theory to save face. They do not accept a client allegation merely because the client pays the fee. They examine facts favourable and unfavourable to the client, because a one-sided investigation lacks credibility and may fail when tested.
+Perseverance is not stubbornness. A determined investigator still changes direction when the evidence requires it. They do not continue a weak theory to save face. They do not accept a client allegation just because the client pays the fee. They examine facts favourable and unfavourable to the client, because a one-sided investigation lacks credibility and may fail when tested.
 
 Professional patience also protects fairness. In family, workplace, fraud, insurance and liability matters, allegations can damage reputations before any finding is made. A competent investigator treats all parties with procedural fairness, keeps records of sources and methods and avoids language that states more than the evidence proves.
 ## Human relations and communication
-Investigation is people-centred work. Even document-heavy matters depend on people who create, store, explain, conceal, lose or interpret records. Investigators therefore need strong interpersonal skills. They must speak clearly, listen closely, build rapport, adapt to different personalities and remain calm with hostile, distressed or evasive people.
+Investigation is people-centred work. Even document-heavy matters depend on people who create, explain or conceal records. Investigators therefore need strong interpersonal skills. They must speak clearly, listen closely, build rapport, adapt to different personalities and remain calm with hostile, distressed, or evasive people.
 
 Respect improves evidence quality. Witnesses provide fuller and more accurate information when they understand the purpose of the conversation and feel safe enough to speak. Rapport does not require manipulation or false friendship. It requires courtesy, attention, patience, plain language and control of the interview environment.
 
@@ -42,7 +42,7 @@ Good communication includes nonverbal awareness, but nonverbal signals should be
 
 Effective investigators manage conversations without dominating them. They ask broad questions first, allow uninterrupted accounts, then use focused questions to clarify details. They avoid compound questions, leading questions and jargon. They check understanding, note exact words when precision matters and distinguish what a person saw from what they inferred.
 
-Clear written communication is equally important. The best investigation can lose force if the report is vague, disorganised or inflated. Reports should identify the task, scope, sources, relevant facts, limitations, analysis and conclusion. They should use direct language and preserve important caveats.
+Clear written communication is equally important. The best investigation can be discredited if the report is vague, disorganised or inflated. Reports should identify the task, scope, sources, relevant facts, limitations, analysis and conclusion. They should use direct language and preserve important caveats.
 ## Professional traits
 A competent investigator needs a cluster of habits rather than a single personality type. The most useful traits include:
 - Alertness and careful observation
