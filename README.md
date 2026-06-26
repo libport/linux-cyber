@@ -11,7 +11,7 @@ Programme designed for mastery in real-time intelligence informed, responsively 
 - [Pluralsight Red Hat Certified Engineer](RHCE/README.md) (path) ([course link](https://www.pluralsight.com/paths/rhce-red-hat-certified-engineer-ex294))
 - Pluralsight Cisco Certified Network Associate (path) ([course link](https://www.pluralsight.com/paths/cisco-ccna-cisco-certified-network-associate-200-301))
 - [Pluralsight Docker](docker/README.md) (path) ([course link](https://www.pluralsight.com/paths/managing-docker-in-production))
-- [Pluralsight Certified Kubernetes Administrator](CKA/README.md) (path) ([course link](https://www.pluralsight.com/paths/certified-kubernetes-administrator))
+- :construction: [Pluralsight Certified Kubernetes Administrator](CKA/README.md) (path) ([course link](https://www.pluralsight.com/paths/certified-kubernetes-administrator))
 - Codecademy Associate Systems Engineer to Principal Systems Engineer (path) ([course link](https://www.codecademy.com/learn/ext-paths/systems-engineering-journey))
 ### Advanced
 - [Pluralsight Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting path](RHCSLDT/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342))
