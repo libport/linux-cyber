@@ -7,7 +7,7 @@ The certification course covers the following:
 - Improving overall research methodology
 - Improving personal OPSEC
 ## Books
-- [Private Security and the Investigative Process](PSIP/README.md), 4th edition, by Charles P. Nemeth ([publisher catalogue page](https://www.taylorfrancis.com/books/mono/10.4324/9781351037266/private-security-investigative-process-fourth-edition-charles-nemeth))
+- :construction: [Private Security and the Investigative Process](PSIP/README.md), 4th edition, by Charles P. Nemeth ([publisher catalogue page](https://www.taylorfrancis.com/books/mono/10.4324/9781351037266/private-security-investigative-process-fourth-edition-charles-nemeth))
 - [Deep Dive: Exploring the Real-World Value of Open Source Intelligence](deep-dive/README.md), by Rae Baker ([publisher catalogue page](https://www.wiley.com/en-us/shop/general-introductory-computer-science/deep-dive-exploring-the-real-world-value-of-open-source-intelligence-p-9781119933250))
 - [Open Source Intelligence Methods and Tools](OSIMT/README.md), by Nihad A. Hassan and Rami Hijazi ([publisher catalogue page](https://link.springer.com/book/10.1007/978-1-4842-3213-2))
 ## Further Reading
