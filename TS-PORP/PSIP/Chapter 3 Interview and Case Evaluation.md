@@ -2,7 +2,7 @@
 ## Purpose of investigative interviews
 Investigative interviewing turns initial information into reliable leads, tested evidence and practical case decisions. A competent investigator does not treat interviewing as casual conversation or as an assumed security skill. The investigator plans the interview, sets a respectful tone, asks purposeful questions and evaluates the answers against the case theory and available evidence.
 
-Each interview can identify new witnesses, documents, records or inconsistencies. The investigator follows credible leads with background research, contact with the new source and a further interview where appropriate. Case development remains iterative. One source can expose another, and one lead can strengthen, redirect or weaken an investigation.
+Each interview can identify new witnesses, documents, records or inconsistencies. The investigator follows credible leads with background research, contact with the new source and a further interview where appropriate. Case development remains iterative. One source can expose another, and a lead can strengthen, redirect or weaken an investigation.
 
 The interviewer's aim is to gather accurate information, clarify issues and preserve a professional relationship with the interviewee. Rapport supports accuracy, but rapport must not become manipulation. Ethical interviewing uses active listening, open questions, clear explanations and careful follow-up. Coercion, false authority, intimidation and pressure tactics can contaminate information and create legal risk.
 ## Planning and first contact
@@ -40,7 +40,7 @@ Follow-up letters help clients and witnesses understand what has been discussed 
 
 Client contact reports help firms monitor service quality and maintain continuity. They should record the date, method of contact, participants, matters discussed and actions required. Clear records improve supervision, reduce duplication and support later case evaluation.
 ## Evaluation and later interviews
-After information is collected, the investigator evaluates reliability, relevance and sufficiency. Case evaluation should not rely on a claimed sixth sense. It should compare the account with documents, physical evidence, digital evidence, witness statements, timelines, motive, opportunity and known inconsistencies.
+After information is collected, the investigator evaluates reliability, relevance and sufficiency. Case evaluation should compare the account with documents, physical evidence, digital evidence, witness statements, timelines, motive, opportunity and known inconsistencies.
 
 Client screening is necessary. Investigators should be cautious where a proposed assignment appears motivated by revenge, harassment, unlawful surveillance, unrealistic financial expectations, concealed conflicts or pressure to mislead. Social change objectives or strong emotions do not automatically make a client unreliable. Each case must be assessed on its facts.
 
