@@ -9,7 +9,7 @@ These notes cover material from [*Private Security and the Investigative Process
 - [Chapter 4: Witness Testimony and Evidence in the Private Security Industry](Chapter%204%20Witness%20Testimony%20and%20Evidence%20in%20the%20Private%20Security%20Industry.md)
 - [Chapter 5: Collection of Information](Chapter%205%20Collection%20of%20Information.md)
 - [Chapter 6: Collection of Evidence and Preservation of the Scene](Chapter%206%20Collection%20of%20Evidence%20and%20Preservation%20of%20the%20Scene.md)
-- Chapter 7: Surveillance Techniques
+- [Chapter 7: Surveillance Techniques](Chapter%207%20Surveillance%20Techniques.md)
 - Chapter 8: Report Writing
 - Chapter 9: Investigative Method and Technique: Theft/Property Offenses
 - Chapter 10: Investigative Method and Technique: Insurance Cases
