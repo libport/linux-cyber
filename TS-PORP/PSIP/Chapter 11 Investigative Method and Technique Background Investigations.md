@@ -1,0 +1,59 @@
+# Chapter 11: Investigative Method and Technique: Background Investigations
+## Purpose and risk
+Background investigations help organisations decide whether a person presents an acceptable risk before or after they receive access to people, property, information, money or trust. They matter in government, business, private security, investment, contracting and domestic service settings because false identity claims, forged documents, hidden misconduct and misleading work histories can expose others to financial loss, violence, fraud, data theft, negligent hiring claims and reputational damage.
+
+A sound investigation does not assume that an applicant's resume, application or interview answers are accurate. It tests material claims against independent records, direct sources and lawful interviews. It also matches the depth of the enquiry to the role. A cashier, driver, childcare worker, executive, contractor with building access and employee handling confidential data create different risks, so each requires a proportionate scope.
+
+Small organisations often rely on background checks as their first practical protection against internal theft or misconduct. Larger organisations use them as part of personnel risk management, due diligence, vendor selection and regulatory compliance. Post-hire or continuous screening may also be justified when an employee's role changes, new risks arise or serious conduct concerns appear. Any ongoing screening must be transparent, lawful and based on clear consent or another valid legal basis.
+## Core principles
+Investigators should apply a sequential and corroborative method:
+- Define the ethics, trust, confidentiality and reputation requirements attached to the role.
+- Ask job-relevant behavioural and competency questions during the selection process.
+- Obtain written consent before accessing consumer reports, employment records or other restricted information.
+- Verify facts through primary sources wherever possible.
+- Use a risk-based reference process that goes beyond simple date and title checks when the role warrants it.
+- Apply the same standards to comparable applicants and employees.
+- Plan how the organisation will assess serious adverse information before it appears.
+- Record each source, limitation, discrepancy and decision so the outcome remains defensible.
+
+Investigators must not treat background screening as a search for disqualifying material at any cost. They should collect information that is relevant, necessary, lawful and reliable. They should avoid protected characteristics such as race, colour, religion, sex, gender identity, disability, genetic information, family medical history, age where protected by law and national origin unless a narrow legal exception applies. Medical enquiries usually require particular care and should not occur before the stage allowed by law.
+## Consent and scope
+A background investigation authorisation should state who will conduct the search, why the search is being conducted, what categories of information may be obtained and how the information may affect employment or engagement decisions. For employment consumer reports in the United States, employers must provide a stand-alone written disclosure, obtain written permission and follow pre-adverse and post-adverse action procedures if they rely on the report to make an unfavourable decision.
+
+The scope may include identity, addresses, education, employment, professional licences, references, criminal and civil court records, credit history, driving records, public records, business interests, assets and interviews about reputation or character. Access rules differ by jurisdiction and record type. Investigators should confirm the current law before collecting, using or disclosing each category.
+## Planning and documentation
+A clear plan prevents an investigation from becoming inconsistent or intrusive. The plan should identify the decision being supported, the risk categories being tested, the records to be searched, the people to be contacted, the legal basis for each step and the point at which the investigator will stop collecting information. It should also set a standard for handling discrepancies. A mismatch in dates, names or addresses may be harmless, but it can also signal identity confusion, omission or deception. Investigators should resolve material discrepancies before reporting conclusions.
+
+Documentation matters as much as discovery. Each request, consent, search result, interview, refusal and limitation should be logged. This audit trail protects the subject from inaccurate conclusions and protects the organisation if a decision is later challenged. It also helps decision-makers distinguish between verified fact, unverified allegation, database lead and professional judgement.
+## Establishing identity
+Identity verification links the person under review to names, dates, addresses and records. It should account for former names, aliases, business names, residential history and international connections where relevant. A proper identity review may examine authorised identity documents, address records, voter or electoral records where lawful, business registrations, property records, tax or assessment records, vehicle records, financing statements, bankruptcy filings, divorce property records and civil litigation records.
+
+Investigators should not rely on deception to obtain protected information. Pretexting, database misuse and unauthorised access can create legal and ethical exposure. Court portals, commercial databases and online indexes can speed up a search, but they are not substitutes for official records. Online court information may be incomplete, outdated or non-official. Common names, date of birth mismatches, sealed records, expunged records, juvenile matters and overlapping court jurisdictions require careful confirmation.
+## Employment and education history
+Employment history can reveal reliability, honesty, performance, attendance, discipline and reasons for separation. The application form should collect enough information to verify the applicant's claims without asking unlawful or irrelevant questions. Suitable topics usually include current and former names needed for verification, contact details, work history, education, professional qualifications, lawful work status, job-related driving history, licence status and references.
+
+Investigators should verify job titles, dates, duties, supervisors, eligibility for rehire and stated reasons for leaving. They should compare the resume, application, interview answers and third-party records for gaps or contradictions. They should treat neutral employer responses cautiously because many organisations restrict disclosures to dates and titles to manage defamation and privacy risk.
+
+Education checks should confirm attendance, qualification, dates and awarding institution. Diploma mills, altered transcripts and exaggerated qualifications make direct verification important. Access to transcripts normally requires consent. Professional licence checks should confirm the licence type, status, disciplinary history and any restrictions.
+## Criminal, civil and regulatory records
+Criminal and civil searches should match the subject's identity and the relevant jurisdictions. Investigators should search all places where the subject has lived, worked or operated when the role justifies that breadth. Court records should be read in context. An arrest, charge, dismissed case, conviction, civil claim, judgement, lien or bankruptcy has a different meaning and different legal treatment.
+
+Consumer reporting limits must be handled accurately. Under current US federal law, most bankruptcies older than ten years and most civil suits, civil judgements, arrest records, paid tax liens, collection accounts and other adverse information older than seven years cannot be included in ordinary consumer reports, subject to statutory exceptions. The bankruptcy reporting period is ten years, not fourteen years. Conviction records are treated differently under the Fair Credit Reporting Act, while state and local law may impose tighter limits.
+
+Motor vehicle records also require care. They are not freely public in the United States. The Driver's Privacy Protection Act restricts disclosure of personal information from state motor vehicle records and allows release only for specified permissible uses or with consent.
+
+Investigators should also consider the age, seriousness, relevance and outcome of adverse material. A minor old offence may have little connection to a low-risk role, while a recent fraud conviction may be highly relevant to a finance role. Civil litigation can indicate unresolved financial or conduct risk, but it can also reflect ordinary business disputes. Bankruptcy can show financial stress, yet it should not be treated as dishonesty without supporting facts.
+## Credit, assets and due diligence
+Credit and financial information can assist where a role involves money, fiduciary duties, sensitive data or high-value decision-making. It can also support asset tracing, due diligence, fraud prevention and enforcement. Investigators should avoid fishing expeditions. They should explain why financial information is job-related or transaction-related, obtain required authorisation and apply the same standard to similar cases.
+
+Asset-oriented enquiries may cover real property, personal property, vehicles, corporate interests, assumed business names, secured transactions, liens, judgements, bankruptcy schedules and public filings. These records can reveal undisclosed ownership, financial pressure, hidden business relationships and enforceable claims. Commercial investigation platforms can aggregate records quickly, but investigators must verify key findings with source documents before reporting or acting on them.
+## References, assessment tools and polygraphs
+References can add context about judgement, conduct, reliability and interpersonal behaviour. Traditional reference letters are often weak because authorship may be uncertain, wording varies and former employers fear legal exposure. Investigators should verify the source, ask structured questions and distinguish direct observation from opinion. Cautious phrases may signal reservations, while clear and specific praise usually carries more weight.
+
+Consultative tools such as integrity tests, personality assessments, substance-use screening and service aptitude measures may support selection when they are validated, job-related and administered by competent professionals. They should not replace factual verification or lawful human judgement.
+
+The polygraph has a narrow role in modern employment screening. The US Employee Polygraph Protection Act prohibits most private employers from using lie detector tests for pre-employment screening or during employment. Limited exceptions exist for certain security, pharmaceutical and workplace-loss investigations, and public-sector rules may differ. Law enforcement screening may still use polygraphs where the applicant consents and governing law permits it.
+## Reporting
+The final background report should give the client a clear and balanced view of the subject's verified history. It should include identification data, search scope, consent status, sources checked, education and employment findings, licence checks, criminal and civil records, credit or asset findings where authorised, reference information, unresolved discrepancies, limitations and a risk assessment tied to the role or transaction.
+
+A defensible report separates fact from opinion. It avoids exaggeration, labels disputed information, excludes irrelevant protected information and explains why any adverse finding matters. The strongest reports help decision-makers act fairly, consistently and lawfully while protecting the organisation from foreseeable risk.
