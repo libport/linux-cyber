@@ -11,7 +11,7 @@ These notes cover material from [*Private Security and the Investigative Process
 - [Chapter 6: Collection of Evidence and Preservation of the Scene](Chapter%206%20Collection%20of%20Evidence%20and%20Preservation%20of%20the%20Scene.md)
 - [Chapter 7: Surveillance Techniques](Chapter%207%20Surveillance%20Techniques.md)
 - [Chapter 8: Report Writing](Chapter%208%20Report%20Writing.md)
-- Chapter 9: Investigative Method and Technique: Theft/Property Offenses
-- Chapter 10: Investigative Method and Technique: Insurance Cases
-- Chapter 11: Investigative Method and Technique: Background Investigations
-- Chapter 12: The Security Office: Administrative Issues
+- [Chapter 9: Investigative Method and Technique: Theft/Property Offenses](Chapter%209%20Investigative%20Method%20and%20Technique%20Theft%20Property%20Offenses.md)
+- [Chapter 10: Investigative Method and Technique: Insurance Cases](Chapter%2010%20Investigative%20Method%20and%20Technique%20Insurance%20Cases.md)
+- [Chapter 11: Investigative Method and Technique: Background Investigations](Chapter%2011%20Investigative%20Method%20and%20Technique%20Background%20Investigations.md)
+- [Chapter 12: The Security Office: Administrative Issues](Chapter%2012%20The%20Security%20Office%20Administrative%20Issues.md)
