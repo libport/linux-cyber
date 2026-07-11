@@ -1,1 +1,0 @@
-# Hack The Box Certified Defensive Security Analyst Course Notes

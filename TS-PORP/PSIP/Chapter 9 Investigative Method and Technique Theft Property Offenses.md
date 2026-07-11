@@ -43,7 +43,7 @@ Practical controls include:
 - Check high-risk items that could conceal smaller goods.
 - Display bag-check policies, while recognising that bag checks in Australia must be voluntary and staff should not touch a customer's body or possessions.
 - Record incidents consistently so management can identify products, times, locations and methods at higher risk.
-
+Investigative method and technique in insurance cases
 Technology assists prevention, but it does not replace staff judgement. CCTV, electronic tags, alarms, point-of-sale analytics and exception reporting work best when staff understand how offenders defeat controls.
 
 A prevention program should also reduce the value of stolen goods after they leave the premises. Serial-number recording, asset marking, controlled warranty records, secure online marketplace monitoring and cooperation with police make resale harder. This market reduction approach matters because organised theft depends on a buyer, handler or resale channel.
