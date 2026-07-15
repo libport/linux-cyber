@@ -1,5 +1,5 @@
-# Red Hat Certified Specialist in Containers Course Notes
-These notes cover material from Pluralsight's 2 hour, self-paced course. The notes cover how to to create, configure, and manage containerized services using Red Hat OpenShift and other Red Hat technologies.
+# *Red Hat Certified Specialist in Containers* Course Notes
+These notes cover material from Pluralsight's 2 hour, self-paced [Red Hat Certified Specialist in Containers](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-containers-ex188) course. They cover how to to create, configure, and manage containerized services using Red Hat OpenShift and other Red Hat technologies.
 ## Implement and Manage Images with Podman
 Podman manages Open Container Initiative images and containers without a central daemon. It can run rootless, which lets an unprivileged user build, pull and run containers with a smaller host security exposure than a root-owned runtime. Image management with Podman relies on four connected ideas: images, registries, Containerfiles and rootless execution.
 ### Images and Registries

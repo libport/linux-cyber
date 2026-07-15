@@ -1,6 +1,6 @@
-# Red Hat Certified System Administrator Course Notes
+# *Red Hat Certified System Administrator* Course Notes
 ## Course Description
-This 30 hour, self-paced course teaches Linux system administration with Red Hat Enterprise Linux. This series which will cover tools and scripting, deploying systems, daily operations and tasks, networking, security, and much more. Additionally, for those interested in certification, these courses cover the topics presented by the Red Hat Certified System Administrator (RHCSA) certification and can help you prepare for the exam.
+These notes cover material from Pluralsight's 30 hour, self-paced [Red Hat Certified System Administrator](https://www.pluralsight.com/paths/rhcsa-red-hat-certified-system-administrator-ex200) course that teaches Linux system administration with Red Hat Enterprise Linux. They cover tools and scripting, deploying systems, daily operations and tasks, networking, security, and more. Additionally, for those interested in certification, these courses cover the topics presented by the Red Hat Certified System Administrator (RHCSA) certification and can help you prepare for the exam.
 ## Module Notes
 - [What's New in RHEL 9](What's%20New%20in%20RHEL%209.md)
 - [Using Essential Tools](Using%20Essential%20Tools.md)

@@ -1,5 +1,5 @@
 # TCM Security Practical OSINT Research Professional Certification Notes
-These notes cover material that complement the course content of TCM Security's Practical OSINT Research Professional (PORP) certification. The certification is designed to validate individuals’ skills in gathering intelligence from publicly available sources.
+These notes cover material that complement the course content of TCM Security's [Practical OSINT Research Professional (PORP) certification](https://certifications.tcm-sec.com/porp/). The certification is designed to validate individuals’ skills in gathering intelligence from publicly available sources.
 
 The certification course covers the following:
 - Gaining a better understanding of OSINT techniques
