@@ -14,7 +14,6 @@ Linux provides the operating-system foundation for much of platform engineering,
 - :notebook: [Pluralsight Docker](docker/README.md) ([course link](https://www.pluralsight.com/paths/managing-docker-in-production))
 - :notebook: [Pluralsight Certified Kubernetes Administrator](CKA/README.md) ([course link](https://www.pluralsight.com/paths/certified-kubernetes-administrator))
 - Pluralsight Terraform ([course link](https://www.pluralsight.com/paths/terraform))
-- :construction: :notebook: [Codecademy Associate Systems Engineer to Principal Systems Engineer](ASEPSE/README.md) ([course link](https://www.codecademy.com/learn/ext-paths/systems-engineering-journey))
 ### Book Notes
 - UNIX and Linux System Administration Handbook, 5th edition, by Evi Nemeth, Garth Snyder, Trent R. Hein, Ben Whaley, and Dan Mackin. ([publisher page](https://www.admin.com/))
 - Systems Performance: Enterprise and the Cloud, 2nd edition, by Brendan Gregg. ([publisher page](https://www.brendangregg.com/systems-performance-2nd-edition-book.html))
