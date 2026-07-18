@@ -1,6 +1,6 @@
 # Introduction to Cybersecurity Tools & Cyberattacks
 > [!NOTE]
-> These notes explain how critical thinking, threat awareness, vulnerability management, incident response, identity security, and physical safeguards work together to defend organisations against evolving cyberattacks.
+> Explain how critical thinking, threat awareness, vulnerability management, incident response, identity security, and physical safeguards work together to defend organisations against evolving cyberattacks.
 ## Cybersecurity Insights
 ### Cybersecurity lessons from major events and critical thinking
 #### 9/11 and the shift in cyber priorities

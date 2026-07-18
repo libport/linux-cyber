@@ -1,4 +1,7 @@
 # Package Management Issues
+> [!NOTE]
+> Explains how to diagnose and recover RHEL 8 package-management problems by resolving dependency and version conflicts, repairing corrupted RPM databases, and verifying or restoring altered package files safely.
+
 ## Resolving RHEL package management issues
 Red Hat Enterprise Linux 8 systems use RPM as the low-level package manager and DNF as the main dependency-aware front end. RPM stores installed package metadata in the RPM database and uses that metadata to install, query, verify, update and remove packages. DNF reads repository metadata, resolves dependencies, selects suitable package versions and then uses RPM to carry out the transaction.
 ### Diagnose dependency and version problems

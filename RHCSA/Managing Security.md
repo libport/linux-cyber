@@ -1,6 +1,6 @@
 # Managing Security
 > [!NOTE]
-> This file is a practical RHEL security administration guide that covers SSH key-based authentication, POSIX ACLs, and SELinux modes, contexts, and troubleshooting for securing remote access, filesystem permissions, and service configurations.
+> A layered approach to securing RHEL systems through SSH key authentication, precise ACL permissions, SELinux enforcement, persistent policy configuration, and disciplined audit-led troubleshooting.
 ## SSH key-based authentication
 ### Replacing passwords with keys
 SSH key-based authentication reduces exposure to guessed or reused passwords. A user generates a key pair with `ssh-keygen`. The private key stays on the client. The public key moves to the target account on the remote host, usually with `ssh-copy-id`. The remote host stores that public key in `~/.ssh/authorized_keys` for the destination account.

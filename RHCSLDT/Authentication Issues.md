@@ -1,4 +1,6 @@
 # Authentication Issues
+> [!NOTE]
+> Explains how to troubleshoot RHEL 8 authentication by validating authselect profiles, PAM service rules, NSS sources, packaged configurations, and SSSD connections to LDAP and Kerberos providers.
 ## PAM and identity management troubleshooting in RHEL 8
 Red Hat Enterprise Linux 8 manages most host authentication through authselect, Pluggable Authentication Modules (PAM), Name Service Switch (NSS), and the System Security Services Daemon (SSSD). Administrators should treat older authconfig habits as legacy practice. Authselect selects a tested profile and generates the PAM and NSS configuration that supports that profile.
 ### Authentication configuration

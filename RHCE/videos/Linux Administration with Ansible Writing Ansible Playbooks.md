@@ -1,7 +1,6 @@
 # Linux Administration with Ansible: Writing Ansible Playbooks
-
 > [!NOTE]
-> A practical guide to writing readable, idempotent Ansible playbooks for mixed Linux environments, covering YAML structure, inventories, variables, handlers, safe use of native commands, common administration tasks, reusable task composition, and validation practices for reliable automation.
+> Explains how to build reliable, portable Ansible playbooks using clear YAML, inventories, variables, modules, handlers, validation, idempotent execution, and reusable automation components.
 
 Ansible playbooks define and maintain system state in YAML. They replace repetitive, host-specific administration with repeatable, readable automation. A playbook can install software, manage files, start services, create users, schedule jobs, and combine smaller units of automation into larger workflows.
 

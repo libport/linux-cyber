@@ -1,6 +1,6 @@
 # Cybersecurity Job Search, Resume, and Interview Prep
 > [!NOTE]
-> These notes equips aspiring cybersecurity professionals to choose a career path, build relevant skills, create compelling applications, navigate interviews, and evaluate job offers with confidence.
+> Equips aspiring cybersecurity professionals to choose a career path, build relevant skills, create compelling applications, navigate interviews, and evaluate job offers with confidence.
 ## Getting Ready for a Cybersecurity Career
 Cybersecurity professionals protect digital assets by reducing risk and improving an organisation’s ability to prevent, detect, respond to, and recover from cyberattacks. Their work aims to preserve confidentiality, integrity, and availability of information and systems. The field changes quickly, so effective practitioners keep pace with evolving threats, new technologies, and updated security controls and operating practices.
 ### Common cybersecurity roles

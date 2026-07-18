@@ -1,6 +1,6 @@
 # Operating Systems: Overview, Administration, and Security
 > [!NOTE]
-> These notes cover the administration, architecture, and security of Windows, Linux, macOS, iOS, and Android, alongside the foundations of virtualisation, cloud computing, and containers.
+> Covers the administration, architecture, and security of Windows, Linux, macOS, iOS, and Android, alongside the foundations of virtualisation, cloud computing, and containers.
 ## Windows Operating Systems
 ### Operating system fundamentals
 #### What an operating system provides

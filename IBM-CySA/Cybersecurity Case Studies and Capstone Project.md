@@ -1,6 +1,6 @@
 # Cybersecurity Case Studies
 > [!NOTE]
-> These notes uses real-world cyber incidents to teach structured analysis of attack causes, impacts, responses, compliance failures, and practical defenses across phishing, ransomware, insider threats, AI-enabled fraud, penetration testing, and digital forensics.
+> Using real-world cyber incidents to teach structured analysis of attack causes, impacts, responses, compliance failures, and practical defenses across phishing, ransomware, insider threats, AI-enabled fraud, penetration testing, and digital forensics.
 
 ## Analysing Case Study Layouts and Phishing Case Studies
 ### Exploring cybersecurity case studies

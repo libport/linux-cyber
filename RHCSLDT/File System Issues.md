@@ -1,4 +1,6 @@
 # File System Issues
+> [!NOTE]
+> Presents a layered, safety-first approach to diagnosing and recovering RHEL 8 storage failures involving XFS, ext4, LVM metadata, LUKS encryption, and iSCSI connectivity or authentication.
 ## Diagnose and troubleshoot file system issues
 Red Hat Enterprise Linux 8 administrators diagnose file system issues by separating storage faults from configuration faults. The work commonly involves XFS and ext4 repair, Logical Volume Manager metadata recovery, Linux Unified Key Setup recovery and iSCSI target or initiator faults. Administrators should attach the required training disks before building the lab, then confirm device names with `lsblk` rather than assuming a fixed NVMe name. Cloud platforms can assign different names across servers, so every destructive command should target a verified device.
 ### Prepare storage safely

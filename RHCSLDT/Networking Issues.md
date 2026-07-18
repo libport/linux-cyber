@@ -1,4 +1,6 @@
 # Networking Issues
+> [!NOTE]
+> Presents a layered approach to troubleshooting Linux network connectivity by testing reachability and ports, verifying services, firewalls, DNS, routes, and interfaces, and using packet captures to pinpoint where traffic fails.
 ## Troubleshooting Linux Network Connectivity
 Linux network troubleshooting starts with a clear path through the stack. Applications such as HTTPD and SSH generate data. The transport layer splits that data into segments and carries it with TCP or UDP. The network layer routes packets between networks. The data link and physical layers move frames through interfaces, MAC addresses, cables, switches, and virtual network devices. The TCP/IP model compresses these functions into application, transport, internet, and network access layers.
 

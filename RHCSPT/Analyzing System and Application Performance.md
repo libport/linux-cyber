@@ -1,4 +1,7 @@
 # Analyzing System and Application Performance
+> [!NOTE]
+> Presents an evidence-led approach to diagnosing system and application performance by combining requirements analysis, targeted monitoring, dynamic tracing, code profiling, historical metrics, and disciplined operational practice.
+
 System and application performance analysis starts with a clear understanding of requirements, workload and risk. Administrators make better decisions when they compare applications against measured behaviour rather than vendor claims, release dates or assumptions about newer versions. The best choice may be the latest release, an older release, a competing tool or a redesign of the environment around the application.
 
 A useful evaluation records the operating system version, patch level, CPU, memory, storage and network requirements. It also identifies disk I/O, network I/O, scaling behaviour and dependencies such as shared storage, firewalls, load balancers and VPNs. These details reveal hidden costs and operational risks before deployment. They also define the metrics that matter during testing.

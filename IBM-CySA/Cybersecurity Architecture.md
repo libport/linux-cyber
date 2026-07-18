@@ -1,6 +1,6 @@
 # Cybersecurity Architecture
 > [!NOTE]
->  These notes explain how to build resilient cybersecurity architectures by integrating sound security principles with identity, endpoint, network, application, data, detection, and incident-response controls.
+>  How to build resilient cybersecurity architectures by integrating sound security principles with identity, endpoint, network, application, data, detection, and incident-response controls.
 ## Cybersecurity Architecture Overview
 ### Cybersecurity architecture fundamentals
 Cybersecurity architecture applies security principles, the CIA triad, and recognised frameworks to design systems that remain trustworthy under attack and during failures. It aims to reduce risk to acceptable levels while keeping delivery practical for product teams and operations. Security is most effective when designed into the system lifecycle rather than bolted on after implementation.

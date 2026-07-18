@@ -1,4 +1,7 @@
 # Aiding Third-Party Investigations
+> [!NOTE]
+> Explains how RHEL administrators can support third-party investigations by capturing kernel crash dumps with kdump and securely building, deploying, and controlling SystemTap diagnostic modules.
+
 ## Kernel crash dumps and SystemTap modules
 Kernel crash dumps help investigators analyse a failed Linux kernel after a panic. On RHEL 8, kdump reserves memory for a crash kernel, starts a second kernel after the failure and saves a vmcore for later analysis.
 

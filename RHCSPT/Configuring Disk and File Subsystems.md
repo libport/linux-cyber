@@ -1,13 +1,15 @@
 # Configuring Disk and File Subsystems
+> [!NOTE]
+> Explains how to optimise RHEL 8 storage by selecting and persisting suitable disk schedulers, choosing workload-appropriate file systems, and safely creating, expanding, and repairing XFS volumes.
 ## Disk scheduler selection
 The Linux disk scheduler orders read and write requests before they reach storage. Red Hat Enterprise Linux 8 supports multi-queue schedulers only, which helps the block layer scale on solid-state drives and multi-core systems.
 
-| Scheduler | Main use |
-|---|---|
-| `none` | Uses first-in, first-out scheduling. It suits high-performance SSDs, CPU-bound systems with fast storage and NVMe. Leave NVMe devices on `none` unless testing proves a need to change. |
-| `mq-deadline` | Groups requests into read and write batches, then schedules them by logical block address. It suits most workloads, especially asynchronous writes. |
-| `bfq` | Favours low latency and responsiveness over maximum throughput. It suits desktops, interactive systems and large file copies. |
-| `kyber` | Tunes for a latency target by measuring each I/O request. It suits fast, low-latency NVMe and SSD storage. |
+| Scheduler     | Main use                                                                                                                                                                                |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `none`        | Uses first-in, first-out scheduling. It suits high-performance SSDs, CPU-bound systems with fast storage and NVMe. Leave NVMe devices on `none` unless testing proves a need to change. |
+| `mq-deadline` | Groups requests into read and write batches, then schedules them by logical block address. It suits most workloads, especially asynchronous writes.                                     |
+| `bfq`         | Favours low latency and responsiveness over maximum throughput. It suits desktops, interactive systems and large file copies.                                                           |
+| `kyber`       | Tunes for a latency target by measuring each I/O request. It suits fast, low-latency NVMe and SSD storage.                                                                              |
 
 The kernel selects a default scheduler by device type. Administrators should keep it unless workload analysis justifies a change. The active scheduler appears in square brackets in the device scheduler file.
 

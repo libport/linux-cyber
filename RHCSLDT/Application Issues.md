@@ -1,4 +1,6 @@
 # Application Issues
+> [!NOTE]
+> Presents a systematic approach to diagnosing Linux application failures through shared-library inspection, memory analysis, runtime tracing, and SELinux troubleshooting while distinguishing administrator-remediable issues from code defects requiring developer action.
 ## Diagnosing Linux application issues
 Linux administrators diagnose application failures by checking shared libraries, memory behaviour, trace output and SELinux policy. The work usually separates system faults from application faults. Administrators can repair missing packages, incorrect labels, port mappings and SELinux booleans. They usually report application memory leaks or code defects to the application owner with clear diagnostic evidence.
 ### Shared library dependencies

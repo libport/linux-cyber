@@ -1,4 +1,6 @@
 # Monitoring and Altering Kernel Behavior
+> [!NOTE]
+> Explains how RHEL administrators can safely inspect, modify, and persist kernel parameters and modules to tune performance, control functionality, and strengthen system security.
 ## Kernel parameters and modules
 Red Hat administrators use kernel parameters and modules to control Linux behaviour, tune performance and reduce unnecessary functionality. Kernel parameters fall into two practical groups. Command-line parameters apply at boot. Runtime parameters apply after boot and usually sit under `/proc/sys`.
 ## Viewing kernel parameters

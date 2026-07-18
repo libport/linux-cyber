@@ -1,4 +1,7 @@
 # General Trouble Shooting Methods
+> [!NOTE]
+> Presents a disciplined RHEL troubleshooting framework that combines evidence gathering, authoritative documentation, performance monitoring, log analysis, and centralised logging to diagnose faults and implement persistent, verifiable fixes.
+
 Red Hat EX342 candidates need a reliable method for diagnosing Linux faults, collecting evidence, using documentation, monitoring systems and forwarding logs to a central host. Red Hat identifies RHEL 8.4 as the base for EX342 and RH342, so practice should use a RHEL 8.4 system wherever possible. A Red Hat Developer account gives individual learners a no-cost path to RHEL access for study and lab work, subject to Red Hat's terms.
 
 The general troubleshooting objective covers four capabilities:

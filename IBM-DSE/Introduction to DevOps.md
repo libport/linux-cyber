@@ -1,6 +1,6 @@
 # Introduction to DevOps
 > [!NOTE]
-> These notes explain how DevOps unites culture, collaboration, automation, measurement and shared ownership to help cross-functional teams deliver reliable software rapidly through small changes, continuous feedback, and learning.
+> Explain how DevOps unites culture, collaboration, automation, measurement and shared ownership to help cross-functional teams deliver reliable software rapidly through small changes, continuous feedback, and learning.
 ## Overview of DevOps
 ### Why DevOps developed
 Digital disruption rewards organisations that can test ideas, learn from customers and improve services quickly without sacrificing reliability. Technology enables that work, but a strong business model and an effective operating system direct it. Ride-sharing, streaming and mobile services succeeded by combining existing technologies with new ways to create and deliver value.

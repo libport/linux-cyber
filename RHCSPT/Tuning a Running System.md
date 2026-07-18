@@ -1,4 +1,7 @@
 # Tuning a Running System
+> [!NOTE]
+> Explains how RHEL administrators can optimise running systems through process priorities, TuneD profiles, cgroup-based resource controls, systemd policies, and carefully reviewed power-management settings.
+
 Administrators tune a running Linux system by adjusting process priority, selecting TuneD profiles, applying custom TuneD settings, managing control groups, and reviewing power consumption. These techniques improve performance, reduce unnecessary resource use, and make workload behaviour more predictable.
 ## Process Priority and Niceness
 Linux uses a nice value to influence scheduling priority. The range runs from -20 to 19. Lower values favour the process, while higher values make the process more willing to yield CPU time. Most processes start at 0, and child processes inherit the nice value of the parent process.

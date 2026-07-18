@@ -1,6 +1,6 @@
 # Database Essentials and Vulnerabilities
 > [!NOTE]
-> These notes introduce database fundamentals, SQL administration, and layered data protection, with particular emphasis on preventing injection attacks through secure design, least privilege, validation, auditing, and resilient backups.
+> Introduction on database fundamentals, SQL administration, and layered data protection, with particular emphasis on preventing injection attacks through secure design, least privilege, validation, auditing, and resilient backups.
 ## Database Fundamentals
 ### Relational databases
 - A relational database stores data in tables with rows for records and columns for attributes.

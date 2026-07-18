@@ -1,6 +1,6 @@
 # What's New in RHEL 9
 > [!NOTE]
-> This document explains that RHEL 9 is an incremental update focused on newer core software, stronger security defaults, NetworkManager-based networking, LVM-integrated VDO storage, and tighter Podman/systemd container management rather than a full redesign.
+> RHEL 9’s key advances, including updated platform components, NetworkManager-only networking, stronger SSH defaults, LVM-integrated VDO storage, and deeper Podman–systemd integration.
 
 Red Hat Enterprise Linux 9 is an incremental platform update rather than a full redesign. It keeps the core administration model from RHEL and updates the platform around newer software, tighter defaults, and cleaner tooling. The most important changes sit in four areas: the base operating system, the RHCSA study focus, storage through LVM-VDO, and container management with Podman and systemd.
 

@@ -1,6 +1,6 @@
 # Penetration Testing, Threat Hunting, and Cryptography
 > [!NOTE]
-> These notes cover penetration testing, threat hunting and intelligence, and modern cryptography to help organisations uncover weaknesses, detect adversaries, and protect data with effective security controls.
+> Covers penetration testing, threat hunting and intelligence, and modern cryptography to help organisations uncover weaknesses, detect adversaries, and protect data with effective security controls.
 ## Penetration Testing: Planning and Discovery Phases
 Penetration testing, often called pen testing, is a structured security assessment in which authorised testers simulate real attacks against systems, applications, and people to identify weaknesses and demonstrate how those weaknesses could be exploited. It is one technique within ethical hacking, which also covers activities such as malware analysis and risk assessment. Pen tests are commonly delivered by independent specialists to provide an external perspective that may surface issues missed by in house teams.
 

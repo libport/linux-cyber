@@ -1,4 +1,7 @@
 # Profiling and Tuning System Hardware and Performance
+> [!NOTE]
+> Explains how RHEL administrators can diagnose hardware and boot issues, optimise CPU affinity, and configure huge pages to improve system stability and workload performance.
+
 Red Hat administrators need a clear hardware profile before they tune performance. Software often receives most attention, but hardware, firmware, kernel messages, CPU placement and memory page choices can explain bottlenecks, startup delays and unstable behaviour.
 ## Hardware and boot diagnostics
 `dmidecode` decodes the system DMI or SMBIOS tables and presents firmware and hardware data in readable form. Its output can include BIOS version, system model, serial numbers, board details, chassis information, processor data, memory slots and supported features. Vendors supply this data, so administrators should treat it as useful but not infallible.

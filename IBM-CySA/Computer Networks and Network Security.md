@@ -1,6 +1,6 @@
 # Computer Networks and Network Security
 > [!NOTE]
-> These notes cover the fundamentals of computer networking, protocols, addressing, routing, monitoring, and layered security controls for protecting networks and endpoints.
+> The fundamentals of computer networking, protocols, addressing, routing, monitoring, and layered security controls for protecting networks and endpoints.
 
 ## Networking Fundamentals
 ### Networking models

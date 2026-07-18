@@ -1,4 +1,6 @@
 # System Startup Issues
+> [!NOTE]
+> Presents a structured approach to resolving RHEL 8 startup failures by diagnosing each boot stage and recovering bootloaders, root access, kernels, modules, systemd services, and hardware faults with the least invasive method available.
 ## Diagnosing and Troubleshooting System Startup Issues
 Red Hat Enterprise Linux startup troubleshooting requires access below the normal login layer. Cloud playground servers usually do not provide that access because the administrator must interrupt boot, edit GRUB, use rescue media, or choose an alternate boot entry. A local virtual machine, a hypervisor-backed lab server, or bare metal system suits these tasks. For EX342 practice, the environment should match Red Hat Enterprise Linux 8.4 where possible.
 

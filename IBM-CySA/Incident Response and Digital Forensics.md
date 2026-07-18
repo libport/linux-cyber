@@ -1,6 +1,6 @@
 # Incident Response and Digital Forensics
 > [!NOTE]
-> These notes explain how organisations prepare for, detect, contain, investigate, and recover from cyber incidents while preserving and analysing digital evidence through disciplined forensic workflows.
+> How organisations prepare for, detect, contain, investigate, and recover from cyber incidents while preserving and analysing digital evidence through disciplined forensic workflows.
 ## Incident Response
 Incident response is a structured approach that helps an organisation prepare for, detect, manage, and recover from cybersecurity threats such as unauthorised access, malware, phishing, ransomware, and data breaches. The aim is to reduce harm to people, information, systems, operations, reputation, and cost.
 ### Security events and security incidents
