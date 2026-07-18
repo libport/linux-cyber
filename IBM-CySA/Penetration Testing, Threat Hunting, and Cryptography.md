@@ -1,7 +1,6 @@
 # Penetration Testing, Threat Hunting, and Cryptography
-
 > [!NOTE]
-> This document surveys three core security disciplines. It explains penetration testing as an authorised, scoped simulation of real attacks, covering planning, reconnaissance, exploitation, evidence gathering, and reporting, and clarifying how it differs from automated vulnerability scanning. It then introduces threat hunting and threat intelligence, including how telemetry, hypotheses, and structured frameworks improve detection and response. Finally, it covers cryptography fundamentals of confidentiality, integrity, hashing, digital signatures, symmetric vs. asymmetric encryption, key management pitfalls, and the shift toward post-quantum approaches.
+> These notes cover penetration testing, threat hunting and intelligence, and modern cryptography to help organisations uncover weaknesses, detect adversaries, and protect data with effective security controls.
 ## Penetration Testing: Planning and Discovery Phases
 Penetration testing, often called pen testing, is a structured security assessment in which authorised testers simulate real attacks against systems, applications, and people to identify weaknesses and demonstrate how those weaknesses could be exploited. It is one technique within ethical hacking, which also covers activities such as malware analysis and risk assessment. Pen tests are commonly delivered by independent specialists to provide an external perspective that may surface issues missed by in house teams.
 

@@ -19,7 +19,7 @@ The IBM Cybersecurity Analyst Professional Certificate is a 4-month, self-paced 
 - [Cybersecurity Compliance Framework, Standards & Regulations](Cybersecurity%20Compliance%20Framework,%20Standards%20&%20Regulations.md)
 - [Penetration Testing, Threat Hunting, and Cryptography](Penetration%20Testing,%20Threat%20Hunting,%20and%20Cryptography.md)
 - [Incident Response and Digital Forensics](Incident%20Response%20and%20Digital%20Forensics.md)
-- [Cybersecurity Case Studies](Cybersecurity%20Case%20Studies.md)
+- :package: [Cybersecurity Case Studies and Capstone Project](Cybersecurity%20Case%20Studies%20and%20Capstone%20Project.md)
 - [Generative AI: Boost Your Cybersecurity Career](Generative%20AI%20Boost%20Your%20Cybersecurity%20Career.md)
 - [Cybersecurity Job Search, Resume, and Interview Prep](Cybersecurity%20Job%20Search,%20Resume,%20and%20Interview%20Prep.md)
 ## Further Reading

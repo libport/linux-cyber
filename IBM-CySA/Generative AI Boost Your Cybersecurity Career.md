@@ -1,7 +1,6 @@
 # Generative AI: Boost Your Cybersecurity Career
-
 > [!NOTE]
-> This guide explains how generative AI can accelerate a cybersecurity career by improving speed, consistency, and context handling across common security tasks. It contrasts conventional AI with generative models, then surveys applications in threat intelligence, threat hunting, incident response, vulnerability management, SIEM/SOAR operations, and stakeholder reporting. It also highlights key risks of prompt injection, data leakage, hallucinations, poisoning, and bias. In addition, practical mitigations such as least privilege, sandboxing, logging, human oversight, and retrieval-augmented generation.
+> These notes explain how generative AI can strengthen cybersecurity careers and operations by enhancing threat detection, vulnerability management, SIEM and SOAR workflows, and incident response while requiring human oversight and robust safeguards.
 ## Get Started with Gen AI in Cybersecurity
 Conventional artificial intelligence differs from generative artificial intelligence and why the shift matters for cybersecurity. Conventional AI is task-focused and typically constrained by fixed rules or models trained on existing datasets. Generative AI is capable of producing new outputs, such as text, images, code, or simulations, and as more adaptive when facing changing conditions.
 ### Conventional AI and generative AI

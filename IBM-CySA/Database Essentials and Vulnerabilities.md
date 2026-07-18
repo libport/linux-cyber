@@ -1,7 +1,6 @@
 # Database Essentials and Vulnerabilities
-
 > [!NOTE]
-> This document surveys database fundamentals and the security risks that commonly threaten them. It contrasts relational and NoSQL models, ER-based data modelling, and essential SQL/administration tasks (DDL/DML/DCL, roles, permissions, and backup strategies). It then covers data protection practices of classification, data at rest/in transit/in use, sovereignty, encryption, masking, tokenisation, segmentation, and auditing. Finally, it explains injection vulnerabilities (OS command, SQL, NoSQL, LDAP, XPath) and prevention aligned with OWASP and NIST guidance.
+> These notes introduce database fundamentals, SQL administration, and layered data protection, with particular emphasis on preventing injection attacks through secure design, least privilege, validation, auditing, and resilient backups.
 ## Database Fundamentals
 ### Relational databases
 - A relational database stores data in tables with rows for records and columns for attributes.

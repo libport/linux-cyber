@@ -1,7 +1,7 @@
 # Computer Networks and Network Security
-
 > [!NOTE]
-> This guide surveys core computer networking and security concepts. It explains OSI and TCP/IP models, common protocols, ports, sockets, and wireless IEEE standards, then covers network design and hardware roles. It introduces IPv4/IPv6 addressing, subnetting, routing tables, ARP, and packet/header fields, with practical troubleshooting using tools like Wireshark, traceroute, DNS, DHCP, syslog, and flow analysis. Security sections detail packet inspection, firewall types, IDS/IPS, NAT, and layered defenses, plus FIM, DLP, NAC, UBA, and EDR/XDR practices. 
+> These notes cover the fundamentals of computer networking, protocols, addressing, routing, monitoring, and layered security controls for protecting networks and endpoints.
+
 ## Networking Fundamentals
 ### Networking models
 - A networking model defines how systems communicate, including how data is packaged, addressed, transmitted, and received.

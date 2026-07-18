@@ -1,7 +1,6 @@
 # Introduction to Cybersecurity Tools & Cyberattacks
-
 > [!NOTE]
-> This primer connects cyberattacks to major events and early culture like WarGames. Showing how priorities, policy, and tooling evolved. Especially in national security in the context of the U.S. Department of Homeland Security. It introduces critical-thinking techniques for triage and root-cause analysis, then surveys threats. AI-boosted phishing and OSINT targeting, malware and ransomware, insider risk, sniffing, spoofing, DoS, and injection. It also outlines controls and operations: IAM (SSO, passkeys), vulnerability scanning (Tenable Nessus; Greenbone Networks OpenVAS), and incident response/forensics aligned with NIST and SANS Institute.
+> These notes explain how critical thinking, threat awareness, vulnerability management, incident response, identity security, and physical safeguards work together to defend organisations against evolving cyberattacks.
 ## Cybersecurity Insights
 ### Cybersecurity lessons from major events and critical thinking
 #### 9/11 and the shift in cyber priorities

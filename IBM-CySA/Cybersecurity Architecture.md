@@ -1,7 +1,6 @@
 # Cybersecurity Architecture
-
 > [!NOTE]
-> This document introduces cybersecurity architecture as the disciplined design of systems that remain trustworthy under attack, grounded in the CIA triad and practical frameworks. It explains core principles like defence in depth, least privilege, separation of duties, secure-by-design, and simplicity, and contrasts them with security by obscurity. It then surveys key domains of endpoint, identity and access management, network, application, and data security. Plus monitoring, SIEM/XDR, incident response, SOAR, and vulnerability assessment, linking practices to OWASP and NIST for end-to-end risk reduction.
+>  These notes explain how to build resilient cybersecurity architectures by integrating sound security principles with identity, endpoint, network, application, data, detection, and incident-response controls.
 ## Cybersecurity Architecture Overview
 ### Cybersecurity architecture fundamentals
 Cybersecurity architecture applies security principles, the CIA triad, and recognised frameworks to design systems that remain trustworthy under attack and during failures. It aims to reduce risk to acceptable levels while keeping delivery practical for product teams and operations. Security is most effective when designed into the system lifecycle rather than bolted on after implementation.

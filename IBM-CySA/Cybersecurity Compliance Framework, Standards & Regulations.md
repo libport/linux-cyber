@@ -1,7 +1,6 @@
 # Cybersecurity Compliance Framework, Standards & Regulations
-
 > [!NOTE]
-> This document explains how cybersecurity compliance is managed through governance, risk, and compliance (GRC) practices that align security controls with business objectives and legal obligations. It outlines governance building blocks (policies, standards, procedures, oversight), risk management approaches, asset and change management, and the role of GRC tools. It also surveys major frameworks and standards (including NIST CSF 2.0, ISO/IEC, OWASP, ITIL, SOC reports, and ISACA), alongside key laws and privacy regimes, third-party risk, and emerging AI governance such as the EU AI Act.
+> These notes explain how organisations use GRC, ITIL, risk and asset management, global regulations, industry standards, and security audits to build compliant, resilient cybersecurity programmes.
 ## Introduction to Information Security and Compliance
 ### Governance, Risk and Compliance and Cybersecurity Management
 Summary of how organisations coordinate governance, risk management, compliance, and core security practices to keep operations lawful, resilient, and aligned with business objectives.

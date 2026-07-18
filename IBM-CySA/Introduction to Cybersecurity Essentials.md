@@ -1,7 +1,6 @@
 # Introduction to Cybersecurity Essentials
-
 > [!NOTE]
-> This document introduces foundational cybersecurity concepts and everyday practices for protecting information assets. It explains data and privacy categories (PII, PCI, PHI), common threats (physical risks, insider threats, malware, web attacks, DoS, and social engineering), and how recurring breach patterns often trace back to weak patching, access control, and monitoring. It then covers practical controls such as MFA, SSO, RBAC, auditing, encryption basics, safe password habits, secure browsing on public networks, and VPN/IPsec fundamentals, emphasising defence in depth and least privilege.
+> These notes introduce essential cybersecurity threats and practical safeguards for protecting data, devices, accounts, networks, browsing activity, and applications through layered security and safer online behaviour.
 ## Security Concerns
 ### Security and information privacy essentials
 #### Information assets and analytics

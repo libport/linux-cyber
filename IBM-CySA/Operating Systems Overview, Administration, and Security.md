@@ -1,7 +1,6 @@
 # Operating Systems: Overview, Administration, and Security
-
 > [!NOTE]
-> This document surveys operating system fundamentals and secure administration across Windows, Linux, and Apple platforms. It explains OS roles, storage and filesystems, Windows architecture, and essential management tools (Microsoft Management Console, command line, Group Policy, WSUS). Security coverage includes UAC, encryption (BitLocker/EFS, FileVault), endpoint protection, firewalling, patching, auditing, and directory-based authentication (Active Directory, Kerberos). It then introduces Linux distributions, shell navigation, core commands, permissions, and hardening. Finally, it reviews mobile OS basics plus virtualization, cloud service models, and containers such as Docker.
+> These notes cover the administration, architecture, and security of Windows, Linux, macOS, iOS, and Android, alongside the foundations of virtualisation, cloud computing, and containers.
 ## Windows Operating Systems
 ### Operating system fundamentals
 #### What an operating system provides

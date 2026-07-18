@@ -1,7 +1,7 @@
 # Cybersecurity Case Studies
-
 > [!NOTE]
-> This document uses real-world incidents to turn cybersecurity theory into practice. It provides a repeatable framework and template for analysing breaches: timeline, root cause, response actions, impact, lessons learned, and measurable recommendations. Topics span phishing and business email compromise (invoice fraud, vishing), point-of-sale malware and skimming (Target 2013, Home Depot 2014), insider threats and cloud misconfiguration, AI-enabled deepfake fraud, ransomware patterns and major disruptions, plus incident response, digital forensics, penetration testing, and compliance penalties.
+> These notes uses real-world cyber incidents to teach structured analysis of attack causes, impacts, responses, compliance failures, and practical defenses across phishing, ransomware, insider threats, AI-enabled fraud, penetration testing, and digital forensics.
+
 ## Analysing Case Study Layouts and Phishing Case Studies
 ### Exploring cybersecurity case studies
 Case studies help organisations and learners translate cybersecurity theory into practice by examining real incidents. They support critical thinking, reveal how adversaries operate, and show how controls, processes, and people influence outcomes.
@@ -318,3 +318,4 @@ Amounts below refer to publicly reported final penalties or settlements, not ini
 | 2020 | Marriott | £18.4 million | UK ICO | Starwood breach security failings |
 | 2022 | Didi | 8.026 billion yuan | China regulator | data security violations |
 | 2017 | Equifax | up to US$700 million | US settlement | identity data breach |
+## Capstone Project

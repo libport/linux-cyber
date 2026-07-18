@@ -23,11 +23,11 @@ Linux provides the operating-system foundation for much of platform engineering,
 ## Cybersecurity
 Cybersecurity is the practice of protecting systems, networks, and data from unauthorized access, disruption, damage, and theft. In platform engineering, cybersecurity requirements are embedded into shared infrastructure and developer workflows through secure defaults, access controls, automated scanning, secrets management, and policy enforcement.
 ### Course Notes and Project Files
-- :notebook: [IBM Cybersecurity Analyst Professional Certificate](IBM-CySA/README.md) ([course link](https://www.coursera.org/professional-certificates/ibm-cybersecurity-analyst))
+- :package: :notebook: [IBM Cybersecurity Analyst Professional Certificate](IBM-CySA/README.md) ([course link](https://www.coursera.org/professional-certificates/ibm-cybersecurity-analyst))
 - :notebook: [TCM Security Practical OSINT Research Professional](TS-PORP/README.md) ([course link](https://certifications.tcm-sec.com/porp/))
-- Johns Hopkins University Intrusion Detection Specialization ([course link](https://www.coursera.org/specializations/intrusion-detection))
 - LPIC-3 Exam 303: Security ([course link](https://www.pluralsight.com/courses/lpic-3-exam-303-security))
 - Red Hat Certified Specialist in Security: Linux ([RH Doc](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html-single/security_hardening/index))
+- Johns Hopkins University Intrusion Detection Specialization ([course link](https://www.coursera.org/specializations/intrusion-detection))
 - Cisco Certified Network Associate ([course link](https://www.pluralsight.com/paths/cisco-ccna-cisco-certified-network-associate-200-301))
 ### Book Notes
 - Threat Modeling: Designing for Security, by Adam Shostack. ([publisher page](https://www.wiley.com/en-us/shop/general-introductory-computer-science/threat-modeling-designing-for-security-p-9781118809990))

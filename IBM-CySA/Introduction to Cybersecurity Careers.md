@@ -1,7 +1,6 @@
 # Introduction to Cybersecurity Careers
-
 > [!NOTE]
-> This guide introduces cybersecurity as the practice of protecting information, systems, and services, then maps the field’s career ladder from entry roles (specialist, cybercrime, intrusion analyst, IT auditor) through mid-level testing and consulting to leadership positions such as manager, engineer, architect, and CISO. It outlines transition pathways, training options, and the importance of lifelong learning and networking. It also summarises core technical and soft skills, and provides a practical roadmap for certification exam preparation, plus an overview of the IBM Cybersecurity Analyst Professional Certificate.
+> These notes introduce cybersecurity career paths, essential technical and professional skills, training options, and certification strategies to help aspiring practitioners enter the field, advance, and adapt as threats evolve.
 ## Cybersecurity Careers
 Cybersecurity is a safeguard for information, systems and services against malicious activity. Threats continue to evolve, from ransomware to phishing, security teams must interpret new risks and respond quickly.
 

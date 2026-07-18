@@ -1,7 +1,6 @@
 # Incident Response and Digital Forensics
-
 > [!NOTE]
-> This document explains incident response as a structured process to prepare for, detect, contain, eradicate, and recover from cybersecurity incidents while minimising operational, financial, and reputational harm. It distinguishes security events from confirmed incidents, emphasises the value of a tested incident response plan, and summarises common lifecycles from NIST and SANS Institute. It then introduces digital forensics workflows (collection, examination, analysis, reporting), DFIR integration, evidence integrity and chain of custody, typical data sources, and supporting tools and automation.
+> These notes explain how organisations prepare for, detect, contain, investigate, and recover from cyber incidents while preserving and analysing digital evidence through disciplined forensic workflows.
 ## Incident Response
 Incident response is a structured approach that helps an organisation prepare for, detect, manage, and recover from cybersecurity threats such as unauthorised access, malware, phishing, ransomware, and data breaches. The aim is to reduce harm to people, information, systems, operations, reputation, and cost.
 ### Security events and security incidents
