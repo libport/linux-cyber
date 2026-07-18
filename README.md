@@ -14,7 +14,8 @@ Linux provides the operating-system foundation for much of platform engineering,
 - :notebook: [Docker](docker/README.md) ([course link](https://www.pluralsight.com/paths/managing-docker-in-production))
 - :notebook: [Certified Kubernetes Administrator](CKA/README.md) ([course link](https://www.pluralsight.com/paths/certified-kubernetes-administrator))
 - Terraform ([course link](https://www.pluralsight.com/paths/terraform))
-- IBM DevOps and Software Engineering Professional Certificate ([course link](https://www.coursera.org/professional-certificates/devops-and-software-engineering))
+- [IBM DevOps and Software Engineering Professional Certificate](IBM-DSE/README.md) ([course link](https://www.coursera.org/professional-certificates/devops-and-software-engineering))
+- Generative AI for Software Developers Specialization ([course link](https://www.coursera.org/specializations/generative-ai-for-software-developers))
 ### Book Notes
 - UNIX and Linux System Administration Handbook, 5th edition, by Evi Nemeth, Garth Snyder, Trent R. Hein, Ben Whaley, and Dan Mackin. ([publisher page](https://www.admin.com/))
 - Linux Observability with BPF, by David Calavera and Lorenzo Fontana ([publisher page](https://www.oreilly.com/library/view/linux-observability-with/9781492050193/))

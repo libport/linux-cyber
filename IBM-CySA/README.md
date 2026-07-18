@@ -1,13 +1,15 @@
 # IBM Cybersecurity Analyst Professional Certificate Notes
 Course notes for the [IBM Cybersecurity Analyst Professional Certificate on Coursera](https://www.coursera.org/professional-certificates/ibm-cybersecurity-analyst).
 ## Course Description
-The IBM Cybersecurity Analyst Professional Certificate is a 4-month, self-paced programme aimed at reinforcing foundational skills for cyber security analyst roles through practical, hands-on learning. It covers core skills like network and endpoint protection, SIEM and threat intelligence, vulnerability assessment and penetration testing, plus incident response and digital forensics. The certificate is also positioned as support for CompTIA Security+ exam prep.
-## Course Topics
-- Cybersecurity essentials, tools, and technologies
-- Cyberattacks, operating systems, and networking fundamentals
-- Database fundamentals and vulnerabilities, cybersecurity architecture, compliance frameworks, standards, and regulations
-- How to use generative AI for cybersecurity
-- Tools and strategies for job search, resume building, and interview preparation to kickstart your career
+This course is a 4-month, self-paced programme aimed at reinforcing foundational skills for cyber security analyst roles through practical, hands-on learning. It covers cybersecurity fundamentals, networks, operating systems, databases, vulnerabilities, security architecture, compliance, generative AI, penetration testing, incident response, digital forensics, threat intelligence and career preparation through practical, real-world projects. The certificate is also positioned as support for CompTIA Security+ exam prep.
+### Projects
+Through hands-on labs, real-world case studies and applied projects, this course develops and demonstrates the ability to:
+- Build practical incident response and digital forensics skills.
+- Use industry-specific cybersecurity tools.
+- Apply industry standards and best practices to mitigate risk, strengthen security and support compliance through audit processes.
+- Apply established incident response methodologies.
+- Use generative AI tools to improve cybersecurity effectiveness and productivity.
+- Investigate a real-world security breach by identifying the attack, vulnerabilities and associated costs, and recommending preventive measures.
 ## Module Notes
 - [Introduction to Cybersecurity Careers](Introduction%20to%20Cybersecurity%20Careers.md)
 - [Introduction to Cybersecurity Essentials](Introduction%20to%20Cybersecurity%20Essentials.md)
