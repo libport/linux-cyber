@@ -1,6 +1,6 @@
 # Introduction to Cybersecurity Essentials
 > [!NOTE]
-> Introduction on essential cybersecurity threats and practical safeguards for protecting data, devices, accounts, networks, browsing activity, and applications through layered security and safer online behaviour.
+> Introduces essential cybersecurity threats and practical safeguards for protecting data, devices, accounts, networks, browsing activity, and applications through layered security and safer online behaviour.
 ## Security Concerns
 ### Security and information privacy essentials
 #### Information assets and analytics

@@ -1,6 +1,6 @@
 # Introduction to Cybersecurity Careers
 > [!NOTE]
-> Introduction on cybersecurity career paths, essential technical and professional skills, training options, and certification strategies to help aspiring practitioners enter the field, advance, and adapt as threats evolve.
+> Introduces cybersecurity career paths, essential technical and professional skills, training options, and certification strategies to help aspiring practitioners enter the field, advance, and adapt as threats evolve.
 ## Cybersecurity Careers
 Cybersecurity is a safeguard for information, systems and services against malicious activity. Threats continue to evolve, from ransomware to phishing, security teams must interpret new risks and respond quickly.
 

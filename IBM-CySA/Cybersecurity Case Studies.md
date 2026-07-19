@@ -1,7 +1,6 @@
 # Cybersecurity Case Studies
 > [!NOTE]
 > Using real-world cyber incidents to teach structured analysis of attack causes, impacts, responses, compliance failures, and practical defenses across phishing, ransomware, insider threats, AI-enabled fraud, penetration testing, and digital forensics.
-
 ## Analysing Case Study Layouts and Phishing Case Studies
 ### Exploring cybersecurity case studies
 Case studies help organisations and learners translate cybersecurity theory into practice by examining real incidents. They support critical thinking, reveal how adversaries operate, and show how controls, processes, and people influence outcomes.
@@ -318,4 +317,3 @@ Amounts below refer to publicly reported final penalties or settlements, not ini
 | 2020 | Marriott | £18.4 million | UK ICO | Starwood breach security failings |
 | 2022 | Didi | 8.026 billion yuan | China regulator | data security violations |
 | 2017 | Equifax | up to US$700 million | US settlement | identity data breach |
-## Capstone Project
