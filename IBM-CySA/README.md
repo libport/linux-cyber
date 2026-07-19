@@ -1,5 +1,5 @@
 # IBM Cybersecurity Analyst Professional Certificate Notes
-Course notes for the [IBM Cybersecurity Analyst Professional Certificate on Coursera](https://www.coursera.org/professional-certificates/ibm-cybersecurity-analyst).
+Course notes for the [IBM Cybersecurity Analyst Professional Certificate](https://www.coursera.org/professional-certificates/ibm-cybersecurity-analyst).
 ## Course Description
 This course is a 4-month, self-paced programme aimed at reinforcing foundational skills for cyber security analyst roles through practical, hands-on learning. It covers cybersecurity fundamentals, networks, operating systems, databases, vulnerabilities, security architecture, compliance, generative AI, penetration testing, incident response, digital forensics, threat intelligence and career preparation through practical, real-world projects. The certificate is also positioned as support for CompTIA Security+ exam prep.
 ### Projects
@@ -26,6 +26,6 @@ Through hands-on labs, real-world case studies and applied projects, this course
 - [Cybersecurity Job Search, Resume, and Interview Prep](Cybersecurity%20Job%20Search,%20Resume,%20and%20Interview%20Prep.md)
 ## Further Reading
 Notes are supplemented with information from third-party sources, including:
-- [CompTIA Cybersecurity Analyst (CySA+)Cert Guide](https://www.pearsonitcertification.com/store/comptia-cybersecurity-analyst-cysa-plus-cs0-002-cert-9780136747123), 2nd Edition, by Troy McMillan
-- [Foundations of Information Security](https://www.oreilly.com/library/view/foundations-of-information/9781098122546/), by Jason Andress
-- [How Cybersecurity Really Works](https://www.oreilly.com/library/view/how-cybersecurity-really/9781098128999/), by Sam Grubb
+* CompTIA Cybersecurity Analyst (CySA+) Cert Guide, 2nd edition, by Troy McMillan. ([publisher page](https://www.pearsonitcertification.com/store/comptia-cybersecurity-analyst-cysa-plus-cs0-002-cert-9780136747123))
+* Foundations of Information Security, by Jason Andress. ([publisher page](https://www.oreilly.com/library/view/foundations-of-information/9781098122546/))
+* How Cybersecurity Really Works, by Sam Grubb. ([publisher page](https://www.oreilly.com/library/view/how-cybersecurity-really/9781098128999/))
