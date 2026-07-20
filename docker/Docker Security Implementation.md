@@ -1,4 +1,6 @@
 # Docker security implementation
+> [!NOTE]
+> This guide explains how to secure Docker across the container lifecycle through trusted images, vulnerability scanning, hardened Dockerfiles, protected hosts, encrypted access, secrets management, least privilege, and robust logging.
 ## Secure image selection
 Container automation lowers deployment effort, but it does not remove supply-chain risk. Teams should start with trusted base images and treat popularity as a signal rather than proof. Docker Official Images, Verified Publisher images, Hardened Images and sponsored open-source images provide stronger provenance than anonymous or unmaintained repositories. Download counts and stars can help triage choices, but they do not prove that an image is safe. Administrators should prefer minimal, maintained images and avoid importing images they cannot explain, update or replace.
 

@@ -1,4 +1,7 @@
 # Microservices with Docker
+> [!NOTE]
+> This guide shows how to build, connect, scale, and deploy a containerized microservices application across Docker Compose, Docker Swarm, and Google Kubernetes Engine while addressing networking, storage, resilience, and monitoring.
+
 Containerised microservices separate an application into independently packaged services that run together through shared networking, configuration and storage. The example application contains an ASP.NET Core API, a PostgreSQL database and an NGINX web front end. Docker Compose runs the local development environment, Docker Swarm demonstrates cluster orchestration, and Google Kubernetes Engine (GKE) shows a managed Kubernetes deployment path.
 ## Local orchestration with Docker Compose
 `docker init` can generate container files for an ASP.NET Core project, including a Dockerfile and Compose configuration. After the API port is set to `9000`, `docker compose up` builds the image, pulls the required .NET SDK base image, creates a container and attaches the logs. The running API responds on `localhost:9000`.

@@ -1,4 +1,7 @@
 # Preparing Docker Applications for Production
+> [!NOTE]
+> This guide explains how to make containerized applications production-ready through portable images, runtime configuration, secure secrets, centralized logging, meaningful health checks, resilient routing, and explicit deployment models.
+
 Production containers need more than a working image. A container image must run consistently, accept environment-specific configuration, expose useful logs, report its health, wait for dependencies when necessary, and fit into a routing model that can handle traffic securely. These practices let a platform such as Docker Compose, Docker Swarm, Kubernetes, or a managed cloud service operate the application rather than merely start a black-box process.
 
 A production-ready image keeps application binaries and dependencies stable while pushing environment-specific values into the runtime platform. The same image should move from development to test to production. Configuration, secrets, logging destinations, health policies, scaling rules, and routing rules should belong to the deployment model, not to a rebuilt image. This separation gives teams repeatable releases and reduces the risk that production runs code that has not passed earlier tests.

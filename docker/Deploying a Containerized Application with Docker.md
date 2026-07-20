@@ -1,4 +1,6 @@
 # Deploying a Containerized Application with Docker
+> [!NOTE]
+> This guide explains how to build, run, share, update, configure, troubleshoot, and monitor a containerized Python application using Docker.
 ## Prepare the application before containerisation
 Containerisation works best when the application already runs correctly outside Docker. A developer should first confirm the complete local workflow: clone the repository, install Python, install dependencies, compile assets where required, then start the application.
 

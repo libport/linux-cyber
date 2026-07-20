@@ -1,4 +1,6 @@
 # Getting Started with Docker and AI
+> [!NOTE]
+> This guide explains how Docker Model Runner enables private, container-integrated local AI deployment while highlighting model management, application integration, hardware, security, and operational considerations.
 ## Local AI deployment
 Organisations increasingly deploy large language models and chatbots locally to protect data, reduce cloud dependency, control costs and meet container-first engineering standards. Docker Model Runner helps Docker teams run AI models locally without adding a separate model platform. It brings model pulling, caching, serving and application integration into the Docker workflow.
 

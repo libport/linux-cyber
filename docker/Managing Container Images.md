@@ -1,4 +1,7 @@
 # Managing Container Images
+> [!NOTE]
+> This guide explains how disciplined Dockerfile design, reproducible builds, secure registries, image-trust controls, and Kubernetes credential policies make container images reliable, efficient, and safe deployment artifacts.
+
 Container images give container platforms a repeatable way to package operating system files, application code, libraries, dependencies and configuration. A well-designed image lets a team build once, test consistently and deploy the same artefact across workstations, private hosts, public clouds and Kubernetes clusters.
 
 A container image remains immutable. When a runtime starts a container from an image, it adds a writable layer for the container's runtime changes. This design gives containers much of their speed and predictability. Docker can reuse layers that already exist on a host, so a pull may download only missing metadata or layers rather than an entire software stack.

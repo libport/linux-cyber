@@ -1,4 +1,6 @@
 # Docker Basic Concepts and Configuration
+> [!NOTE]
+> This guide introduces Docker’s core architecture, installation, image-building, container operations, networking, storage, security, and orchestration options.
 ## Containers and images
 Docker packages applications as isolated processes that share the host kernel. A container is not a small virtual server. It is a runtime environment created from an image, with filesystem layers, settings and resource controls. This model lets teams run many workloads on one host, start them quickly, and move them between environments with fewer differences.
 

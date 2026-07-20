@@ -1,4 +1,7 @@
 # Tactics and Tools for Troubleshooting Docker
+> [!NOTE]
+> This guide presents an evidence-first approach to diagnosing Docker failures across containers, images, builds, filesystems, registries, volumes, networking, and host environments while minimizing risky or destructive changes.
+
 Docker troubleshooting works best when engineers collect evidence before changing configuration. Container logs, inspection output, filesystem checks and network state usually reveal whether the fault sits in the image, the container command, the host, a registry, a mount or a network.
 ## Core workflow
 Engineers should start with the smallest reliable signal and then widen the investigation.

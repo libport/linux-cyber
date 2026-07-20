@@ -1,3 +1,5 @@
+> [!NOTE]
+> This guide explains how Docker Swarm orchestrates scalable, resilient multi-host applications through clustered nodes, desired-state services, declarative stacks, overlay networking, secure configuration, and automated workload management.
 # Getting Started with Docker Swarm
 Docker Swarm extends Docker Engine from a single host to a managed cluster. It keeps the familiar Docker workflow while adding scheduling, service discovery, load balancing, rolling updates, secrets, configs, and cluster-level state management. A developer can still pull an image and run a container, but Swarm adds a control plane that decides where service tasks should run and keeps them aligned with the declared target state.
 
