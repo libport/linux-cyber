@@ -7,7 +7,7 @@ Linux provides the operating-system foundation for much of platform engineering,
 ### Course Notes and Project Files
 - :notebook: [Red Hat Certified System Administrator](RHCSA/README.md) ([course link](https://www.pluralsight.com/paths/rhcsa-red-hat-certified-system-administrator-ex200))
 - :notebook: [Red Hat Certified Engineer](RHCE/README.md) ([course link](https://www.pluralsight.com/paths/rhce-red-hat-certified-engineer-ex294))
-- Configuration Management Using Ansible ([course link](https://www.pluralsight.com/paths/configuration-management-using-ansible))
+- [Configuration Management Using Ansible](ansible/README.md) ([course link](https://www.pluralsight.com/paths/configuration-management-using-ansible))
 - :notebook: [Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting](RHCSLDT/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342))
 - :notebook: [Red Hat Certified Specialist in Performance Tuning](RHCSPT/README.md) ([course link](https://www.pluralsight.com/courses/red-hat-certified-specialist-in-performance-tuning-ex442))
 - :notebook: [Red Hat Certified Specialist in Containers](RHCSC/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-containers-ex188))
