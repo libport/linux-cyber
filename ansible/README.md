@@ -3,9 +3,8 @@ These notes cover material from Pluralsight's 24-hour, self-paced [Configuration
 ## Course Notes
 - [Getting Started with Ansible](Getting%20Started%20with%20Ansible.md)
 - [Ansible Fundamentals](Ansible%20Fundamentals.md)
-- Managing Ansible with AWX
+- [Managing Ansible with AWX](Managing%20Ansible%20with%20AWX.md)
 - Testing and Debugging Ansible Automation
 - Automating Container Management with Ansible
-- Ansible on Windows Fundamentals
 - YAML Essentials
   
