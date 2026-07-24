@@ -26,14 +26,14 @@ The full package suits broad exploration. The core package suits controlled envi
 
 An isolated installation avoids conflicts with operating-system Python packages. Current documentation supports `pipx` and `pip`. A `pipx` installation keeps Ansible in its own environment and exposes its commands on the shell path:
 
-```text
+```shell
 pipx install --include-deps ansible
 ansible --version
 ```
 
 A user-level `pip` installation remains available when it fits the environment:
 
-```text
+```shell
 python3 -m pip install --user ansible
 ansible --version
 ```
@@ -42,7 +42,7 @@ The interpreter-qualified form, `python3 -m pip`, prevents a common error in sys
 
 Command completion can reduce typing and expose available options. The optional `argcomplete` package supports Bash and offers limited support for Z shell and Tcsh. A `pipx` installation can inject it into the Ansible environment:
 
-```text
+```shell
 pipx inject --include-apps ansible argcomplete
 activate-global-python-argcomplete --user
 ```
@@ -51,7 +51,7 @@ A module is a focused unit of automation. `ansible.builtin.file` manages paths a
 
 An ad hoc command runs one module without creating a playbook. The following command tests local module execution:
 
-```text
+```shell
 ansible localhost -m ansible.builtin.ping
 ```
 
@@ -59,7 +59,7 @@ The ping module does not send an ICMP echo request. It verifies that Ansible can
 
 The file module can ensure that a directory exists:
 
-```text
+```shell
 ansible localhost -m ansible.builtin.file \
   -a "path=test state=directory"
 ```
@@ -70,7 +70,7 @@ The `touch` state needs careful interpretation. It creates a missing file, but i
 
 The copy module can place literal content in a file:
 
-```text
+```shell
 ansible localhost -m ansible.builtin.copy \
   -a "dest=hello content='hello world'"
 ```
@@ -81,7 +81,7 @@ Not every desired state fits one module. If a file occupies a path that must bec
 
 Module documentation defines parameters, return values, platform requirements, examples, and support for check or diff mode. Local documentation remains available through `ansible-doc`:
 
-```text
+```shell
 ansible-doc ansible.builtin.file
 ansible-doc --list
 ```
@@ -90,7 +90,7 @@ The online collection index provides the same information with cross-links. Docu
 
 The command module executes a program directly without a shell:
 
-```text
+```shell
 ansible all -m ansible.builtin.command -a "date"
 ```
 
@@ -100,13 +100,13 @@ Check mode simulates supported tasks without changing managed systems. It predic
 
 The following command previews a playbook:
 
-```text
+```shell
 ansible-playbook site.yml --check
 ```
 
 Diff mode shows before-and-after details for modules that support it. It can operate during a real run or alongside check mode:
 
-```text
+```shell
 ansible-playbook site.yml --check --diff --limit web01
 ```
 
@@ -128,7 +128,7 @@ Inventory describes the hosts Ansible can manage. It may come from a command-lin
 
 An inline list needs a trailing comma so Ansible treats it as a host list rather than a filename:
 
-```text
+```shell
 ansible all -i "pi4,pi5," -m ansible.builtin.ping
 ```
 
@@ -156,7 +156,7 @@ The command `ansible-config dump --only-changed` reveals active changes and thei
 
 Remote POSIX hosts commonly use the SSH connection plugin. Ansible relies on existing SSH authentication, host-key verification, and account configuration rather than installing a resident agent. A normal SSH connection should work before Ansible troubleshooting begins:
 
-```text
+```shell
 ssh pi3
 ansible pi3 -m ansible.builtin.ping
 ```
@@ -167,7 +167,7 @@ Ansible creates an implicit `localhost` when a task explicitly targets it and no
 ## Privilege escalation and facts
 Some tasks need privileges beyond those of the connection account. Package installation, system-wide configuration, and protected file changes commonly require escalation. The `become` mechanism applies privilege escalation on the machine where the task executes:
 
-```text
+```shell
 ansible pi3 -m ansible.builtin.timezone \
   -a "name=Australia/Sydney" --become
 ```
@@ -178,7 +178,7 @@ Credentials should not appear in plain text in inventory, playbooks, shell histo
 
 Playbooks gather facts by default at the start of each play. The `ansible.builtin.setup` module collects operating-system, network, hardware, interpreter, and other information. An ad hoc query can filter the output:
 
-```text
+```shell
 ansible all -m ansible.builtin.setup \
   -a "filter=ansible_distribution*"
 ```
@@ -234,7 +234,7 @@ The YAML dictionary form exposes module arguments clearly and works well with ed
 
 The play runs with:
 
-```text
+```shell
 ansible-playbook site.yml
 ```
 
@@ -253,7 +253,7 @@ Tags allow selective execution:
     - nginx
 ```
 
-```text
+```shell
 ansible-playbook site.yml --tags nginx --check --diff
 ```
 
@@ -269,7 +269,7 @@ Collections package reusable Ansible content. A collection can contain modules, 
 
 The `ansible` community package bundles a curated set of collections. `ansible-core` supplies only the core runtime and built-in content. A controller using `ansible-core` can install selected collections from Galaxy or another configured distribution server:
 
-```text
+```shell
 ansible-galaxy collection install community.general
 ansible-galaxy collection list
 ```
@@ -285,7 +285,7 @@ collections:
     version: ">=5.0.0,<6.0.0"
 ```
 
-```text
+```shell
 ansible-galaxy collection install -r requirements.yml
 ```
 
@@ -295,7 +295,7 @@ A fully qualified name follows `namespace.collection.content`. In `community.gen
 
 Useful discovery commands include:
 
-```text
+```shell
 ansible-galaxy collection list
 ansible-doc --list
 ansible-doc -t inventory --list
@@ -348,7 +348,7 @@ The plugin reads the Docker API and produces hosts for the current containers. `
 
 The inventory can be inspected before use:
 
-```text
+```shell
 ansible-inventory -i lab.docker.yml --list --yaml
 ansible all -i lab.docker.yml -m ansible.builtin.ping
 ```
