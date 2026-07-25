@@ -1,4 +1,4 @@
-## Ansible fundamentals
+# Ansible fundamentals
 Ansible is an open-source automation system for configuring hosts, deploying software, and orchestrating operational tasks. It expresses infrastructure policy as readable source files, applies that policy across managed systems, and reduces the inconsistency created by repeated manual work.
 
 Configuration management keeps systems aligned with a defined state. Without it, servers that began with identical settings can diverge as administrators install packages, alter permissions, or change services. This configuration drift complicates maintenance, security, and incident response. Ansible addresses drift by applying repeatable automation to selected hosts.
