@@ -1,4 +1,4 @@
-# IBM DevOps and Software Engineering Professional Certificate Notes
+# *IBM DevOps and Software Engineering Professional Certificate* Notes
 Course notes for the [IBM DevOps and Software Engineering Professional Certificate](https://www.coursera.org/professional-certificates/devops-and-software-engineering).
 ## Course Description
 This course is a 6-month, self-paced programme aimed reinforcing foundational skills for software engineering and DevOps through practical, hands-on learning. Guided by IBM experts, it develops job-ready skills in Python, Linux, GitHub, Agile, cloud-native development, Docker, Kubernetes, OpenShift, microservices, serverless technologies, CI/CD, testing, security, deployment monitoring and troubleshooting.

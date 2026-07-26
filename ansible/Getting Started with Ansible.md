@@ -1,4 +1,7 @@
 # Getting Started with Ansible
+> [!NOTE]
+> This practical guide introduces Ansible’s agentless, desired-state approach and explains how to build, validate, scale, and troubleshoot secure, repeatable infrastructure automation.
+
 Ansible automates system configuration, software deployment, and infrastructure operations. It runs from a control node and applies a declared configuration to managed nodes. The control node does not need a persistent Ansible service, database, or agent. Managed nodes usually do not need Ansible installed because the controller transfers or invokes the required automation through connection plugins such as SSH, PowerShell remoting, local execution, or a platform API.
 
 Ansible works best when automation describes the required end state. A task can declare that a directory must exist, a package must be installed, a setting must have a particular value, or a service must be running. A module examines the current state and changes it only when necessary. This approach reduces the conditional scripting otherwise required to handle every possible starting state.

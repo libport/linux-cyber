@@ -1,319 +1,249 @@
 # Cybersecurity Case Studies
-> [!NOTE]
-> Using real-world cyber incidents to teach structured analysis of attack causes, impacts, responses, compliance failures, and practical defenses across phishing, ransomware, insider threats, AI-enabled fraud, penetration testing, and digital forensics.
-## Analysing Case Study Layouts and Phishing Case Studies
-### Exploring cybersecurity case studies
-Case studies help organisations and learners translate cybersecurity theory into practice by examining real incidents. They support critical thinking, reveal how adversaries operate, and show how controls, processes, and people influence outcomes.
+Cybersecurity case studies connect technical evidence, organisational decisions, business effects, legal duties, and control improvements. Effective analysis distinguishes confirmed facts from inference, explains how an incident unfolded, and turns evidence into proportionate safeguards.
+## Analysing Cybersecurity Case Studies and Phishing Incidents
+### Purpose and limits
+Case studies help organisations understand how attackers combine technical weaknesses with human behaviour and operational gaps. They also show how detection, escalation, communication, and recovery decisions affect the scale of an incident.
 
-Benefits for a security team include:
-- Building pattern recognition for likely threats and recurring attack paths
-- Learning from past breaches, including technical gaps and process failures
-- Comparing response approaches across different contexts and teams
-- Staying current with attacker tactics and defensive controls
-- Informing policy and governance by linking incidents to business impact and legal exposure
+Useful case studies can:
+- reveal recurring attack paths and control failures
+- connect security events with financial, legal, operational, and human consequences
+- test whether policies work under pressure
+- support training with realistic decisions and trade-offs
+- identify controls that can prevent recurrence or reduce harm
 
-Some breaches drive major remediation and regulatory scrutiny. The 2017 Equifax breach is one example. It did not create the EU General Data Protection Regulation, which was adopted in 2016 and became applicable in 2018.
-### Framework for analysing a cybersecurity case study
-A structured method reduces missed details and unsupported assumptions:
-1. Read the scenario end to end and map the timeline, key actors, and affected systems or data.
-2. Identify the root cause, including the initial trigger and contributing factors.
-3. Document actions taken, including dates, decision owners, and resources used.
-4. Evaluate effectiveness and timeliness against intended outcomes.
-5. Identify successes, gaps, and failures with specific evidence.
-6. Analyse impact, including operational disruption, financial loss, and longer-term strategic effects.
-7. Capture lessons learned, including what to repeat and what to change.
-8. Produce recommendations that are actionable, prioritised, and measurable.
-### Case study analysis template sections
-A consistent template supports comparison across incidents:
-- Root cause
-- Actions taken
-- Effectiveness and timeliness
-- Successes, gaps, and failures
-- Impact on the organisation
-- Lessons learned
-- Recommendations for future actions
-- Conclusion and broader implications
-### Phishing scams and related attacks
-Phishing is a social engineering attack that tricks people into disclosing sensitive information or taking unsafe actions, usually by impersonating trusted entities. It commonly uses email and text messages, and increasingly uses phone calls and social media. Messages often create urgency or fear, and may include malicious links or attachments.
+Each case study remains specific to its time, technology, threat actor, and organisation. Analysts should avoid treating one incident as a universal model or claiming a causal link that the evidence does not support. For example, the 2017 Equifax breach intensified public scrutiny of data protection, but it did not cause the European Union's General Data Protection Regulation. The European Union adopted the regulation in 2016, and it applied from 25 May 2018.
+### Evidence-led analysis
+An analyst can structure a case study around eight questions:
+1. The analyst defines the incident, affected organisation, relevant dates, and confirmed scope.
+2. The analyst separates primary evidence, credible reporting, disputed claims, and unresolved questions.
+3. The analyst identifies the assets, identities, data, and business processes at risk.
+4. The analyst reconstructs the attack path from initial access to discovery, containment, and recovery.
+5. The analyst maps technical weaknesses and organisational conditions without assuming that a single failure caused the event.
+6. The analyst assesses operational, financial, legal, regulatory, and human effects.
+7. The analyst evaluates which controls failed, which controls worked, and which safeguards would reduce similar risk.
+8. The analyst records uncertainty and updates conclusions when stronger evidence becomes available.
 
-Common variants include spear phishing, whaling, vishing, smishing, and pharming. Typical lures include suspicious login alerts, account or payment problems, urgent invoice requests, and prompts to share credentials or one-time codes.
-### Using threat trend reports
-Threat trend reports based on large-scale telemetry, including DNS-layer data, help teams understand which malware and campaigns are most prevalent and how they evolve. This supports risk assessment, control selection, and targeted awareness training.
-### Case study: invoice fraud against Google and Facebook
-A business email compromise scheme from around 2013 to 2015 induced two US-based internet companies, widely reported as Google and Facebook, to wire payments to fraudulent accounts. The scheme impersonated a legitimate hardware supplier and used realistic emails and forged business documents to exploit weak invoice and payment verification. US prosecutors reported losses of more than US$120 million. The perpetrator, Evaldas Rimasauskas, was arrested in 2017 and sentenced to five years in prison in 2019.
+Timelines, attack-path diagrams, evidence tables, and decision logs can improve clarity. They should identify their sources and distinguish observed events from analytical reconstruction.
+### Phishing and business email compromise
+Phishing uses deceptive messages or interactions to persuade a target to disclose information, approve a payment, open a malicious file, follow a harmful link, or grant access. Attackers often impersonate trusted people or organisations and create urgency, authority, fear, or curiosity.
 
-Key lessons include:
-- Treat bank detail changes and unusual invoices as high risk
-- Require out-of-band verification and dual approval for payments
-- Separate duties across request, approval, and execution
-- Train finance and procurement staff to recognise business email compromise patterns
-- Use technical controls such as domain authentication and anomaly detection
-### Case study: voice phishing and authority impersonation
-Voice phishing uses phone calls to apply pressure and drive disclosure or transfers. Reported cases have involved impersonation of officials, detailed personal information to build credibility, and threats of legal consequences to bypass verification.
+| Form | Common method | Main risk |
+|---|---|---|
+| Bulk phishing | High-volume messages sent to many recipients | Credential theft, malware delivery, or payment fraud |
+| Spear phishing | Tailored messages aimed at a person or team | Access to sensitive systems or information |
+| Whaling | Targeting executives or other high-value decision-makers | Strategic access, confidential data, or large payments |
+| Business email compromise | Impersonating or taking over a business account | Fraudulent transfers, invoice changes, or payroll diversion |
+| Smishing | Deceptive text messages | Credential theft, malicious application installation, or payment fraud |
+| Vishing | Deceptive voice calls or voice messages | Disclosure of credentials, security codes, or financial approval |
 
-Practical controls include:
-- Independent call-back procedures using trusted numbers
-- Transaction holds for unusual or high-value requests
-- Regular scenario-based training for social engineering
-- Clear reporting pathways and rapid escalation to incident response
-- Monitoring for suspicious authentication and account activity
-## Analysing PoS and Insider Breach Case Studies
-Point of sale (POS) systems have moved from standalone cash registers to networked platforms that combine checkout, inventory, customer management, workforce reporting, and analytics. Industry standardisation such as barcode scanning reduced manual entry and errors. The Universal Product Code (UPC) standard was adopted in 1973 and first used in live retail scanning in 1974, supported by vendors including IBM.
+Attackers strengthen these approaches with information from corporate websites, social media, breached databases, and compromised mailboxes. A convincing message may quote a real invoice, continue an existing email thread, or imitate an established approval process.
+#### Rimasauskas business email compromise
+Evaldas Rimasauskas and his associates impersonated an Asian hardware manufacturer that conducted business with two US internet companies. They created lookalike corporate infrastructure, sent fraudulent invoices and contracts, and directed payments to bank accounts under their control. The scheme obtained more than US$120 million before investigators traced the transactions. The US Department of Justice did not name the victim companies in its public case record.
 
-Modern POS environments often include cloud services and mobile devices so staff can transact anywhere in a store. This convenience increases the need to treat POS as a critical part of the organisation’s security perimeter.
+The case demonstrates that a technically simple impersonation can produce a major loss when payment processes rely on email and familiar branding. Effective controls include independent verification of bank-detail changes, dual approval for high-value transfers, payment limits, domain monitoring, mailbox security, and rapid recall procedures with financial institutions.
+#### Voice phishing and authority impersonation
+Voice phishing can combine spoofed caller identification, personal information, scripted urgency, and synthetic audio. An attacker may claim to represent an executive, a bank, a supplier, or a government agency. Caller identification and a familiar voice do not establish identity.
 
-POS systems commonly store and process:
-- Transaction data such as item, price, quantity, and time
-- Inventory data such as stock levels, supplier details, and reorder points
-- Customer data such as contact details, purchase history, and loyalty rewards
-- Workforce data such as user activity, shifts, and sales performance
-- Payment data such as card details and billing information
-- Access control data such as user IDs, roles, and passwords
+Organisations can reduce the risk through callback procedures using trusted contact details, separate approval channels, transaction limits, staff training, and a culture that allows employees to pause an urgent request. Authentication should rely on verified information or cryptographic controls rather than biographical facts that an attacker can obtain.
+## Point-of-Sale Systems and Insider Risk
+### Point-of-sale exposure
+Point-of-sale systems process transactions and often connect payment terminals, registers, store networks, inventory platforms, identity services, and external service providers. They may handle payment-card data, customer information, employee credentials, product records, and transaction logs. That combination makes them attractive to criminals and difficult to secure across large retail estates.
 
-Common weaknesses include malware, card skimming, interception of poorly protected network traffic, phishing, insider misuse, weak authentication, and inadequate network security. Controls are often aligned with PCI DSS and broader security governance.
-### POS malware and skimming
-POS malware is malicious software designed to steal payment data from POS systems, often by capturing card data from memory before it is encrypted or transmitted. Skimming is the use of an unauthorised device on a payment terminal, ATM, or fuel pump to capture card data, and sometimes PINs.
+Common attack paths include:
+- stolen vendor or employee credentials
+- weak remote-access controls
+- poor network segmentation
+- unpatched operating systems and applications
+- malicious software that captures card data in memory
+- altered terminals or attached skimming devices
+- insecure integrations with suppliers and payment processors
+- inadequate monitoring and delayed response to alerts
 
-Typical paths into a POS environment include:
-- Stolen credentials, including third-party vendor access
-- Social engineering and phishing that lead to malware installation
-- Poorly secured remote access tools and weak password practices
-- Misconfigured systems and delayed patching
+Payment environments need layered safeguards. Point-to-point encryption protects card data from the point of interaction to a secure decryption environment. Tokenisation reduces the amount of reusable card data stored in business systems. Network segmentation limits movement between corporate, vendor, and payment systems. Multifactor authentication, application allowlisting, secure configuration, device inspection, central logging, and prompt incident response provide further protection. Compliance with the Payment Card Industry Data Security Standard supports these controls but does not guarantee that an environment is secure.
+### Target, 2013
+Attackers compromised Target during the 2013 holiday period and stole payment-card data from about 40 million accounts. Target also reported that personal information relating to as many as 70 million people had been taken. A US Senate staff analysis reconstructed the incident from public evidence and reported that attackers used credentials associated with a third-party vendor, moved through Target's network, installed card-stealing malware, staged captured data internally, and removed it through external systems.
 
-A common malware pattern is RAM scraping, followed by data staging on internal systems and exfiltration to attacker controlled servers. Indicators can include unexpected outbound connections, unusual process names, and security alerts that go untriaged.
+Some details in early public reconstructions remained unconfirmed. The evidence nevertheless supports several control lessons:
+- Third-party access should use least privilege, multifactor authentication, time limits, and monitoring.
+- Payment networks should remain isolated from vendor and general corporate networks.
+- Security teams need clear ownership for high-confidence alerts and rapid escalation paths.
+- Organisations should test whether monitoring tools produce action, not only whether the tools generate alerts.
+- Incident exercises should include payment systems, suppliers, executives, legal advisers, and communications teams.
+### Home Depot, 2014
+Home Depot reported that criminals used a third-party vendor's credentials to enter the company's network. They then obtained elevated rights and deployed custom malware on self-checkout systems in US and Canadian stores. The malware captured payment-card information from April to September 2014 and affected as many as 56 million cards.
 
-Response and prevention measures include:
-- Disconnecting affected terminals from the network to limit spread
-- Preserving logs and images for investigation
-- Cleaning or reimaging terminals and rotating credentials
-- Applying patches and hardening configurations
-- Monitoring POS networks for suspicious activity
-- Training staff to recognise phishing and handling procedures
+Home Depot's public filing supports the need for strong vendor authentication, privilege control, segmentation, endpoint hardening, encryption, and continuous monitoring. It also shows why a large retailer must deploy controls consistently across every store and terminal rather than treating the corporate network as the only critical environment.
+### Insider risk
+Insider risk arises when a person with authorised access or organisational knowledge causes harm, whether intentionally or unintentionally. Relevant people can include employees, contractors, suppliers, partners, former staff, and anyone whose trusted account remains active.
 
-Skimming controls focus on the physical layer:
-- Regular inspection of terminals for overlays and tampering
-- Tamper evident seals and locked enclosures
-- CCTV coverage of checkout areas
-- Restricting physical access and separating duties
-- Staff training to spot distraction tactics
-### Case study: Target POS breach in 2013
-Public reporting on the 2013 Target incident describes attackers gaining initial access through a third-party vendor, moving into Target’s network, and deploying memory scraping malware on POS terminals. Reporting also indicates that stolen data was staged on internal servers and exfiltrated to external infrastructure over a period of time.
+Insider incidents can involve:
+- theft or disclosure of sensitive information
+- fraud, sabotage, or unauthorised system changes
+- accidental exposure through error or insecure configuration
+- misuse of privileged accounts
+- compromised credentials used by an external attacker
+- concealment of activity through deleted logs or altered records
 
-Mapped to a cyber kill chain, the incident is commonly:
-- Reconnaissance of vendor facing systems and processes
-- Delivery of phishing or malware to the vendor
-- Credential theft and initial entry into the retailer environment
-- Lateral movement to reach POS assets
-- Installation of RAM scraping malware and collection of card data
-- Command and control that maintained access for weeks
-- Exfiltration of card data and customer records
+No universal behavioural sequence identifies a harmful insider. Personal characteristics alone do not establish risk. Organisations should focus on documented activity, access patterns, conflicts with policy, and corroborated indicators while respecting privacy, employment law, and procedural fairness.
 
-Key response challenges included detecting and acting on alerts, constraining vendor access, and preventing movement from less trusted zones into cardholder environments.
-### Case study: Home Depot POS breach in 2014
-Reporting on the 2014 Home Depot breach describes attackers using stolen third-party credentials, exploiting a Windows vulnerability to increase access, and deploying memory scraping malware across thousands of self checkout terminals. The incident was not detected for months, increasing the scale of exposure.
+Effective safeguards include least privilege, separation of duties, access reviews, prompt offboarding, privileged-access management, data-loss prevention, tamper-resistant logging, secure reporting channels, and proportionate investigation. Security, human resources, legal, privacy, and management teams should define responsibilities before an incident occurs.
+### Joshua Schulte and the Vault 7 disclosures
+Joshua Schulte, a former Central Intelligence Agency software developer, abused his access to steal classified cyber tools and transmit them to WikiLeaks. The disclosures became known as Vault 7 and Vault 8. A US court sentenced him in 2024 to 40 years in prison for offences that included espionage and computer hacking.
 
-Contributing factors commonly cited in incident write ups include:
-- Weak segmentation between corporate systems and POS networks
-- Legacy endpoints and insecure configurations
-- Gaps in monitoring and alert response
-- Missing or disabled security controls, including endpoint protections
-- Limited use of strong encryption such as point to point encryption
+The case shows how broad privileged access, weak separation of duties, and gaps in monitoring can allow one trusted person to remove highly sensitive material. High-risk environments should restrict bulk access, record administrative actions, separate development from release authority, monitor unusual collection activity, and test whether controls can detect misuse by skilled insiders.
+### PegasusEFB cloud exposure
+Security researchers found an openly accessible Amazon S3 bucket linked to PegasusEFB, an electronic flight-bag service. The bucket contained about 6.5 terabytes across more than 23 million files, including flight information, crew personal data, source code, and plain-text secrets. The researchers reported no evidence that malicious actors had accessed the material.
 
-The case reinforces the value of least privilege for vendors, rapid patching, and continuous monitoring of POS environments.
-### Insider threats and detection
-An insider is a person who has, or previously had, authorised access to an organisation’s systems, sites, data, or equipment. Insider threats can be malicious, negligent, or accidental, and can involve theft, sabotage, unauthorised disclosure, or workplace violence. Consequences can include financial loss, operational disruption, legal exposure, reputational damage, and harm to staff and customers.
+The exposure should not be described as a confirmed breach by Pegasus Airlines or as proof of malicious insider activity. It demonstrates how an authorised user, developer, or administrator can create serious risk through insecure cloud configuration. Cloud safeguards should include private-by-default storage, automated configuration checks, secret management, access logging, data classification, and prompt credential rotation after exposure.
+## AI-Enabled Threats and Ransomware
+### Artificial intelligence in cyber operations
+Artificial intelligence can help attackers and defenders process information, generate content, and automate parts of a workflow. Current evidence supports an increase in the speed, scale, and quality of established techniques more strongly than it supports claims of fully autonomous, novel cyberattacks.
 
-An insider threat incident response plan typically defines roles, reporting paths, investigation steps, and legal and privacy requirements. Actions often include detection, triage, containment, evidence preservation, documentation, and notification where required.
+Threat actors can use generative systems to:
+- draft persuasive phishing messages in several languages
+- gather and summarise public information for targeting
+- generate or modify scripts and code
+- create synthetic voices, images, and video for impersonation
+- accelerate vulnerability research and basic reconnaissance
+- adapt social-engineering content for different recipients
 
-A common behavioural progression model describes six stages:
-- Grievance and ideation
-- Preparation
-- Exploration
-- Experimentation
-- Execution
-- Escape
+These uses do not remove the need for infrastructure, access, operational decisions, and human oversight. Analysts should label an incident AI-enabled only when evidence connects an AI capability to the attack. Automation, data scraping, or a large data set does not establish that connection.
 
-Understanding these stages supports earlier intervention and monitoring of risky behaviour.
-### Mitigation program themes
-Effective programs typically combine people, process, and technology:
-- Ongoing staff engagement, screening, and security awareness training
-- Asset identification and risk prioritisation, including who has access to what
-- A repeatable operating model such as detect, identify, assess, and manage
-- Cross functional governance across security, IT, HR, legal, and leadership
-- Strong access control, privileged account monitoring, and zero trust principles
-### Insider case studies
-The Vault 7 leak refers to the public release of CIA cyber tool documentation by WikiLeaks in March 2017. US authorities later prosecuted former CIA employee Joshua Schulte, who was convicted of offences related to unauthorised disclosure. The case highlights the need to monitor privileged access, protect sensitive repositories, and investigate anomalies quickly.
+Defenders can use artificial intelligence to prioritise alerts, identify anomalous activity, classify malicious messages, summarise investigations, assist malware analysis, and search large collections of security data. These systems can also produce false results, expose sensitive inputs, inherit bias, or encourage excessive trust. Organisations need access controls, approved-use policies, data handling rules, human review, testing, monitoring, and an ability to disable unsafe functions.
+### Adoption and governance
+Splunk's 2024 survey of 1,650 security leaders found extensive use of generative artificial intelligence in security operations. It also found governance gaps. Thirty-four per cent of respondents said their organisations had no generative AI policy, and 65 per cent said they did not fully understand the technology's implications.
 
-Pegasus Airlines reported a 2022 incident involving an exposed Amazon S3 bucket that was publicly accessible due to misconfiguration. Researchers reported that the bucket contained airline operational data, software components, and credentials. The incident demonstrates how configuration errors and unsecured cloud storage can create large scale exposure, and why cloud access controls, logging, and staff training are essential.
-### Summary
-POS evolution links with modern breach risk. It emphasises that POS environments process high value payment and identity data, making them attractive targets for malware, skimming, credential theft, and insider misuse. Strong security relies on layered controls across technology, physical safeguards, vendor governance, monitoring, and consistent incident response practices.
-## Analysing AI-Related Breaches and Ransomware Case Studies
-Artificial intelligence can strengthen cyber security while also amplifying cybercrime. Below list common AI-enabled attack patterns, how defenders apply AI in security operations, and the risks that come with deploying AI.
-### How attackers use AI
-AI can increase the speed, scale and believability of attacks by automating decisions and tailoring content to targets.
+These results describe the surveyed population, not every organisation. They support a practical governance priority: an organisation should understand which tools staff use, what data those tools receive, how outputs influence decisions, and who accepts the associated risk.
+### Deepfake payment fraud in Hong Kong
+An official Hong Kong Police return recorded three deepfake fraud cases in 2024. In the largest case, fraudsters used a pre-recorded video conference to impersonate company officers and induced an employee to transfer HK$240 million. A second pre-recorded conference case caused a loss of HK$4 million.
 
-- Phishing and social engineering, including personalised messages and synthetic audio or video impersonations
-- Password guessing and credential abuse, where models learn likely patterns from leaked datasets
-- Malware that changes code or behaviour to evade signature-based tools
-- Faster vulnerability discovery and exploitation through automated code and traffic analysis
-- Reconnaissance at scale, including public-data harvesting to select targets, timing and techniques
-- Ransomware optimisation, including selective encryption of high-value data to maximise leverage
-### How defenders use AI
-AI can improve detection, triage and response when it is integrated into security processes and monitored.
+The cases show why visual presence and voice similarity cannot replace transaction controls. High-value payments should require independent verification, multiple approvers, trusted contact channels, and anomaly checks. Staff should be able to challenge an unusual instruction regardless of the apparent seniority of the requester.
+### Classification discipline
+Public incidents sometimes receive an AI label without supporting evidence. Facebook's large-scale data-scraping case concerned the automated collection of public profile data and weaknesses in platform design. LinkedIn likewise stated that a 2021 data set offered for sale combined scraped public data from LinkedIn with information from other websites and did not expose private member data through a breach of LinkedIn.
 
-- Threat detection and response using real-time analysis of high-volume logs and alerts
-- Behavioural analytics that flags unusual user and system activity
-- Continuous monitoring and automated auditing to identify indicators of compromise
-- Vulnerability management that helps prioritise patching based on risk and likely impact
-- Spam and phishing filtering that adapts to evolving attacker techniques
-- Fraud detection through anomaly detection in transactions and account activity
-- Predictive analytics that uses prior incidents and precursor signals to forecast likely attack paths
-### Governance and safety considerations
-AI outcomes depend on data quality and system design. Biased, incomplete or poisoned training data can drive false positives, missed attacks, or unsafe decisions. Security programmes also need to manage privacy and misuse risks through access controls, model and prompt security, and clear policies. Ongoing monitoring, human oversight and workforce training remain essential.
-### Industry context on AI adoption in security
-Splunk’s State of Security 2024 research reports that 91% of security teams use generative AI in security operations, yet 65% say they do not fully understand its implications. The same research reports broad public generative AI use across organisations and notes that 34% do not have a generative AI policy.
-### Case study: deepfake video conference fraud
-Hong Kong police reported a fraud in which a finance employee transferred HK$200 million, about US$25 million, after seeing and hearing convincing synthetic versions of senior staff on a video call. The case shows how deepfakes can defeat informal verification habits in finance workflows.
+Scraping can create privacy and security risks, but it is not itself evidence of artificial intelligence. Accurate classification helps organisations select the right controls and avoids overstating the role of emerging technology.
+### Ransomware
+Ransomware restricts access to systems or data and demands payment. Many operators also steal information and threaten disclosure, a practice commonly called double extortion. The ransomware-as-a-service model allows affiliates to conduct intrusions with tools and infrastructure supplied by a specialist operator.
 
-- Treat urgent and confidential payment requests as high risk
-- Require multi-person approval for high-value transfers
-- Use out-of-band verification, such as direct calls to known numbers, before releasing funds
-- Improve staff awareness of deepfake tactics and social engineering pressure
-### Examples of AI-adjacent incidents and techniques
-Several public incidents where automation and large-scale data extraction feature prominently:
-- TaskRabbit, April 2018: the service took its platform offline to investigate a cyber security incident and advised users to change passwords where reused
-- Facebook contact data exposure publicised in 2021: a dataset affecting 533 million users was linked to scraping and contact importer features, with Ireland’s regulator later issuing a €265 million fine in 2022
-- LinkedIn data for sale reports, 2021: LinkedIn stated the data was scraped from public profiles and was not the result of a breach of its systems
-- Yum Brands, January 2023: a ransomware incident disrupted certain IT systems and temporarily closed nearly 300 UK restaurants for one day
-- Activision, December 2022: reporting described a successful phishing incident that led to unauthorised access to internal data, including employee information
-### Ransomware fundamentals and trends
-Ransomware encrypts systems or data to coerce payment. Modern campaigns commonly add extortion by stealing data and threatening to publish it.
+A typical intrusion may involve stolen credentials, exploitation of an internet-facing service, malicious email, or access purchased from another criminal. Attackers often escalate privileges, disable security tools, discover backups, move laterally, steal data, and deploy encryption. The exact sequence varies, and encryption may never occur when data theft alone creates sufficient leverage.
+### Atlanta and Colonial Pipeline
+The SamSam ransomware incident disrupted many City of Atlanta services in March 2018 and required an extensive recovery effort. The incident reinforced the need for resilient backups, current asset information, network segmentation, central logging, and practised recovery procedures.
 
-- Double extortion: encryption plus a threat to leak stolen data
-- Triple extortion: added pressure on customers or partners through additional threats or contact
-- Ransomware as a Service: packaged tooling and infrastructure sold to affiliates
+Colonial Pipeline detected ransomware on 7 May 2021 and shut down its pipeline operations to contain uncertainty around the intrusion. The shutdown affected fuel supply across parts of the eastern United States. The event showed how an intrusion into business systems can create operational consequences when an organisation cannot quickly establish the boundary between corporate and industrial environments.
 
-AI can further increase efficiency by improving target selection, refining phishing, and accelerating vulnerability discovery. Many law enforcement agencies discourage ransom payments because payment can fund further crime, does not guarantee recovery, and can create legal risks in sanctioned jurisdictions.
-### Case studies: City of Atlanta and Colonial Pipeline
-- City of Atlanta, March 2018: SamSam ransomware disrupted municipal services, while emergency response continued through manual workarounds. The incident highlights the cost of deferred IT maintenance and weak credential controls.
-- Colonial Pipeline, May 2021: attackers entered via a compromised VPN password without multi-factor authentication, stole data and deployed ransomware, prompting a shutdown and fuel shortages. The case reinforces the need for MFA, credential hygiene and coordinated response.
-### Practical safeguards
-- Harden identity controls, including MFA and strong password policies
-- Apply least privilege and monitor privileged access
-- Patch and reduce known vulnerabilities with risk-based prioritisation
-- Maintain tested backups and restoration procedures
-- Train staff on phishing, impersonation and deepfake risks
-- Build and rehearse incident response and business continuity plans
-## Analysing Incident Response and Digital Forensics Case Studies
-### Incident response in cybersecurity
-Incident response is a coordinated set of proactive and reactive activities that reduce the likelihood and impact of cyber attacks and restore services quickly. It includes technical work plus legal, human resources, and communications coordination.
+Ransomware resilience depends on controls that work together:
+- phishing-resistant multifactor authentication and secure remote access
+- rapid remediation of exposed vulnerabilities
+- network segmentation and restricted administrative pathways
+- protected, tested, and recoverable backups
+- endpoint detection, central logging, and active monitoring
+- rehearsed containment, restoration, communication, and decision processes
+- predefined engagement with law enforcement, regulators, insurers, and specialist advisers
+## Incident Response and Digital Forensics
+### Incident-response scope
+Incident response helps an organisation detect, contain, eradicate, and recover from cybersecurity incidents while preserving evidence and learning from the event. Vulnerability management, patching, identity security, and resilience sit within the broader cybersecurity risk program. They support preparation and reduce incident likelihood, but they do not become incident-response activities solely because they improve security.
 
-Proactive controls commonly include monitoring, vulnerability assessment, and patch management. Security information and event management systems can centralise logs and flag anomalies. Automated response tools may isolate compromised assets to contain malware.
+NIST Special Publication 800-61 Revision 3 integrates incident response with the six Cybersecurity Framework 2.0 functions: Govern, Identify, Protect, Detect, Respond, and Recover. Preparation depends on governance, asset knowledge, protective controls, roles, communication paths, suppliers, and exercises. During an incident, the organisation should establish authority, prioritise safety and business needs, preserve reliable records, communicate consistently, and adapt as evidence develops.
+### Google Home rollout incident
+During a 2017 rollout, a Google Assistant software defect caused devices to retrieve speaker-recognition files about 50 times more often than expected. The requests exhausted a service quota. Google paused the rollout at 25 per cent, but the team misdiagnosed the problem, increased the quota, and resumed deployment without identifying the root cause. When the rollout reached all users over a weekend, many requests failed and the response escalated late.
 
-Many organisations document this in an incident response plan that defines detection, containment, recovery, and reporting steps. Plans should be updated using lessons learned and changing threats.
-### Learning from incident response case studies
-Case study reviews help teams understand why an incident happened, whether controls and procedures were effective, and what should change. They can also surface attacker tactics, techniques, and procedures and indicators of compromise, such as suspicious logins, abnormal traffic, and malware signatures.
+The review identified several operational lessons:
+- Teams should declare an incident early when user impact or uncertainty exceeds normal operations.
+- Responders should assign incident command, operations, and communications roles.
+- Teams should stabilise service before pursuing a complete diagnosis.
+- A paused rollout should not resume until the team understands the failure or can control the risk.
+- High-risk changes should occur when the required responders can monitor and intervene.
+- A shared incident record should capture decisions, evidence, actions, and ownership.
+### Google data-centre lightning incident
+In 2015, four lightning strikes near a Google data centre in Belgium disrupted power to disk equipment. Servers remained powered, but some disk trays lost power when parts of the backup system failed to transfer correctly. Google declared a major incident, restored power, migrated virtual machines, and repaired affected storage.
 
-Improvements often include:
-- Stronger phishing resistance through training and email security
-- Faster remediation through disciplined patching
-- Strong password policies and multi-factor authentication
-- Secure coding and code review to reduce injection risks
-- Tighter access controls, monitoring, and network resilience
-### Case study: Google Home rollout and quota incident
-During a Google Assistant rollout affecting Google Home, an on call engineer saw an unexpected rise in queries per second. The rollout was halted and limited to a partial deployment, but the team did not declare an incident and initially pursued an incorrect suspected cause. Miscommunication between client and server teams slowed diagnosis.
+About five per cent of standard persistent disks in the affected zone experienced at least one input or output error. Google reported permanent data loss affecting about 0.000001 per cent of the space allocated to running persistent disks in the zone. Snapshots remained unaffected.
 
-The rollout later resumed, and once it reached full deployment, traffic again exceeded server limits. Users experienced errors and complaints increased. Escalation to support and site reliability engineering occurred late. Analysis confirmed a quota issue, and a quota increase reduced impact and stabilised the service.
+The event demonstrates the value of layered power protection, geographic resilience, tested backups, clear incident roles, and precise communication about impact. A low percentage of permanent data loss can still affect customers whose data falls within that fraction.
+### Digital forensics
+Digital forensics identifies, collects, preserves, examines, and reports digital evidence. Investigators need lawful authority, technical competence, reproducible methods, and records that explain who handled evidence and what changed.
 
-Key lessons include declaring incidents early, involving the right responders immediately, and completing root cause analysis before resuming a rollout.
-### Case study: Lightning strike power event at a Google data centre
-Power events are a common contributor to data centre disruptions. In a widely discussed 2015 incident, lightning strikes disrupted a local utility supplying a Google data centre in Belgium. Generators started and batteries bridged the start up period, but repeated strikes contributed to a brief loss of power to some disk trays. Servers stayed powered but temporarily lost access to affected disks, affecting virtual machine read and write operations.
+Core practices include:
+- defining the legal and investigative scope before collection
+- preserving original evidence and using verified working copies where appropriate
+- recording chain of custody and evidence-handling decisions
+- using validated tools and documenting their versions and settings
+- collecting volatile evidence when delay would destroy it
+- normalising time zones and checking clock accuracy
+- separating observed facts from interpretation
+- protecting irrelevant, personal, privileged, and sensitive information
+- retaining and disposing of evidence under lawful, documented rules
+### Bernard Madoff
+Bernard Madoff pleaded guilty in March 2009 to 11 federal offences connected with his investment fraud and received a 150-year prison sentence in June 2009. Public court records establish the plea and sentence, but they do not support attributing the prosecution to one specific forensic-imaging or metadata technique. The case should therefore support only claims grounded in the available investigative or court record.
+### United States v Ganias
+Federal agents created forensic images of Ganias's computer hard drives in 2003 while executing a warrant in an investigation of other people. They retained non-responsive data and obtained a second warrant in 2006 to search it for evidence against Ganias. A Second Circuit panel initially found a Fourth Amendment violation and vacated the conviction. The court later reheard the case en banc, assumed without deciding that a constitutional violation had occurred, applied the good-faith exception, and affirmed the conviction.
 
-The storage site reliability engineering team declared a major incident and set clear roles, including an incident commander, operations lead, and communications lead. Response priorities included restoring stable power, recovering infrastructure, mitigating impact, and communicating accurate status. Post incident analysis reported minimal data loss and commitments to reliability improvements.
-### When incident response goes wrong
-Common contributors include:
-- Backup systems and plans that are outdated, fragile, or untested
-- Unavailable key staff and unclear role definitions
-- Missed detection, misdiagnosis, and slow escalation
-- Weak vendor and third-party risk controls
-- Poor communication that delays action and erodes trust
-### Digital forensics overview
-Digital forensics uses disciplined methods to collect, preserve, and analyse digital evidence for cybercrime and incident investigations. Handling follows a chain of custody so integrity and admissibility can be demonstrated. Computer forensics is narrower, focusing on computers, while digital forensics spans many device types.
-### Case studies: Bernard Madoff and United States v. Ganias
-The Bernard Madoff investigation illustrates effective forensic practice. Investigators created forensic images to avoid altering originals and analysed financial records, emails, and metadata to trace money flows and establish timelines. Findings supported prosecution outcomes, including a guilty plea in March 2009 and a 150 year prison sentence in June 2009.
-
-United States v. Ganias illustrates legal risk. Investigators imaged drives under a warrant for specific targets, which also captured unrelated client data. Years later, retained images were searched for a different purpose. Courts found the approach unconstitutional, and key evidence was excluded.
-### When digital forensics goes wrong
-Examples include:
-- The Casey Anthony trial, where expertise and interpretation were challenged
-- Connecticut v. Amero, where malware driven pop ups were initially overlooked
-- Mass v. Michael Fiola, where malware may have downloaded illegal content without the user’s knowledge
-- Porcha Woodruff, where a facial recognition match allegedly contributed to arrest without adequate corroboration
-
-Better outcomes rely on skilled analysts, validated tools, malware aware interpretation, strict legal compliance, and corroboration beyond a single signal.
-## Analysing Penetration Testing and Compliance Case Studies
+The final decision did not rule that investigators may retain and search unrelated data without limit. It shows why investigators need particularised authority, defensible retention rules, minimisation procedures, and legal review when a later investigation seeks data collected under an earlier warrant.
+## Penetration Testing and Compliance
 ### Penetration testing
-Penetration testing is a controlled security assessment that simulates attacker behaviour to identify and validate weaknesses in systems, applications, and networks. It is performed by penetration testers, also known as ethical hackers, under an agreed scope and written authorisation.
-#### Why organisations commission pen tests
-- They demonstrate real impact by attempting exploitation, not only detection.
-- They confirm which findings are truly exploitable and reduce false positives.
-- They support assurance and compliance by testing whether controls work in practice.
-#### Common tool categories
-- Security-focused operating systems that bundle assessment utilities.
-- Password and credential testing tools.
-- Port scanners for reachable services.
-- Vulnerability scanners for known issues and misconfigurations.
-- Packet analysers for network traffic inspection.
-### Why case studies matter
-- They show how attacks are executed and what consequences follow.
-- They expose recurring weaknesses that can be prioritised for prevention.
-- They illustrate remediation approaches and what effective reporting looks like.
-- They demonstrate gaps that automated scanning can miss.
-- They provide reference patterns for scoping, ethics, and follow-up.
-### Case study summary: Equifax breach (2017)
-The Equifax breach exposed sensitive identity data for about 147 million people. Reviews highlighted an unpatched Apache Struts remote code execution flaw (CVE-2017-5638), inconsistent patching, weak segmentation and access controls, and gaps in monitoring and logging. Delayed remediation of critical findings enabled exploitation. The incident triggered major legal and financial consequences, including a global settlement totalling at least US$575 million, and potentially up to US$700 million, with up to US$425 million allocated for consumer support.
-### Case study summary: IBM X-Force Red phishing engagement
-IBM X-Force Red provides offensive security services such as penetration testing and adversary simulation. In a phishing engagement, work commonly follows:
-- Reconnaissance using open-source intelligence such as websites, public records, and staff social profiles.
-- Email design that mimics trusted communications, with a spoofed domain and a credential-harvesting login page.
-- Controlled distribution and measurement of opens, clicks, and credential submissions.
-- Analysis to quantify success rates and identify filtering and awareness gaps.
-- Reporting with prioritised recommendations and remediation actions.
-### Pen testing tales: physical and social engineering
-Physical and social routes can bypass strong technical controls:
-- Internet-accessible cameras and poor placement can expose credentials.
-- Perimeter and asset controls can fail when unattended devices are accessible.
-- Tailgating and timing can enable unauthorised entry and data or device theft.
-- Legal risk rises when scope, documentation, and escalation paths are unclear.
+Penetration testing uses authorised, controlled attempts to identify and validate exploitable weaknesses. It differs from a vulnerability scan because testers may demonstrate how an attacker could combine weaknesses, gain access, escalate privileges, or reach a defined objective. Written authorisation and agreed rules of engagement set the scope, timing, methods, data handling, safety limits, contacts, and stop conditions.
 
-These scenarios reinforce the need for clear rules of engagement and basic physical controls, including access management, device security, and monitoring.
-### Cybersecurity compliance
-Cybersecurity compliance is the handling of personal and sensitive data in line with law, industry standards, and organisational policy. Common objectives include transparency, accuracy, enforceable individual rights, and secure handling across the data lifecycle. Regulations and frameworks commonly referenced include:
-- GDPR for EU data protection and privacy.
-- HIPAA for protection of health information in the United States.
-- PCI DSS for safeguarding payment card data.
-- SOX for governance and financial reporting controls in public companies.
-- CCPA for consumer privacy rights in California.
+A sound engagement includes:
+1. The organisation defines objectives, critical assets, exclusions, and acceptable risk.
+2. Testers gather information within the approved scope.
+3. Testers identify vulnerabilities and validate them with the least harmful method that answers the test objective.
+4. Testers document attack paths, affected assets, evidence, and business consequences.
+5. The organisation prioritises remediation according to exploitability, exposure, impact, and existing controls.
+6. Testers confirm whether remediation closes the attack path without creating new weaknesses.
 
-Noncompliance can increase cyber risk and lead to penalties, litigation, and reputational harm. Case studies and benchmarking help organisations compare practices with peers, justify investment, and align programs with regulator expectations.
-### Compliance case study summary: Marriott and the Starwood breach
-The breach began in Starwood systems before Marriott’s 2016 acquisition and was detected in 2018. The UK Information Commissioner’s Office linked the incident to exposure of about 339 million guest records globally and issued a final fine of £18.4 million for GDPR security failings. The case highlights weaknesses such as insufficient monitoring of privileged activity, missing defence-in-depth, and inadequate protection of sensitive fields, including a lack of encryption for some passport data.
-### Compliance case study summary: Equiniti Trust Company
-Equiniti Trust Company LLC, formerly American Stock Transfer and Trust Company LLC, suffered two cyber incidents involving client funds and securities.
+Automated tools can improve coverage but cannot replace judgement. They may miss chained weaknesses, produce false positives, or cause disruption. A test should protect personal information, credentials, production data, and operational availability throughout the engagement.
+### Authorised phishing simulation
+An authorised phishing simulation can test reporting behaviour, technical controls, and business processes. A realistic engagement may use a plausible login page or business request, but it should minimise data collection and avoid unnecessary distress. The organisation should establish approval, scope, privacy protections, escalation paths, and a plan for any real compromise discovered during the exercise.
 
-- In 2022, an attacker compromised an email exchange and sent fraudulent instructions that led to the release and sale of newly issued shares, with proceeds of about US$4.78 million sent to an external bank account.
-- In 2023, an attacker used synthetic identity fraud and weaknesses in account linking to access customer holdings and move about US$1.9 million to external accounts.
+Useful measures include report rate, time to first report, security-team response time, control effectiveness, and completion of follow-up actions. Click rate alone provides an incomplete view and can encourage blame rather than improvement.
+### Physical and social-engineering assessments
+An authorised assessment may test reception procedures, visitor controls, identity verification, clean-desk practices, removable-media handling, and secure disposal. Testers can use agreed pretexts to assess whether staff verify unusual requests and report suspicious behaviour.
 
-The incidents prompted remediation such as stronger verification of payment instructions and multilayer authentication that does not rely on a single identifier. US regulators later announced enforcement action, including a civil penalty of US$850,000 and obligations to improve controls protecting funds and securities.
-### Selected large cybersecurity and privacy penalties
-Amounts below refer to publicly reported final penalties or settlements, not initial notices of intent.
+Rules of engagement should prohibit unsafe conduct, uncontrolled access to personal data, coercion, and entry into excluded areas. The test should protect staff dignity and focus on systems, training, and processes rather than public identification of individuals.
+### Equifax, 2017
+Equifax failed to patch a known Apache Struts vulnerability promptly after a fix became available in March 2017. Attackers exploited the vulnerability from May to July and accessed personal information relating to about 147 million people. Investigations also identified weaknesses in asset management, network segmentation, data protection, and monitoring. An expired digital certificate prevented a network-monitoring tool from inspecting encrypted traffic for months.
 
-| Year | Organisation | Amount | Regulator or basis | Typical driver |
-| ---- | --------------- | -------------------: | ------------------------ | --------------------------------- |
-| 2023 | Meta | €1.2 billion | Irish DPC and EU process | EU to US data transfers |
-| 2021 | Amazon | €746 million | Luxembourg authority | GDPR advertising consent findings |
-| 2021 | WhatsApp | €225 million | Irish DPC | GDPR transparency findings |
-| 2020 | British Airways | £20 million | UK ICO | 2018 payment data breach |
-| 2020 | Marriott | £18.4 million | UK ICO | Starwood breach security failings |
-| 2022 | Didi | 8.026 billion yuan | China regulator | data security violations |
-| 2017 | Equifax | up to US$700 million | US settlement | identity data breach |
+The incident demonstrates how basic control failures can combine:
+- incomplete asset information can prevent a patching process from reaching an exposed system
+- weak verification can allow a failed remediation task to remain undetected
+- poor segmentation can increase the data available after initial access
+- inadequate monitoring can extend an attacker's dwell time
+- concentrated personal data can amplify long-term harm to individuals
+
+The 2019 settlement with the US Federal Trade Commission, Consumer Financial Protection Bureau, states, and territories required Equifax to pay at least US$575 million and potentially up to US$700 million. The settlement included consumer relief and security obligations.
+### Compliance and security
+Compliance means satisfying applicable legal, regulatory, contractual, industry, and internal requirements. Security means managing risk through suitable governance, people, processes, and technology. The two overlap, but one does not establish the other.
+
+| Requirement | Primary focus | Important distinction |
+|---|---|---|
+| General Data Protection Regulation | Personal-data processing in the European Economic Area and related territorial scope | It is European Union law with security, accountability, transparency, and data-subject obligations. |
+| California Consumer Privacy Act, as amended | Privacy rights and duties for covered businesses handling California residents' personal information | It is a state privacy law, not a complete cybersecurity framework. |
+| Health Insurance Portability and Accountability Act rules | Protected health information handled by covered US entities and business associates | The Privacy, Security, and Breach Notification Rules apply according to role and data. |
+| Payment Card Industry Data Security Standard | Cardholder-data environments | It is an industry standard enforced mainly through contractual relationships, not a general privacy law. |
+| Sarbanes-Oxley Act | Corporate governance, financial reporting, and internal control for covered US issuers | It does not prescribe a complete cybersecurity control set. |
+
+An organisation should identify the requirements that apply to its location, role, data, contracts, and services. It should then map those requirements to controls, evidence, ownership, monitoring, and review. A checklist may confirm the presence of a control without establishing that the control works in practice.
+### Marriott and Starwood
+Attackers compromised Starwood's reservation environment before Marriott acquired Starwood in 2016. Marriott discovered the activity in 2018. The Information Commissioner's Office estimated that the incident affected about 339 million guest records worldwide, including about 30.1 million records associated with residents of the European Economic Area at the time of notification.
+
+The Information Commissioner's Office imposed a final penalty of £18.4 million in 2020 for infringements during the period in which the General Data Protection Regulation applied. The regulator identified inadequate technical and organisational measures, including failures in monitoring and protection. The case highlights the need for security due diligence before an acquisition, verified remediation after completion, secure integration, data minimisation, and continuing oversight of legacy systems.
+### Equiniti Trust Company
+The US Securities and Exchange Commission described two incidents involving Equiniti Trust Company, formerly American Stock Transfer and Trust Company.
+
+In 2022, an attacker hijacked an existing email conversation, impersonated a US issuer, and fraudulently instructed Equiniti to issue and liquidate shares. Equiniti transferred about US$4.78 million to overseas accounts and recovered about US$1 million.
+
+In 2023, attackers used stolen Social Security numbers to create fake accounts that Equiniti's systems automatically linked to real shareholder accounts. The names did not match, but the matching Social Security numbers allowed the linkage. The attackers liquidated about US$1.9 million in securities, and Equiniti recovered about US$1.6 million.
+
+Equiniti reimbursed affected clients and shareholders. In 2024, the Securities and Exchange Commission censured the company, ordered it to cease and desist, and imposed a US$850,000 civil penalty. The incidents support stronger out-of-band verification, identity matching, anomaly detection, manual review of high-risk changes, and tested fraud-response procedures.
+### Selected regulatory outcomes
+The legal basis, calculation method, appeal status, and finality of each outcome differ. Headline amounts should not be compared as if regulators applied one common formula.
+
+| Year | Organisation | Outcome | Principal issue or current status |
+|---|---|---|---|
+| 2023 | Meta Platforms Ireland | €1.2 billion | The Irish Data Protection Commission addressed transfers of personal data from the European Union and European Economic Area to the United States. |
+| 2021 | Amazon Europe Core | €746 million decision | A Luxembourg court annulled the fine in March 2026 and returned the case for reassessment. The 2021 amount is not a final current penalty. |
+| 2021 | WhatsApp Ireland | €225 million | The Irish Data Protection Commission addressed transparency obligations under the General Data Protection Regulation. |
+| 2020 | British Airways | £20 million | The Information Commissioner's Office addressed security failures connected with a 2018 personal-data breach. |
+| 2020 | Marriott International | £18.4 million | The Information Commissioner's Office addressed inadequate security during the period covered by the General Data Protection Regulation. |
+| 2022 | Didi Global | 8.026 billion yuan | China's cyberspace regulator found violations of the Cybersecurity Law, Data Security Law, and Personal Information Protection Law. |
+| 2019 | Equifax | At least US$575 million, potentially up to US$700 million | The settlement resolved claims arising from the 2017 breach and included consumer relief and security obligations. |

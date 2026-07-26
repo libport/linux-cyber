@@ -1,3 +1,7 @@
+
+# Introduction to Cloud Computing
+> [!NOTE]
+> Cloud computing delivers on-demand, elastic access to shared technology resources, but achieving its promised speed, scale, and flexibility requires deliberate architecture, security, governance, cost control, and operational discipline.
 ## Overview of Cloud Computing
 Cloud computing gives users on-demand network access to a shared pool of configurable resources, including servers, storage, networks, applications, and services. Providers can provision and release these resources quickly with little manual administration. Compared with locally hosted infrastructure, cloud services can reduce upfront capital expenditure, shorten deployment times, and support rapid changes in capacity. They do not automatically cost less or deliver stronger security, availability, or performance. Outcomes depend on architecture, configuration, contracts, workload patterns, and operational discipline.
 ### Essential characteristics

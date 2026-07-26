@@ -1,547 +1,438 @@
-# Cybersecurity Architecture
+# Cybersecurity architecture
 > [!NOTE]
->  How to build resilient cybersecurity architectures by integrating sound security principles with identity, endpoint, network, application, data, detection, and incident-response controls.
-## Cybersecurity Architecture Overview
-### Cybersecurity architecture fundamentals
-Cybersecurity architecture applies security principles, the CIA triad, and recognised frameworks to design systems that remain trustworthy under attack and during failures. It aims to reduce risk to acceptable levels while keeping delivery practical for product teams and operations. Security is most effective when designed into the system lifecycle rather than bolted on after implementation.
-### Five security principles
-- Defence in depth uses multiple, independent layers so that a single control failure does not expose the system.
-- Least privilege grants only the minimum access required, for the minimum time required, and removes unnecessary services and accounts.
-- Separation of duties avoids single points of control by requiring independent approval or oversight for high-risk actions.
-- Secure by design integrates security from requirements through deployment and operations so that secure defaults are the starting point.
-- KISS keeps designs and controls as simple as possible so that legitimate users can comply without workarounds.
-### Principle to avoid
-- Security by obscurity treats secrecy of design as protection. Kerckhoffs's principle is the common counterpoint, stating that a cryptosystem should remain secure even if everything about it is public except the key.
-### The CIA triad
-The CIA triad is a practical checklist for system design and assurance.
+> Cybersecurity architecture combines governance, risk management, and technical controls across identity, endpoints, networks, applications, data, detection, response, and recovery.
+## Architecture foundations
+### Purpose and scope
+Cybersecurity architecture translates business objectives, legal obligations, risk tolerance, and threat information into a coherent system design. It defines trust boundaries, security services, control responsibilities, and evidence requirements across the system lifecycle. Effective architecture reduces the likelihood and impact of compromise while supporting reliable delivery and operation.
 
-| Objective | Meaning | Common controls | Typical failures |
+Security decisions begin during requirements and design. Early decisions shape identity models, data flows, deployment patterns, recovery options, and operating costs. Retrofitted controls can address some weaknesses, but they rarely remove architectural exposure as efficiently as a sound initial design.
+### Core design principles
+- Defence in depth places independent and complementary controls across people, processes, and technology so that one failure does not expose the whole system.
+- Least privilege limits each person, service, device, and process to the access required for an approved task and period.
+- Separation of duties divides high-risk activities among independent roles and requires appropriate approval, review, or oversight.
+- Secure by design integrates security into requirements, design, implementation, verification, deployment, operation, and retirement.
+- Secure by default limits exposure and privilege without requiring users or administrators to discover and enable essential protections.
+- Simplicity reduces configuration errors, hidden dependencies, and operational workarounds. Teams should choose the least complex design that satisfies the security and business requirements.
+- Explicit trust decisions require systems to authenticate and authorise access according to identity, device or workload state, resource sensitivity, and current context.
+
+Security by obscurity can add friction for an attacker, but secrecy of design cannot serve as the primary control. Kerckhoffs's principle expresses this limit for cryptography: a cryptosystem should remain secure when every detail except the key is public.
+### Confidentiality, integrity, and availability
+The confidentiality, integrity, and availability objectives provide a compact way to test a design.
+
+| Objective | Security outcome | Common controls | Common failures |
 | --- | --- | --- | --- |
-| Confidentiality | Only authorised parties can access sensitive information. | Authentication and authorisation, role-based access control (RBAC), encryption in transit and at rest, key management, data classification. | Weak identity proofing, excessive privileges, poor key handling, plaintext storage or transport. |
-| Integrity | Information remains accurate and tampering is detectable. | Hashing and checksums, message authentication codes (MACs), digital signatures, immutable logging, version control, controlled change processes. | Unprotected logs, unauthorised changes, lack of audit trails, integrity checks that are not verified. |
-| Availability | Authorised users can access services when needed. | Redundancy, capacity planning, monitoring, rate limiting, timeouts, DDoS protection, backups, disaster recovery planning. | Resource exhaustion, single points of failure, unbounded sessions, poor resilience planning. |
+| Confidentiality | Only authorised parties can access sensitive information. | Identity proofing, authentication, authorisation, encryption, key management, and data classification | Weak authentication, excessive privilege, exposed secrets, insecure key storage, and plaintext data |
+| Integrity | Authorised parties can make approved changes, and systems can detect unauthorised or accidental changes. | Message authentication codes, digital signatures, protected audit logs, version control, change approval, and validated checks | Unprotected logs, unauthorised changes, missing audit trails, and unverified integrity results |
+| Availability | Authorised users and services can access required capabilities within agreed service levels. | Redundancy, capacity management, rate limiting, monitoring, backups, disaster recovery, and denial-of-service protection | Resource exhaustion, single points of failure, unbounded workloads, and untested recovery plans |
 ### Confidentiality in practice
-Confidentiality is commonly enforced through access control and encryption.
+Access control and cryptography work together to protect confidentiality.
 
-- Authentication answers who the user is, for example with multi-factor authentication that combines factors such as something known, something held, and something inherent.
-- Authorisation answers what the authenticated user is allowed to do, often through RBAC that maps roles to permitted actions and resources.
-- Encryption protects data so that interception does not expose content, provided the attacker does not have the key. Symmetric encryption uses the same shared key to encrypt and decrypt, while asymmetric encryption uses a public and private key pair to support secure exchange and digital signatures.
-- Key management is essential. Strong encryption provides little value if keys are stored insecurely, shared widely, or never rotated.
+- Authentication establishes confidence that a claimant controls an authenticator bound to an identity.
+- Authorisation decides which actions that identity may perform on a resource.
+- Encryption protects content in transit and at rest. Symmetric cryptography uses a shared secret key. Public-key cryptography supports functions such as key establishment, encryption in suitable schemes, and digital signatures.
+- Key management governs secure generation, storage, distribution, use, rotation or replacement, revocation, backup, recovery, and destruction.
+- Data minimisation reduces the volume and sensitivity of information that systems collect, retain, and expose.
+
+Strong algorithms cannot compensate for exposed keys, excessive access, insecure endpoints, or poorly designed recovery processes.
 ### Integrity in practice
-Integrity mechanisms ensure that modification attempts can be detected and acted upon.
+Integrity controls must distinguish accidental corruption from hostile modification.
 
-- System logs should be protected so attackers cannot erase or rewrite evidence of activity. Common approaches include append-only storage, write once read many media, and forwarding logs to a separate system.
-- Cryptographic integrity checks, such as MACs and digital signatures, can reveal whether messages, records, or logs have been altered.
-- Change control and versioning support integrity by making edits attributable and reviewable. This is relevant to both configuration and code.
-- Distributed ledgers and append-only data structures support immutability by making edits and deletions evident, while allowing new entries to be added.
+- Checksums can reveal accidental transmission or storage errors, but an attacker can often replace an unprotected checksum.
+- Cryptographic hashes support integrity checking when a trusted process protects the expected hash value.
+- Message authentication codes establish integrity and source authenticity when authorised parties share a secret key.
+- Digital signatures establish integrity and origin when verifiers trust the signer's public key and the private key remains protected.
+- Append-only or write-once-read-many storage, restricted administration, and forwarding to separate systems can protect audit evidence.
+- Change control, peer review, and version history make changes attributable and reversible.
 ### Availability in practice
-Availability failures commonly involve denial of service where resources are exhausted.
+Availability engineering addresses faults, malicious activity, operational error, and dependency failure. Denial-of-service attacks exhaust a constrained resource such as bandwidth, connection state, memory, processing time, or a downstream service quota.
 
-- A denial of service attack overwhelms a service with traffic or workload so legitimate requests cannot be served.
-- A distributed denial of service attack amplifies impact by using many compromised machines under central control, often a botnet.
-- A SYN flood abuses the TCP three-way handshake. The client sends SYN, the server replies with SYN-ACK, and the client should complete with ACK. Attackers send large numbers of SYNs without completing the handshake, forcing the server to hold state until timeouts or resource limits are reached.
-- Reflection and amplification attacks can increase attacker impact by tricking third-party systems into sending large responses to a target.
+- A distributed denial-of-service attack sends traffic or workload from many sources, which can include a botnet.
+- A SYN flood sends Transmission Control Protocol connection requests without completing the three-way handshake, consuming connection state until controls discard or expire it.
+- Reflection attacks spoof a target's address so third-party services send responses to the target.
+- Amplification attacks use protocols whose responses greatly exceed the request size.
 
-Common mitigations include aggressive timeouts, connection limits, upstream filtering, rate limiting, caching, autoscaling with guardrails, and designing capacity and redundancy for expected abuse cases. Availability also relies on operational readiness, including alerting, runbooks, and tested recovery procedures.
-### Cybersecurity architect role and mindset
-A cybersecurity architect translates stakeholder needs into a secure reference architecture and guides engineers who implement the design. The role differs from general IT architecture because it considers how systems fail, not only how they function. The architect typically works through:
-- Understanding business goals, compliance requirements, and constraints from stakeholders.
-- Producing context and overview diagrams that communicate components, trust boundaries, and critical data flows.
-- Identifying threat scenarios and failure modes, then selecting mitigations that reduce risk and meet the CIA objectives.
-- Defining security principles and policies that can be implemented consistently by delivery teams.
-- Reviewing designs and changes over time so security assumptions remain valid as systems evolve.
+Common protections include upstream filtering, connection and request limits, rate limiting, short and risk-appropriate timeouts, caching, bounded queues, circuit breakers, resilient dependencies, and capacity reserves. Autoscaling requires cost and resource guardrails because unbounded scaling can convert an attack into a financial or dependency failure. Alerting, runbooks, tested backups, and recovery exercises complete the architecture.
+### Cybersecurity architect responsibilities
+A cybersecurity architect converts stakeholder needs into target, reference, and solution architectures, then guides the teams that implement and operate them. The architect examines how a system can fail and how attackers can abuse it, not only how it should function.
 
-The architect is most effective when involved early and continuously. Late engagement often forces expensive redesigns and leads to weaker compromises.
-### Common architecture artefacts
-Architects often use a progressive set of diagrams.
+Core responsibilities include:
+- Establishing business objectives, legal and regulatory obligations, risk tolerance, and delivery constraints
+- Identifying assets, sensitive data, trust assumptions, external dependencies, and failure modes
+- Modelling threats and abuse cases, including threats across organisational and technology boundaries
+- Selecting controls that reduce risk and satisfy confidentiality, integrity, availability, privacy, safety, and resilience requirements
+- Defining reusable security patterns, standards, and decision records
+- Reviewing implementation evidence and revisiting assumptions as the system, threats, and operating environment change
 
-- Business context diagrams show high-level relationships among actors and organisations.
-- System context diagrams map those relationships to systems and integrations.
-- Architecture overview diagrams describe key components, interfaces, and data flows at a level suitable for threat modelling and control placement.
+STRIDE can help teams classify threats as spoofing, tampering, repudiation, information disclosure, denial of service, and elevation of privilege. It supports threat modelling, but it does not replace root-cause analysis after an incident.
+### Architecture artefacts
+Architecture artefacts should show enough detail to support decisions and verification.
 
-These artefacts provide a shared language between stakeholders, architects, and engineers.
-### Security domains in a typical system
-Security controls are typically designed across multiple domains that align to system components.
+- Business context diagrams show relationships among users, organisations, business capabilities, and external parties.
+- System context diagrams map business relationships to systems, services, and integrations.
+- Data-flow diagrams show processes, data stores, data flows, external entities, and trust boundaries.
+- Deployment diagrams show runtime components, zones, platforms, and administrative paths.
+- Sequence diagrams show identity exchanges, authorisation decisions, error paths, and sensitive transactions.
+- Decision records capture assumptions, alternatives, consequences, owners, and review triggers.
 
+Every diagram should label sensitive data, trust boundaries, protocols, authentication points, authorisation points, and security-relevant dependencies. Diagram reviews should confirm that every cross-boundary flow has an explicit purpose and control set.
+### Security domains
+Most architectures distribute controls across connected domains:
+- Governance, risk, and compliance
 - Identity and access management
-- Endpoint security
-- Network security
-- Application security
-- Data security
-- Monitoring and detection, often through security information and event management
-- Incident response and orchestration
+- Endpoint and workload security
+- Network and infrastructure security
+- Application and software supply chain security
+- Data security and privacy
+- Monitoring, detection, and threat intelligence
+- Incident response, recovery, and resilience
 
-A secure architecture aims to collect security telemetry from each domain, detect anomalies quickly, and coordinate response actions so incidents are contained before they become business-impacting outages.
-### OWASP Top 10 and application security
-The OWASP Top 10 is a widely used set of web application risk categories that helps teams focus on common attack paths. The 2021 edition includes:
-- Broken access control
-- Cryptographic failures
-- Injection
-- Insecure design
-- Security misconfiguration
-- Vulnerable and outdated components
-- Identification and authentication failures
-- Software and data integrity failures
-- Security logging and monitoring failures
-- Server-side request forgery (SSRF)
+The architecture should collect usable telemetry from each domain, correlate evidence across boundaries, and support timely containment and recovery. Prevention alone cannot address every credible scenario.
+### Cybersecurity Framework 2.0
+The National Institute of Standards and Technology (NIST) Cybersecurity Framework 2.0 organises cybersecurity outcomes into six concurrent functions.
 
-The list is most useful when it informs threat modelling, architecture reviews, and development gates rather than being treated as a compliance checklist. For example, access control should be enforced at each layer, injection risk should be reduced through parameterised queries and input validation, and logging should be designed so investigations are possible.
-### Practical tools aligned to OWASP risks
-- OWASP ZAP (ZAP by Checkmarx) supports dynamic testing for common web issues and is often suited to development and smaller environments.
-- Burp Suite is commonly used for manual penetration testing workflows and deeper investigation.
-- SonarQube supports static analysis across many languages and can help detect patterns linked to common web risks.
-- Snyk supports software composition analysis to identify vulnerable dependencies and recommend remediation.
+- Govern establishes and monitors cybersecurity risk strategy, policy, roles, oversight, and supply chain risk management.
+- Identify develops an understanding of assets, suppliers, vulnerabilities, threats, and current risk.
+- Protect applies safeguards such as access control, awareness, data security, platform security, and infrastructure resilience.
+- Detect finds and analyses possible attacks, compromises, and other adverse events.
+- Respond manages, analyses, contains, reports, and communicates about detected incidents.
+- Recover restores affected assets and operations, verifies recovery, and communicates progress.
 
-Tooling provides value when it is integrated into delivery workflows, such as pull request checks, pipeline scans, and regular dependency review.
-### NIST Cybersecurity Framework
-The NIST Cybersecurity Framework provides a common structure for managing cyber risk through five functions.
+The framework defines outcomes rather than prescribing a product or implementation. Organisations can use current and target profiles to expose gaps, set priorities, and communicate risk.
+### Architecture delivery checks
+- Do business owners define confidentiality, integrity, availability, privacy, and recovery requirements for critical services and data?
+- Do diagrams show assets, dependencies, administrative paths, sensitive data flows, and trust boundaries?
+- Do all interfaces enforce consistent authentication and authorisation?
+- Do services validate input, protect output, handle errors safely, and restrict secrets?
+- Do teams protect code, configuration, logs, and critical records against unauthorised change?
+- Do designs remove single points of failure and bound resource consumption?
+- Do monitoring and logging support detection, investigation, attribution, and legal obligations?
+- Do incident response and recovery plans assign owners, define decision authority, and receive regular exercises?
+- Do assurance activities test control operation and record residual risk?
+## Identity and endpoint security
+### Endpoint trust and scope
+Endpoints include user devices, servers, virtual machines, cloud workloads, mobile devices, operational technology, and internet-connected equipment. A compromised or unmanaged endpoint can steal authenticators, alter transactions, evade local controls, or provide an attacker with a foothold. Strong server-side identity controls limit the damage, but they do not make endpoint condition irrelevant.
 
-- Identify focuses on understanding assets, governance, and risk context.
-- Protect implements safeguards such as access control, training, and data protection.
-- Detect enables timely discovery through monitoring, alerting, and analysis.
-- Respond coordinates containment, eradication, and communications.
-- Recover restores services and incorporates lessons learned into improved resilience.
+Endpoint inventories should cover:
+- Physical and virtual servers
+- Desktops, laptops, mobile phones, and tablets
+- Cloud instances, containers, and managed workloads
+- Operational technology and Internet of Things devices
+- Personally owned devices authorised for work
+- Administrative workstations and recovery devices
 
-These functions operate continuously, with outputs from one informing the others. The framework can be used as a coverage check to confirm that prevention, detection, response, and recovery are all addressed.
-### Implementing least privilege
-Least privilege is implemented through a mix of policy, process, and technology.
+Each endpoint type needs an owner, an approved configuration, a support status, a risk classification, and a retirement process.
+### Endpoint management
+An organisation may use one management platform or several specialised platforms. Security depends on complete coverage, consistent policy, reliable telemetry, and coordinated response rather than the number of consoles.
 
-- Identity and access management tools enforce consistent authentication and authorisation decisions.
-- RBAC simplifies administration by assigning permissions to roles that map to job functions.
-- Privileged access management reduces risk by controlling, rotating, and monitoring elevated accounts and by recording privileged activity.
-- System hardening reduces attack surface by removing unused services, disabling default accounts, and changing default credentials.
+Core controls include:
+- Asset discovery that identifies authorised, unknown, unmanaged, and retired devices
+- Vendor-supported operating systems, firmware, and applications
+- Secure configuration baselines with controlled exceptions and drift detection
+- Risk-based patching that accounts for exposure, exploitation, asset criticality, and compensating controls
+- Secure boot, hardware-backed key protection, and application control where supported
+- Device locking and authentication settings aligned with the organisation's identity policy
+- Full-disk or device encryption with recoverable, protected keys
+- Endpoint protection, endpoint detection and response, and central alerting
+- Restricted local administration and dedicated controls for privileged workstations
+- Remote lock or wipe capabilities for managed devices that remain reachable, with controls that respect ownership, safety, and privacy obligations
+- Secure media sanitisation and disposal at retirement
 
-Regular access reviews help prevent privilege creep, remove just-in-case access, and ensure accounts and services that are not required are disabled or removed.
-### Architecture checklist for delivery teams
-A project can be assessed against the following questions.
+Password policies should emphasise length, compromised-password blocklists, rate limiting, and secure password storage. Systems should not impose routine password changes without evidence of compromise, and they should not require arbitrary character-composition rules. Higher-risk access should use phishing-resistant authentication where practical.
+### Personally owned devices and shadow IT
+Personally owned device arrangements can improve flexibility, but unclear rules encourage unmanaged applications, accounts, and cloud services. An enforceable program should make the approved path easy to use and should define:
+- Eligibility, enrolment, support, and removal conditions
+- The data and activity the organisation may manage or monitor
+- Transparent notices, privacy boundaries, and an applicable legal basis
+- Minimum device, operating system, encryption, and security-agent requirements
+- Separation of corporate and personal data where the platform supports it
+- Selective wipe and account-revocation procedures for loss, theft, or employment exit
+- Approved applications and services for email, messaging, file sharing, and collaboration
+- Exceptions for accessibility, safety, operational, and legal needs
 
-- Are confidentiality requirements defined and met for sensitive data?
-- Are authentication and authorisation decisions consistent across interfaces and layers?
-- Are integrity controls in place for logs, code, configurations, and critical records?
-- Are availability targets defined, and are resilience measures tested against realistic failure and attack scenarios?
-- Are monitoring, incident response, and recovery procedures documented and exercised?
-## Access Management and Endpoint Security
-### Endpoint security
-Endpoint security focuses on the trustworthiness of the devices that connect to an organisation’s systems. Strong identity and access management controls, including multi-factor authentication, rely on a device that has not been compromised. A jailbroken, malware infected, or unmanaged device can bypass otherwise strong identity checks.
-#### What counts as an endpoint
-An endpoint is any computing device that connects to a network and exchanges information. This includes:
-- Servers, including virtual and cloud hosted instances
-- Desktops and laptops
-- Mobile phones and tablets
-- Internet of Things devices, including cameras and embedded systems in appliances and equipment
-- Home devices used for work, especially where home networks connect to corporate services
-
-Each additional endpoint increases the attack surface. Diversity of hardware and operating systems increases complexity, and complexity increases security risk.
-#### Endpoint management approach
-A common but weaker approach is to manage servers, user endpoints, and mobile devices with separate tools and separate administrative teams, with limited coverage for IoT. A stronger approach is unified endpoint management, where one logical console enforces consistent security baselines, deploys updates, and collects alerts across device types. Visibility and control enable faster response and better policy consistency.
-#### Core endpoint controls
-Endpoint security controls typically include:
-- Inventory and discovery to identify known and unknown devices
-- Approved hardware and software baselines, including minimum supported versions such as current release and one prior release
-- Password and device lock policies, including minimum length, strength, and expiry rules where passwords are used
-- Patch management for operating systems and applications
-- Encryption requirements for data at rest to reduce impact of loss or theft
-- Remote wipe capability, ideally selective wipe for corporate data on personal devices
-- Endpoint protection and endpoint detection and response to reduce malware and support investigation
-- Location tracking where appropriate, noting privacy and consent implications
-- Secure disposal processes to prevent data exposure when devices are retired
-#### BYOD and bring your own IT
-Bring your own device programs extend to broader bring your own IT behaviours, including unsanctioned apps and cloud services. Organisations generally end up with either a well defined program or a poorly defined program. A blanket prohibition often results in unmanaged use.
-
-A well defined program sets expectations and reduces risk:
-- User consent that explains what the organisation will manage, monitor, and remediate
-- Clear monitoring scope, including whether monitoring applies only to corporate data and activity
-- Selective wipe rules for loss, theft, or employment exit
-- Minimum supported operating system and application versions
-- Required security applications where feasible, such as mobile device management or endpoint security agents
-- Prohibited applications that materially increase risk
-- Supported hardware models to limit unmanageable variability
-- Approved services for functions such as file sharing, with controls to reduce shadow IT
-
-Security outcomes improve when the approved path is easier than the unauthorised path.
+A prohibition without effective enforcement can displace activity into unsanctioned services. Governance, usable approved services, and proportionate technical controls reduce that risk.
 ### Identity and access management
-Identity and access management is the set of processes and technologies that establish who a user is and what they are allowed to do. It is often described using four capabilities.
-#### The four As
+Identity and access management governs digital identities and their access throughout the lifecycle.
+
 | Capability | Purpose |
-|---|---|
-| Administration | Creates, updates, and removes accounts and entitlements |
-| Authentication | Verifies identity, answering who the user is |
-| Authorisation | Determines what actions are allowed, answering what the user can do |
-| Audit | Verifies that the first three were applied correctly and detects misuse |
-#### Directories, store and synchronise
-Identity data is stored in directories, meaning systems that hold user account information. A directory generally includes:
+| --- | --- |
+| Administration | Creates, updates, suspends, and removes identities, accounts, credentials, roles, and entitlements. |
+| Authentication | Establishes confidence that a claimant controls an authenticator bound to an identity. |
+| Authorisation | Determines whether an authenticated identity may perform an action on a resource. |
+| Audit | Records and evaluates identity events, access decisions, administrative changes, and control performance. |
+### Directories and identity data
+Directories store and expose identity attributes through defined schemas and interfaces. Lightweight Directory Access Protocol is one common access protocol, but modern identity systems also use databases, application programming interfaces, and cloud directory services.
 
-| Directory element | Meaning |
-|---|---|
-| Database | Where identity attributes are stored |
-| Schema | How identity attributes are structured |
-| Protocol | How systems query and update the directory, commonly LDAP, which stands for Lightweight Directory Access Protocol |
+Large organisations often operate several authoritative and application-specific identity stores. Integration patterns include:
+- A virtual directory that presents a unified view and retrieves attributes from source systems on demand
+- A metadirectory that copies and reconciles selected attributes into a consolidated store
+- Standards-based provisioning that creates, updates, and disables accounts across connected services
 
-Large organisations often have multiple directories because some applications require specific identity stores. When identities cannot be held in a single enterprise directory, synchronisation becomes important.
+Synchronisation creates security and integrity risks when systems disagree. The architecture should identify authoritative sources, attribute ownership, conflict rules, update latency, and failure handling.
+### Identity lifecycle and governance
+Identity governance and administration connects business roles, approval policy, provisioning, access review, and deprovisioning.
 
-Two common synchronisation patterns are:
-- Virtual directory, which provides an index and retrieves identity attributes on demand, with optional caching
-- Meta directory, which aggregates selected attributes into an enterprise store ahead of time
-#### Identity governance and provisioning
-Administration is often implemented through identity governance and administration, supported by role management. Role definitions map business roles to typical access needs, enabling repeatable access patterns.
+- Joiner processes create approved baseline access after the authoritative workforce or customer event.
+- Mover processes remove obsolete access before or while granting access for a new role.
+- Leaver processes disable interactive and programmatic access promptly, recover assets, and preserve required records.
+- Periodic and event-driven reviews remove dormant accounts, toxic combinations, and accumulated privilege.
 
-Common lifecycle use cases are:
-- Joiner, a new employee record triggers creation of standard accounts through workflow and approvals
-- Mover, an existing user requests additional access or changes role and entitlements are updated through the same workflow
-- Leaver, employment exit triggers rapid removal of access across systems, prioritising deprovisioning to reduce residual risk
-
-A central system of record improves both provisioning and deprovisioning because it tracks which entitlements were granted and where.
-#### Access management
-Authentication typically uses one or more factors:
-
+A central record of entitlements helps teams discover where access exists and confirm that revocation has reached each target system.
+### Authentication factors and assurance
 | Factor category | Examples |
-|---|---|
-| Something known | Password, passphrase, PIN |
-| Something held | Phone, hardware token, smart card |
-| Something inherent | Fingerprint, face recognition, other biometrics |
+| --- | --- |
+| Knowledge | A password, passphrase, or activation PIN |
+| Possession | A device or token that holds an authentication secret or cryptographic key |
+| Inherence | A biometric characteristic used through an approved biometric system |
 
-Multi-factor authentication combines two or more categories, reducing reliance on passwords. Passwordless approaches often combine a registered device with biometrics, with an emphasis on securing the endpoint itself.
+Multi-factor authentication requires proof of two distinct factor categories. Two passwords do not create multi-factor authentication. A phone number alone is not a possession factor, while control of an authenticator bound to a phone can provide one.
 
-Single sign on improves usability by authenticating once and then brokering access to multiple services. Security depends on strong authentication at the sign on point, especially multi-factor authentication.
+Biometrics are not secret and should normally activate an authenticator rather than serve as a remotely stored password substitute. Passwordless authentication does not automatically provide multi-factor or phishing-resistant assurance. The protocol, authenticator, activation method, key protection, and recovery process determine the assurance level.
 
-Authorisation determines whether a user may perform a specific action. Modern approaches often include risk based or adaptive controls, for example:
-- Additional verification for high value transactions or sensitive actions
-- Restrictions based on unusual location, device state, or behaviour
-- Limits based on amount or frequency that trigger step up controls
-#### Privileged access management
-Privileged access management focuses on administrator and root level accounts. Common failure modes include shared passwords, infrequent rotation, and weak attribution. A privileged access management system reduces these risks by:
-- Enforcing individual authentication for privileged users, ideally with multi-factor authentication
-- Brokering access to privileged accounts via controlled checkout and check in
-- Rotating passwords automatically, often after each use
-- Recording privileged sessions to support investigation and deterrence
-- Improving attribution so actions can be linked to a specific administrator
-#### Audit and behaviour analytics
-Audit validates that administration, authentication, and authorisation controls operate as intended. Effective audit combines logging, correlation, and analytics to detect anomalies, such as rapid creation of an account, data extraction, and account deletion. User and entity behaviour analytics can assist by identifying activity patterns that deviate from normal behaviour.
-#### Federation across identity domains
-Federation allows one organisation to act as an identity provider while another acts as a service provider, enabling controlled access across organisational boundaries and cloud services. Federation reduces password sprawl and supports consistent policy enforcement.
-### Multi-factor authentication overview
-Multi-factor authentication requires two or more independent verification factors to access a system, application, or network. It increases resilience because an attacker must compromise multiple controls rather than a single credential.
+Authentication design should match risk. High-value or administrative access should favour phishing-resistant cryptographic authenticators, strong device assurance, protected recovery, and reauthentication for sensitive actions. Manually entered one-time codes can support multi-factor authentication, but they remain vulnerable to phishing and relay attacks.
+### Single sign-on, federation, and adaptive access
+Single sign-on reduces password sprawl and centralises policy, but it also increases the impact of identity-provider failure or compromise. The design should protect the sign-on point, restrict token scope and lifetime, validate token audience and issuer, secure signing keys, and provide resilient recovery.
 
-Single factor authentication relies on one factor, typically a password. Two factor authentication uses two different factor categories, and multi-factor authentication uses two or more categories.
+Federation allows an identity provider to assert identity information to a service provider across organisational or platform boundaries. Contracts and technical controls should define assurance, attribute release, account linking, revocation, logging, key rollover, and incident communication.
 
-Selection of an appropriate method depends on sensitivity, threat level, access context, and user experience. Lower risk use cases may rely on two factors, while high risk environments may require additional controls, stronger device assurance, and stricter authorisation conditions.
-### Key messages
-- Endpoint security underpins trust in identity controls, including multi-factor authentication
-- Unified endpoint management improves visibility, control, and policy consistency across device types
-- Identity and access management aligns administration, authentication, authorisation, and audit
-- Directories and directory synchronisation enable identity reuse across many systems
-- Privileged access management reduces the highest impact risks through brokering, rotation, and monitoring
-- Risk based controls and effective auditing strengthen detection and response
-## Network, Application, and Data Security
-### Application security and secure delivery
-Application security architecture reduces the likelihood and impact of software defects that become exploitable vulnerabilities. Because software of meaningful complexity contains bugs, and some bugs create security weaknesses, application security is treated as a lifecycle concern rather than a one-off review.
-#### Why application security matters
-- Vulnerabilities are commonly introduced during design and coding
-- Defects discovered after release usually cost more to remediate because they trigger operational work, patch rollout, customer impact, and reputational risk
-- A program that detects issues earlier reduces both cost and disruption
-#### From SDLC to DevSecOps
-Traditional software delivery is often a linear software development life cycle, moving from design to build, to test, to release, then operate. This model encourages siloed handovers between development and operations.
+Adaptive access can consider resource sensitivity, requested action, device condition, location signals, network context, session history, and anomalous behaviour. Risk signals should strengthen an access decision, not replace sound authentication or authorisation.
+### Privileged access management
+Privileged access management protects administrator, root, service, and emergency accounts. Controls commonly include:
+- Named administrator identities with multi-factor authentication
+- Separate standard and privileged accounts
+- Just-in-time or time-bounded privilege elevation
+- Approval for high-risk actions and emergency access
+- Credential vaulting and rotation where shared or reusable credentials remain necessary
+- Session brokering, command control, or recording where risk and privacy obligations justify it
+- Closely monitored emergency accounts with tested access procedures
+- Restricted administrative paths and hardened privileged workstations
 
-DevOps replaces the linear flow with a feedback loop across build, release, deploy, operate, and improve. DevSecOps extends the DevOps loop by embedding security into each phase. Security becomes a built-in quality attribute and not a bolt-on control.
+Automation should use managed workload identities or short-lived credentials instead of embedded long-lived secrets wherever supported.
+### Identity audit and behaviour analytics
+Audit evidence should connect lifecycle changes, authentication events, authorisation decisions, privilege use, and administrative activity. Correlation can expose suspicious sequences such as account creation, privilege assignment, bulk data access, and rapid deletion. User and entity behaviour analytics can help identify deviations, but analysts must validate context because unusual activity does not establish malicious intent by itself.
+## Network, application, and data security
+### Network security and segmentation
+Network architecture controls connectivity, limits implicit trust, and provides evidence about flows. Segmentation reduces the paths available after compromise, but effective segmentation requires enforced policy and monitored exceptions.
 
-Common DevSecOps elements include:
-- Security by design, including threat-aware architecture decisions before coding starts
-- Shift-left controls, where security checks run as early as practical in the delivery pipeline
-- Shared ownership across development, security, and operations teams
-- Automation so that security keeps pace with delivery velocity
-#### Secure coding foundations
-Secure coding relies on repeatable practices and clear standards that developers can apply consistently, including:
-- Input validation to reduce injection, buffer overflow, and parsing faults
-- Authentication and authorisation patterns that avoid ad-hoc implementations
-- Cryptography usage guidelines, including safe defaults and key handling
-- Error handling that avoids information leakage through debug output and stack traces
-- Secure code review, supported by automated checks and targeted manual review
+Common patterns include:
+- An internet-facing zone for public services with tightly restricted inbound and outbound access
+- Internal service zones separated by sensitivity, function, environment, or administrative ownership
+- Dedicated management paths that do not share ordinary user access
+- Isolated backup, recovery, security, and identity infrastructure
+- Explicit allow lists for required flows and deny-by-default handling for other traffic
 
-OWASP guidance is commonly used for secure coding checklists and recurring weakness categories. The OWASP Top 10 is often used as a teaching tool and as a high-level risk communication device.
-#### Third-party dependencies, Log4j, and SBOM
-Modern applications depend on third-party packages and shared libraries. Even widely used components can carry high-impact vulnerabilities, as shown by the Log4j incident. Supply chain security therefore benefits from a software bill of materials (SBOM) that records:
-- Component inventory and versions
-- Dependency relationships
-- Source and provenance where possible
-- Known vulnerability exposure and patch status
+Firewalls can apply packet, stateful, application-aware, and identity-aware policy. Anti-spoofing controls reject traffic with invalid or inappropriate source addresses. Egress controls restrict command-and-control traffic, data exfiltration, and unapproved dependencies.
 
-An accurate SBOM supports faster identification of affected systems and faster remediation after new vulnerabilities are disclosed.
-#### Vulnerability testing in the pipeline
-Automated testing complements review by continuously scanning for patterns associated with weaknesses.
+Remote access can use virtual private networks, zero trust network access, secure access service edge capabilities, or controlled administrative gateways. The choice should enforce strong authentication, device checks, least privilege, session protection, and useful logging.
 
-- Static application security testing examines source code and configuration to identify risky patterns earlier
-- Dynamic application security testing probes a running service from the outside, helping find runtime and integration flaws
-
-Both approaches are complementary because they discover different classes of issues and provide different evidence.
-#### Generative AI considerations
-Large language models can generate and debug code rapidly. Risk increases when generated code is not reviewed, when prompts include sensitive source code, or when outputs introduce insecure patterns. Many organisations reduce risk by treating generated code like any other contribution:
-- Apply the same security standards and review expectations
-- Scan and test outputs in the normal pipeline
-- Use approved tools and data handling rules
-- Restrict sharing of confidential source code with external services
-### Layered application security architecture
-Application security architecture is most effective when controls are layered across build-time, test-time, and run-time. No single tool or control provides adequate protection for modern services.
-#### Build-time controls
-Build-time controls aim to prevent known weaknesses from being merged or released:
-- Automated code quality and security scanning in CI/CD pipelines
-- Dependency scanning and policy gates to block known vulnerable versions
-- Infrastructure as code scanning to detect unsafe cloud and platform configurations
-- Secrets detection to reduce credential leakage in repositories
-- Standard patterns for authentication, authorisation, logging, and cryptography
-#### Test-time controls
-Test-time controls validate behaviour in realistic environments:
-- Automated dynamic scanning of web applications and APIs, including common injection and authentication faults
-- Security regression tests for issues that were previously fixed
-- Abuse case testing for critical workflows, such as login, account recovery, and payment flows
-- Validation of security configuration, including headers, TLS settings, and session handling
-#### Run-time controls
-Run-time controls focus on detection and containment:
-- Runtime monitoring and alerting for anomalous behaviour
-- Web application firewall controls where they fit the threat model
-- Container and workload hardening, including vulnerability monitoring
-- Policy enforcement for workloads and service interactions, including least privilege access
-- Logging that supports investigation, attribution, and accountability
-
-Architectures that perform well at scale keep security checks largely automatic and provide fast feedback to engineering teams.
-### Application security architecture principles
-#### Zero trust between services
-Zero trust design removes implicit trust. Service-to-service calls are authenticated and authorised, including internal calls. Mutual TLS and service identity controls can reduce the risk of lateral movement.
-#### Defence in depth
-Defence in depth spreads controls across layers so that a single failure does not result in compromise. Practical examples include:
-- Authentication and authorisation at the API gateway
-- Input validation in services
-- Segmentation between tiers
-- Monitoring and alerting at critical junctions
-#### Observability for security
-Security outcomes improve when the architecture makes risk visible. Logging, metrics, and traces support faster detection and response. Observability becomes more important as services become more distributed.
+Zero trust does not remove networks or grant universal access after authentication. It removes implicit trust based only on network location, affiliation, or asset ownership. Each access decision should consider the subject, device or workload, resource, requested action, and relevant risk signals.
 ### Security architecture diagrams
-Security architecture diagrams communicate trust boundaries, security zones, and data flows. They help teams identify architectural weaknesses before implementation and provide a shared view for review.
-#### Typical zone model for web services
-- Internet zone, untrusted traffic sources
-- DMZ, public-facing services with restricted exposure
-- Internal zone, sensitive services and data stores
-#### Core elements in a simple web application diagram
-- External users and internal administrators
-- External and internal firewalls or equivalent controls
-- Public web tier in the DMZ
-- Application tier in the internal zone
-- Database tier in the internal zone, protected from direct internet access
-#### Common traffic flows and control points
-- External users to web tier over HTTPS
-- Web tier to application tier over restricted internal interfaces
-- Application tier to database tier over a narrowly scoped database connection
-- Administrative access from internal networks through controlled paths
-#### Diagram annotations that add security value
-- Allowed ports and protocols, such as HTTPS on 443
-- Deny-by-default policies with explicit allow lists
-- Where encryption is applied in transit and at rest
-- Where logging occurs and where logs are stored
+A web service diagram should identify external users, administrators, edge controls, public services, internal services, data stores, identity services, management systems, and external dependencies. It should also show:
+- Trust boundaries and security zones
+- Flow direction, purpose, protocol, and port where relevant
 - Authentication and authorisation enforcement points
-#### Diagram review checks
-- Every cross-zone flow passes through an explicit security control
-- Sensitive data stores are furthest from untrusted zones
-- The purpose and protocol of each flow is labelled
-- Key controls are documented and traceable to requirements
-### Data security
-Data security protects sensitive information across its lifecycle, including creation, storage, use, sharing, archiving, and disposal. It combines governance, discovery, protection, compliance, detection, and response.
-#### Governance and classification
-Governance clarifies what is sensitive, who owns it, and how it must be handled. A practical governance model includes:
-- Classification levels with clear criteria and examples
-- Minimum protection requirements by classification
-- Data catalogues so sensitive repositories are known and maintained
-- Resilience planning for recovery after loss, corruption, or ransomware
+- Encryption in transit and at rest
+- Secret and key locations without exposing secret values
+- Logging sources, collection paths, and protected stores
+- Failure paths, recovery dependencies, and administrative access
 
-Classification is ineffective when definitions are vague or inconsistent. It improves when the organisation defines what qualifies as sensitive, and maps each level to controls.
-#### Discovery and data loss prevention
-Discovery identifies sensitive content across both structured and unstructured stores:
-- Databases and application stores that hold structured records
-- Files, email, and collaboration tools that hold unstructured content
+Sensitive data stores should have no direct path from untrusted zones. Every cross-zone flow should pass through an explicit enforcement point, and every exception should have an owner, rationale, expiry or review date, and monitoring requirement.
+### Secure software delivery
+Application security treats software risk as a lifecycle responsibility. Teams introduce weaknesses through requirements, design, code, dependencies, configuration, deployment, and operation. Early controls reduce rework, but production monitoring and response remain essential.
 
-Data loss prevention capabilities support monitoring and control of sensitive content as it moves between systems and outside the organisation. DLP tends to be most effective when paired with clear governance rules and low-noise detection patterns.
-#### Protection and resilience
-Core protections commonly include:
-- Encryption for data at rest and in transit
-- Key management with secure generation, storage, rotation, and access controls
-- Strong access control integrated with identity and access management
-- Backups that support recovery objectives and resilience against ransomware
-- Testing of backup restore processes to confirm recoverability
+The Secure Software Development Framework can integrate secure practices into iterative, sequential, and hybrid delivery models. DevSecOps applies the same principle through shared responsibility, automated feedback, and security controls within delivery and operating workflows.
 
-Encryption without key management is fragile. Key lifecycle management matters because loss of keys can mean loss of data, and weak key protection can negate encryption.
-#### Compliance and retention
-Regulatory obligations vary by industry and geography. Programs usually require demonstrable controls, reporting capability, and retention policies. Effective retention keeps records for required periods and disposes of data that no longer has a valid purpose, reducing exposure and storage burden.
-#### Detection and response
-Prevention is not sufficient. Detection and response typically rely on:
-- Monitoring and alerting on data access and movement
-- Behaviour analytics to flag unusual access patterns and suspicious downloads
-- Incident playbooks that guide investigation and containment
-- Automation and orchestration to scale response while retaining human oversight for novel incidents
+Secure coding practices include:
+- Validating input against expected type, length, range, format, and business rules
+- Using parameterised queries and safe application programming interfaces to reduce injection risk
+- Applying context-appropriate output encoding to reduce cross-site scripting risk
+- Using memory-safe languages or robust bounds and lifetime controls for memory safety
+- Reusing reviewed authentication, authorisation, session, and cryptography components
+- Handling errors without exposing secrets, internal paths, stack traces, or sensitive records
+- Keeping secrets out of source code, build logs, images, and unprotected configuration
+- Combining automated checks with targeted peer and specialist review
+### Application security resources
+The Open Worldwide Application Security Project (OWASP) Top 10 is an awareness resource, not a complete verification standard. The 2025 edition identifies these web application risk categories:
+1. Broken access control
+2. Security misconfiguration
+3. Software supply chain failures
+4. Cryptographic failures
+5. Injection
+6. Insecure design
+7. Authentication failures
+8. Software or data integrity failures
+9. Security logging and alerting failures
+10. Mishandling of exceptional conditions
 
-Organisations that rehearse response, maintain clear ownership, and collect usable logs generally recover faster.
-### Quantum-safe cryptography
-Quantum computing may weaken widely used public-key cryptography in future. Some threats are long-tail, including harvest now decrypt later scenarios, where encrypted data is collected today and decrypted later if cryptography becomes weak.
+The OWASP Application Security Verification Standard provides detailed, testable security requirements. The OWASP Cheat Sheet Series provides implementation guidance. Teams can use the Top 10 for awareness, the verification standard for requirements and assurance, and threat modelling for system-specific risks.
+### Security testing across the lifecycle
+No single tool finds every weakness. A layered testing strategy combines complementary evidence.
 
-A planning approach typically includes:
-- Inventory of where public-key cryptography is used, including TLS, key exchange, and certificates
-- Identification of data with long confidentiality lifetimes
-- Migration planning for cryptographic libraries, protocols, and key infrastructure
-- Testing pathways that support staged rollout and rollback
+| Stage | Representative controls |
+| --- | --- |
+| Design | Threat modelling, abuse cases, architecture review, data-flow review, and security requirements |
+| Build | Static analysis, dependency analysis, secret scanning, infrastructure-as-code scanning, and policy gates |
+| Test | Dynamic application testing, application programming interface testing, fuzzing, security regression tests, and manual review |
+| Release | Artefact signing, provenance checks, environment approval, configuration verification, and rollback readiness |
+| Runtime | Workload hardening, runtime monitoring, web application firewall controls where justified, anomaly detection, and response automation |
 
-Post-quantum approaches are often discussed in several families:
-- Lattice-based schemes
-- Hash-based signatures
-- Code-based schemes
-- Multivariate schemes
-- Symmetric cryptography with suitable key sizes
-### Architects’ role in incidents and failures
-Systems architects support incident work by connecting events to design decisions and by improving resilience.
-#### During an incident
-Architectural support during response commonly includes:
-- Mapping the attack path across diagrams and trust boundaries within the first day
-- Identifying choke points that can limit spread and reduce blast radius
-- Reviewing adjacent systems that may be exposed through lateral movement
-- Recommending containment options that change connectivity and trust, not only blocklists
-#### After an incident
-Post-incident activities commonly include:
-- Root cause analysis using structured methods such as STRIDE
-- Documentation of design gaps, such as missing authentication boundaries, weak segmentation, or insufficient logging
-- Architectural remediation plans that implement zero trust principles and explicit trust boundaries
-- Continuous threat modelling integrated into change processes so similar gaps do not recur
-#### Resilience patterns
-Architectural patterns that reduce impact include:
-- Default deny controls and explicit allow lists for network and service access
-- Rate limiting, throttling, and circuit breaker controls for abuse resistance
-- Immutable infrastructure patterns that favour rapid replacement over in-place repair
-- Strong identity controls for administrators, including privileged access controls
+Automated results need triage. Teams should tune rules, record accepted risk, track recurring causes, and give engineers fast feedback with clear remediation guidance.
+### Third-party components and supply chain records
+Modern applications depend on packages, libraries, build services, containers, and external platforms. The Log4Shell vulnerability in Apache Log4j 2 demonstrated how a flaw in a widely deployed component can create urgent, portfolio-wide exposure.
+
+A software bill of materials (SBOM) records components and dependency relationships. It can include version, supplier, identifier, and provenance data, but an SBOM does not by itself prove that a component is vulnerable or that a product is exploitable. Vulnerability Exploitability eXchange (VEX) information can state whether a known vulnerability affects a particular product and explain the status.
+
+Effective supply chain controls include trusted repositories, dependency pinning, update processes, build isolation, artefact signing, provenance verification, and rapid inventory queries after disclosure.
+### Generative artificial intelligence in software delivery
+Generative artificial intelligence can accelerate coding, review, and troubleshooting, but it can also produce insecure code, disclose sensitive inputs, invent dependencies, or reproduce unsafe patterns. Organisations should:
+- Apply the same security requirements and review standards to generated and human-written code
+- Use approved services, accounts, and data-handling configurations
+- Keep confidential code, credentials, personal information, and restricted data out of unapproved prompts
+- Verify packages, application programming interfaces, licences, and technical claims
+- Scan, test, and review generated changes through the normal delivery workflow
+- Record significant use where traceability, assurance, or legal obligations require it
+### Service-to-service security and observability
+Internal network location should not establish trust. Services should authenticate workloads, authorise each requested action, restrict credentials, and encrypt sensitive traffic. Mutual Transport Layer Security can authenticate both ends of a connection, but the application or policy layer must still authorise access.
+
+Logs, metrics, and traces support detection and diagnosis across distributed systems. Telemetry should use consistent time, service identity, request correlation, and event schemas. Systems should prevent secrets and unnecessary personal information from entering logs, protect log integrity, and retain evidence according to risk and legal requirements.
+### Data governance and classification
+Data security protects information during creation, collection, storage, use, transfer, sharing, archival, and disposal. Governance assigns ownership and connects classification to concrete handling rules.
+
+An effective classification model defines:
+- Clear levels with practical examples
+- Owners and decision authority
+- Minimum access, encryption, logging, sharing, retention, and disposal controls for each level
+- Labelling and discovery requirements
+- Exception and declassification processes
+- Recovery priorities and data-integrity requirements
+
+Classification fails when labels are vague, inconsistent, or disconnected from controls.
+### Discovery and data loss prevention
+Discovery identifies sensitive data across databases, object stores, file systems, email, collaboration platforms, endpoints, backups, and logs. A catalogue should record ownership, purpose, location, lineage, classification, retention, and approved use.
+
+Data loss prevention can inspect and control sensitive content at endpoints, in networks, and within cloud services. Effective policies use accurate data definitions, contextual signals, staged enforcement, and exception handling. Poorly tuned controls create excessive alerts or disrupt legitimate work.
+### Data protection and resilience
+Core protections include:
+- Encryption in transit and at rest with approved algorithms and configurations
+- Managed key lifecycles with separation between keys and protected data
+- Least-privilege access linked to identity governance
+- Integrity controls for critical records and transactions
+- Backups aligned with recovery point and recovery time objectives
+- Immutable or offline recovery copies where ransomware risk justifies them
+- Separate backup administration and protected recovery credentials
+- Restore tests that verify data, applications, dependencies, and operating procedures
+
+Retention schedules should satisfy legal, regulatory, contractual, operational, and historical needs. Disposal should remove data when no valid purpose remains, subject to legal holds and authorised exceptions.
+### Data detection and response
+Monitoring should cover sensitive data access, permission changes, bulk exports, unusual queries, new sharing links, and transfers to unapproved destinations. Playbooks should define investigation, containment, evidence preservation, legal review, communication, and recovery. Automation can enrich and contain known scenarios, while human decision-makers should control novel or high-impact actions.
+### Post-quantum cryptography
+A sufficiently capable cryptographically relevant quantum computer could break widely used public-key algorithms. Data with a long confidentiality lifetime faces harvest-now-decrypt-later risk when an adversary stores encrypted traffic for future decryption.
+
+Organisations should begin migration planning with:
+- A cryptographic inventory covering protocols, certificates, libraries, hardware, code signing, identity systems, and external dependencies
+- Identification of data and signatures that require long-term protection
+- Crypto-agile interfaces that support algorithm and parameter changes
+- Supplier and standards roadmaps
+- Interoperability, performance, rollback, and failure testing
+
+NIST has standardised the Module-Lattice-Based Key-Encapsulation Mechanism (ML-KEM) for key establishment, the Module-Lattice-Based Digital Signature Algorithm (ML-DSA), and the Stateless Hash-Based Digital Signature Algorithm (SLH-DSA). NIST selected HQC as a backup key-encapsulation algorithm, but standardisation remains in progress. Migration should follow applicable standards and protocol guidance rather than replace algorithms without system-level testing.
+### Architectural support during incidents
+Architects support incident teams by relating evidence to trust boundaries, dependencies, and design assumptions.
+
+During an incident, architects can:
+- Map likely attack paths and affected data flows
+- Identify containment points, dependencies, and operational consequences
+- Assess exposure in adjacent systems and shared services
+- Propose changes to connectivity, identity, trust, or deployment patterns
+- Record temporary risk decisions and conditions for reversal
+
+After an incident, architects can:
+- Participate in root-cause and contributing-factor analysis
+- Update threat models, diagrams, assumptions, and risk records
+- Design remediation that addresses control and architecture gaps
+- Validate that changes do not introduce new single points of failure
+- Add regression tests, monitoring, and review triggers
+
+Useful resilience patterns include deny-by-default policy, bounded resource use, circuit breakers, isolated recovery systems, immutable deployment artefacts, rapid workload replacement, strong administrative identity, and tested degraded modes.
 ### Security audits
-Security audits assess whether controls are present, effective, and aligned with obligations. Audits also provide a baseline for continuous improvement.
+Security audits assess whether required controls exist, operate effectively, and produce sufficient evidence. A risk-based audit usually covers:
+- Scope, criteria, systems, processes, suppliers, and obligations
+- Architecture, configuration, policy, access, change, and incident evidence
+- Control design and operating effectiveness
+- Authorised vulnerability assessment or testing where relevant
+- Risk analysis that considers likelihood, impact, exposure, and control strength
+- Findings with owners, priorities, due dates, and verification requirements
 
-Common audit stages include:
-- Scope definition, including systems, processes, and regulatory requirements
-- Evidence collection, including configurations, diagrams, access control records, and policies
-- Vulnerability assessment, including scanning and targeted testing
-- Risk analysis based on likelihood and impact
-- Control evaluation for identity, data protection, and incident readiness
-- Reporting with prioritised recommendations and follow-up verification
+Audits provide assurance at a point in time. Continuous monitoring, management review, and follow-up verification sustain improvement between audits.
+## Detection and response
+### Security operations
+A security operations centre coordinates monitoring, analysis, investigation, and response. It combines telemetry from identity, endpoints, workloads, networks, applications, cloud platforms, and data controls. Clear ownership and escalation paths are as important as collection volume.
+### Security information and event management and extended detection and response
+A security information and event management system collects, parses, normalises, searches, and correlates security-relevant data. It can support alerting, investigation, compliance reporting, trend analysis, and case workflows.
 
-Audit value increases when recommendations are mapped to owners, timelines, and measurable outcomes.
-### Network security essentials
-Network security reduces exposure by controlling connectivity, limiting trust, and monitoring flows. The architecture often uses segmentation to ensure that compromise of a public-facing tier does not create direct access to sensitive systems.
-#### Firewalls and filtering
-Core firewall concepts include:
-- Packet filtering that evaluates source, destination, and port information
-- Anti-spoofing rules that block traffic claiming internal origins from external sources
-- Stateful inspection that considers session context and sequence
-- Application-aware inspection for common malicious patterns
-#### Segmentation and DMZ patterns
-Common segmentation patterns include:
-- A DMZ that hosts internet-facing services
-- An internal zone that hosts application services and data stores
-- Restrictive rules that allow only required flows between tiers
-- Separate controls for administrative access paths
-#### Remote access and modern perimeter patterns
-Remote access is commonly implemented through:
-- VPN solutions with strong authentication and device posture checks
-- Secure access service edge approaches that apply policy based on identity, device, and context
-#### Monitoring and response readiness
-Network monitoring supports detection of policy violations and unusual traffic patterns. Logging and alerting become more important as environments become more distributed and dynamic.
-## Detection and Response
-### Detection and response in security operations
-Security outcomes are commonly prevention, detection, and response. Prevention aims to stop compromise. Detection aims to identify abnormal or malicious activity. Response aims to contain impact, restore services, and reduce recurrence.
-#### Security Operations Centre responsibilities
-A Security Operations Centre centralises monitoring, analysis, and response. It consolidates telemetry from identity, endpoint, network, application, and data controls so analysts can detect anomalies, investigate alerts, and coordinate remediation.
-#### SIEM overview
-A security information and event management system aggregates security-relevant data such as logs, alerts, events, and network flow information. Typical capabilities include:
-- Central collection and normalisation of telemetry
-- Correlation of related events across multiple sources
-- Rules and analytics to prioritise alerts and assign severity
-- Anomaly detection, including user behaviour analytics
-- Reporting to track trends such as alert volume, resolution time, and recurring causes
-#### XDR overview
-Extended detection and response builds on endpoint detection and response by combining telemetry across endpoints and other controls. Common characteristics include:
-- Agents or sensors close to assets for faster detection and response actions
-- Central investigation workflows spanning multiple signal sources
-- Federated search in some architectures so data can be queried in place rather than fully preloaded into a central store
-
-In many environments, SIEM and XDR are complementary. SIEM often provides broad ingestion and correlation. XDR often provides deep endpoint context and response actions, and may use SIEM alerts as triggers for investigation.
+Extended detection and response combines detection and response capabilities across endpoints and other security domains. Product boundaries vary. In many environments, security information and event management provides broad data retention and correlation, while extended detection and response provides deeper endpoint or workload context and direct response actions. Architecture should define the source of truth, data ownership, hand-off points, and action authority.
 ### Indicators of compromise and threat intelligence
-An indicator of compromise is evidence suggesting a system or network may have been breached. Common examples include:
-- Suspicious network traffic such as unexpected spikes or connections to suspicious IP addresses
-- Unusual system behaviour such as unexplained slowdowns, crashes, or unexpected processes
-- Abnormal log activity such as repeated failed logins or logins from unusual locations
-- Phishing indicators such as suspicious emails, links, or attachments
-- Unrecognised or unexpected user accounts
+An indicator of compromise is an observable that may support a conclusion that compromise occurred. Examples include malicious file hashes, command-and-control domains, unauthorised accounts, suspicious process chains, anomalous authentication, and unexpected data transfers. A single weak indicator, such as a slow device, rarely confirms compromise without context.
 
-Threat intelligence is the collection and analysis of information about threats, attacker behaviour, and indicators that can help organisations anticipate and defend against attacks. It is commonly grouped into:
-- Behavioural intelligence about tactics, techniques, and patterns
-- Reputational intelligence about risky IP addresses, domains, and URLs
-- Raw threat data used as inputs for deeper analysis
+Threat intelligence converts threat information into analysis that supports a decision. It can address:
+- Strategic questions about business exposure, investment, and risk
+- Operational questions about campaigns, adversaries, and likely targeting
+- Tactical questions about attacker techniques and defensive opportunities
+- Technical questions about infrastructure, malware, vulnerabilities, and indicators
 
-Threat intelligence sources can include open-source feeds, commercial services, industry reports, government advisories, incident response learnings, and controlled collection methods such as honeypots.
-### Security vulnerability assessment
-A security vulnerability assessment is a structured, preventive review of an organisation’s technology environment. It identifies security weaknesses in networks, hosts, applications, databases, and cloud services before they are exploited. Findings are analysed and prioritised so remediation focuses on issues that present the highest business risk.
-#### Core assessment approaches
-1. Network-based assessment: scans network infrastructure to identify exposed services, open ports, weak protocols, misconfigured firewalls, and unmanaged or rogue devices.
-2. Host-based assessment: reviews servers, workstations, and endpoints for missing patches, insecure configurations, and unnecessary services.
-3. Application-based assessment: tests web and desktop applications for weaknesses such as SQL injection, cross-site scripting, and insecure API use. Static testing analyses source code. Dynamic testing evaluates running applications.
-4. Cloud environment assessment: evaluates cloud configuration, storage permissions, identity and access management controls, and container security across platforms such as Amazon Web Services, Microsoft Azure, and Google Cloud Platform.
-#### Common tool categories
-Comprehensive vulnerability management platforms:
-- Qualys VMDR
-- Tenable.io
-- Rapid7 InsightVM
+Sources include internal incidents, government advisories, industry communities, open sources, commercial services, research reports, honeypots, and controlled sharing relationships. Collection and sharing should protect privacy, confidential information, legal privilege, and source restrictions.
+### Vulnerability assessment
+A vulnerability assessment identifies and analyses weaknesses across assets, configurations, software, identities, and cloud services. It differs from a penetration test, which attempts to demonstrate attack paths within an explicitly authorised scope.
 
-Specialised scanners:
-- Nessus
-- Acunetix
-- OpenVAS
+| Assessment type | Primary focus |
+| --- | --- |
+| Network | Exposed services, protocols, segmentation, filtering, and unmanaged devices |
+| Host and endpoint | Missing updates, insecure configuration, local privilege, software inventory, and unnecessary services |
+| Application and application programming interface | Design weaknesses, authentication, access control, input handling, session management, and business logic |
+| Cloud and platform | Identity policy, public exposure, storage permissions, workload configuration, logging, and control-plane settings |
+| Container and supply chain | Base images, packages, secrets, provenance, runtime privilege, and orchestrator policy |
 
-Developer-focused tools:
-- Snyk
-- StackHawk
-- Burp Suite
+Tools can include asset discovery, authenticated infrastructure scanners, static and dynamic application testing, software composition analysis, cloud security posture management, container scanning, and manual validation. Active testing requires authorisation, safety controls, and coordination with service owners.
+### Risk-based prioritisation
+Severity alone does not establish remediation priority. Prioritisation should combine:
+- Asset criticality and data sensitivity
+- Internet exposure and reachable attack paths
+- Evidence of active exploitation, including the CISA Known Exploited Vulnerabilities Catalog
+- Exploitation likelihood signals such as the Exploit Prediction Scoring System
+- Vulnerability severity and environmental context, including the Common Vulnerability Scoring System
+- Existing controls, detection coverage, and recovery capability
+- Remediation complexity, service risk, and available mitigations
 
-Some organisations also use platforms that prioritise findings using observed exploitability and continuous automated testing approaches.
-#### Implementation principles
-1. Asset baselining: asset discovery and inventory ensure assessments cover endpoints, virtual machines, containers, and services.
-2. Risk-based prioritisation: severity scores are supplemented with exploit likelihood signals, evidence of active exploitation, asset criticality, and advisories such as the CISA Known Exploited Vulnerabilities catalogue.
-3. Continuous scanning: schedules align to change rates, such as weekly for stable environments and more frequent scanning for dynamic cloud workloads.
-4. Development integration: security testing is embedded into build and delivery workflows so issues are found earlier in the software lifecycle.
-5. Response tiers: remediation targets are defined so high-risk issues on critical systems are addressed first and progress is measurable.
-6. Measurement and optimisation: metrics such as mean time to remediate, closure rates for high-risk issues, and recurring root causes guide improvements.
-### Incident response and SOAR
-Incident response typically includes triage, investigation, containment, eradication, and recovery. Triage distinguishes false positives from real incidents and establishes urgency. Remediation focuses on stopping the attack, removing adversary access, patching or reconfiguring affected systems, and restoring normal operations.
+Scanning frequency should reflect asset exposure, change rate, threat activity, and detection capability. Dynamic internet-facing environments usually require more frequent assessment than stable, isolated assets. Metrics should track risk reduction, overdue high-priority findings, recurrence, exception age, and time to verified remediation.
+### Incident response and orchestration
+Incident response coordinates triage, analysis, containment, eradication, recovery, communication, and improvement. Triage validates the signal, assesses potential impact, preserves evidence, assigns severity, and establishes decision authority.
 
-Security orchestration, automation and response platforms aim to make incident handling more consistent and scalable. Typical capabilities include:
-- Case management to track incidents, ownership, priority, and status
-- Automated enrichment of cases with artefacts such as indicators of compromise
-- Playbooks that guide investigations and response actions
-- Integration with security tooling, ticketing, and monitoring systems
+Security orchestration, automation, and response platforms can provide:
+- Case management for ownership, priority, evidence, decisions, and status
+- Automated enrichment of indicators, assets, identities, and vulnerabilities
+- Playbooks for repeatable investigation and response
+- Integration with security, identity, endpoint, network, cloud, ticketing, and communication systems
+- Approval gates for disruptive or irreversible actions
 
-Automation can reduce effort for recurring scenarios. Orchestration supports partially automated workflows where analysts decide when to execute actions. Full automation is not always feasible because novel or first-of-a-kind events may require judgement before response actions are safe.
-#### Breach notification considerations
-When a data breach is confirmed, response teams commonly determine:
-- The categories of data affected, such as names, government identifiers, or payment details
-- The jurisdictions relevant to affected individuals, as notification obligations vary by country and can vary by state or territory
-- Which regulators and affected parties must be notified, and within what timeframes
+Automation suits bounded and well-tested actions. Analysts should retain control when evidence is incomplete, business impact is high, or an action could destroy evidence or disrupt critical services.
+### Breach notification
+Response teams should promptly determine the affected data, individuals, systems, jurisdictions, likely harm, containment status, and notification deadlines. Legal and privacy specialists should interpret applicable requirements because thresholds and timeframes differ.
 
-For example, the European Union General Data Protection Regulation provides for significant penalties for non-compliance with breach reporting obligations. Organisations can also be subject to overseas requirements if they hold data about people covered by those rules.
+Under Australia's Notifiable Data Breaches scheme, covered entities must notify affected individuals and the Office of the Australian Information Commissioner when an eligible breach is likely to result in serious harm and remedial action has not removed that likelihood. Under the European Union General Data Protection Regulation, a controller generally must notify the competent supervisory authority without undue delay and, where feasible, within 72 hours after becoming aware of a personal data breach unless the breach is unlikely to result in a risk to people's rights and freedoms.
+
+The incident plan should preserve the facts, decisions, timing, and approvals that support any notification or decision not to notify.
 ### Incident response frameworks
-Two widely used frameworks are those published by the National Institute of Standards and Technology and by the SANS Institute.
-#### NIST framework stages
-- Preparation
-- Detection and analysis
-- Containment, eradication, and recovery
-- Post-incident activity, including lessons learned and improvements
-#### SANS framework stages
-- Preparation
-- Identification
-- Containment
-- Eradication
-- Recovery
-- Lessons learned
+NIST Special Publication 800-61 Revision 3 integrates incident response across all six Cybersecurity Framework 2.0 functions. Govern, Identify, and Protect support preparation and risk reduction. Detect, Respond, and Recover drive operational incident handling, while lessons inform every function.
 
-Both frameworks emphasise readiness, disciplined investigation, measured containment and recovery, and continuous improvement after incidents.
-### Case study summary: malware in an air-gapped airport environment
-A major international airport operating an air-gapped network identified multiple devices compromised by malware designed to capture and store data locally. The environment had limited visibility, mixed devices with different security levels, and minimal tolerance for downtime.
+The SANS incident handling model uses six stages:
+1. Preparation
+2. Identification
+3. Containment
+4. Eradication
+5. Recovery
+6. Lessons learned
 
-Endpoint detection and response tooling enabled reconstruction of attacker behaviour, including persistence mechanisms and attempts to collect sensitive information. The analysis indicated infection via removable media and lateral movement enabled by weak controls. Remediation included clearing infected devices and storage locations, verifying eradication through threat hunting, strengthening internal traffic control rules, separating public and operational networks, and adopting continuous endpoint monitoring with regular hunting campaigns.
+Framework labels should not delay action. Teams may conduct containment, analysis, recovery planning, communication, and evidence preservation in parallel as facts develop.
+### Illustrative scenario: malware in an isolated operational environment
+An isolated operational network can still receive malware through removable media, maintenance equipment, supply chain updates, portable administrator devices, or an incorrectly controlled connection. Limited telemetry and low tolerance for downtime can delay discovery and constrain containment.
+
+Endpoint telemetry, protected logs, and network evidence can reconstruct persistence, execution, collection, and lateral movement. A proportionate response can isolate affected segments, preserve evidence, remove persistence, rotate exposed credentials, rebuild compromised devices, scan removable media, and verify recovery through targeted threat hunting. Architectural improvements can strengthen media control, administrative paths, internal segmentation, monitoring, and separation between public and operational services.

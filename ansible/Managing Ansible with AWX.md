@@ -1,8 +1,11 @@
 # Managing Ansible with AWX
+> [!NOTE]
+> AWX centralises Ansible automation, access control, credentials, scheduling, workflows, and auditing through a shared control plane, but demands careful adoption, security, maintenance, and production-readiness planning.
+
 AWX provides a web interface, REST API, and task engine for Ansible automation. It centralises projects, inventories, credentials, job execution, schedules, notifications, and access control. AWX is one upstream project for Red Hat Ansible Automation Platform, not an open-source edition of the whole commercial platform.
 
 The AWX project requires careful evaluation for new production deployments. Its official repository states that releases have been paused since the July 2024 release while maintainers undertake a large-scale architectural refactor. Organisations should confirm the project's current release status, security posture, upgrade path, and operational support before adoption.
-### Why AWX helps Ansible scale
+## Why AWX helps Ansible scale
 Command-line Ansible works well for individual operators and small collections of playbooks. Larger environments introduce coordination and governance problems:
 - Projects spread across repositories become difficult to discover, classify, and maintain.
 - Separate cron jobs and CI/CD pipelines obscure schedules, ownership, and dependencies.
@@ -19,11 +22,11 @@ Centralisation improves control but does not establish compliance by itself. Adm
 Effective administration requires practical knowledge of Linux or another Unix-like environment, Ansible playbooks and inventories, Git-based project management, containers, and basic Kubernetes concepts. Teams also need familiarity with permissions, credentials, network services, and structured API data. AWX reduces operational friction, but it does not replace those foundations.
 
 Event-driven use requires an external event source or integration layer to call AWX. A service-management approval, monitoring alert, repository event, or chat command can trigger an API request that launches an approved template. AWX provides the controlled execution point, while the external system detects and validates the event.
-### AWX and Ansible Automation Platform
+## AWX and Ansible Automation Platform
 AWX and Red Hat Ansible Automation Platform serve different risk and support needs. AWX is a community project that exposes new development earlier and does not include a commercial support entitlement. Red Hat Ansible Automation Platform is a subscribed product with supported components and an enterprise lifecycle. Ansible Tower preceded the component now called automation controller. Tower did not become the entire Ansible Automation Platform, which includes capabilities beyond controller functions.
 
 AWX therefore suits laboratories, evaluation, community-supported environments, and organisations prepared to operate the software themselves. The commercial platform better suits environments that require vendor support, certified content, defined lifecycles, and a wider integrated platform. Selection should reflect operational capacity, stability requirements, regulatory obligations, and acceptable risk.
-### Deployment with AWX Operator
+## Deployment with AWX Operator
 AWX Operator deploys and manages AWX on Kubernetes. Its basic installation uses Kustomize against a running cluster and requires a selected operator tag. Administrators should use a currently documented, compatible tag instead of copying the obsolete `2.5.3` example from the source material.
 
 Minikube provides a practical local cluster for testing. Docker is one supported driver, not minikube's only dependency or deployment option. Linux also supports drivers such as KVM2, VirtualBox, QEMU, and bare metal, while macOS and Windows support their own driver sets. A Linux virtual machine with Docker and minikube remains a valid lab configuration when the host provides adequate CPU, memory, storage, and network access.
@@ -42,7 +45,7 @@ A concise lab deployment uses this sequence:
 AWX is community software, so claims about a universally "supported" production installation method are misleading. Kubernetes and AWX Operator form the documented installation path, but each organisation remains responsible for architecture, high availability, backups, upgrades, monitoring, and recovery.
 
 The lab procedure should not become a production blueprint. Production design must address persistent database and project storage, ingress, TLS, DNS, secrets, resource requests and limits, node failure, database recovery, image provenance, and cluster upgrades. Administrators should record the AWX, operator, Kubernetes, PostgreSQL, and execution-environment versions as a tested compatibility set.
-### Resource model and access control
+## Resource model and access control
 An organisation provides an administrative boundary for resources and permissions. Teams group users so administrators can assign roles efficiently. A user may belong to multiple organisations and teams, while external identity providers can reduce local account administration.
 
 Inventories define managed hosts, groups, and variables. They may contain manually managed hosts or draw data from project files and supported inventory sources. A project links AWX to automation content, commonly in Git. Synchronisation creates or updates AWX's local project copy. Administrators can request a sync, schedule one, or enable update-on-launch with a cache timeout to limit repeated source-control traffic.
@@ -52,7 +55,7 @@ A job template defines one repeatable execution. It normally references a projec
 Roles should follow least privilege. Operators who only launch approved templates should not receive permission to edit projects, credentials, or inventories. Credential use can be delegated without revealing secret values, although administrators must still secure encryption keys, backups, external secret integrations, and superuser access.
 
 Execution environments package Ansible Core, collections, Python dependencies, and system libraries into container images. They make job dependencies reproducible across workers and reduce differences between an operator's workstation and AWX. Teams should build images through a controlled pipeline, scan them, publish immutable versions to a trusted registry, and reference fixed tags or digests. Using `latest` weakens reproducibility and can change job behaviour without a template edit.
-### Projects, inventories, and templates
+## Projects, inventories, and templates
 A project should point to a controlled source repository and a deliberate revision, branch, tag, or commit policy. Automatic update-on-launch maximises freshness but may introduce unreviewed changes at execution time. Scheduled or pipeline-triggered synchronisation offers more control. Protected branches, signed changes, tests, and release tags reduce supply-chain and operational risk.
 
 Project-sourced inventories allow existing Git-managed inventory files or inventory plugins to feed an AWX inventory. A sync imports the resulting hosts and groups. Teams should avoid maintaining the same hosts manually and dynamically without a clear ownership rule, because conflicting sources can create drift.
@@ -62,7 +65,7 @@ Job templates let one playbook serve different environments through separate inv
 Workflow templates arrange job templates as nodes. Links can run subsequent nodes on success, on failure, or always. Parallel branches reduce elapsed time when tasks are independent. Convergence rules decide whether any or all parent nodes must satisfy their conditions before a downstream node starts. Surveys can convert approved user choices into variables, enabling controlled self-service automation without embedding every branch in one large playbook.
 
 Workflow design should keep each node focused and independently testable. Failure branches can collect diagnostics, open incidents, or perform bounded recovery. Approval nodes can pause sensitive changes. An `always` link should receive special scrutiny because it can run after a failed predecessor. Converging branches also need explicit assumptions about partial success, idempotence, and safe retries.
-### Jobs, schedules, and notifications
+## Jobs, schedules, and notifications
 A job is one execution of a job template. AWX displays live and historical output, affected hosts, task events, status, duration, and launch details. Filters and event data support troubleshooting, while retained history improves accountability and trend analysis. Workflow jobs add a visual view of node progress and retain links to each underlying job.
 
 Schedules can launch job templates, workflow templates, project updates, and inventory updates at defined times or intervals. Administrators should set time zones deliberately, review daylight-saving behaviour where relevant, define end conditions, and prevent overlapping executions when a previous job may still be running.
@@ -70,7 +73,7 @@ Schedules can launch job templates, workflow templates, project updates, and inv
 Notification templates send events through services such as email, Slack, PagerDuty, or generic webhooks. They can report starts, successes, failures, and workflow approvals where supported. Teams should test each template, restrict tokens, avoid leaking sensitive job output, and route alerts to owners who can act on them.
 
 Operators can inspect job output by host, play, task, and event. Historical jobs reveal who launched automation, which template and revision ran, when execution began, and whether it succeeded. Troubleshooting should start with the failed event and its host-level data, then examine credentials, inventory resolution, project sync status, execution-environment dependencies, network reachability, and target permissions. Retrying a job without diagnosing a non-idempotent failure can compound damage.
-### REST API
+## REST API
 AWX exposes its browsable API at `/api/` and currently identifies version 2 through `/api/v2/`. The API supports resource discovery, filtering, pagination, creation, updates, launches, and synchronisation. Automation can use it to register projects, collect job metrics, launch templates from CI/CD or service-management events, synchronise inventories after repository releases, and register execution-environment image references.
 
 Session authentication suits browser interaction. Basic authentication sends a Base64-encoded username and password with every request and should be confined to protected testing where the installed version permits it. Production integrations should use the strongest token or service authentication supported by that AWX release, keep credentials out of shell history and source code, validate TLS certificates, restrict scopes, and rotate secrets.
@@ -87,7 +90,7 @@ Launching a job template sends `POST` to its launch endpoint. Synchronising an i
 A launch client should first query the template or launch endpoint to determine required passwords, variables, inventory choices, or limits. It should then send an explicit JSON payload, validate the response, and poll the returned job URL until the job reaches a terminal state. A successful API request only confirms that AWX accepted the launch. The associated job may later fail, be cancelled, or time out.
 
 Inventory synchronisation follows the same asynchronous pattern. A `POST` to an update endpoint creates an update job, so automation should monitor that job before assuming the inventory is current. Project updates and execution-environment registration also require permission checks, input validation, and clear handling of duplicate names or unavailable images.
-### Practical adoption sequence
+## Practical adoption sequence
 An incremental rollout reduces risk and gives teams time to refine roles and operating procedures:
 1. Deploy a disposable lab and document the tested version set.
 2. Create an organisation, connect external authentication where appropriate, and define teams with minimal roles.
@@ -101,7 +104,7 @@ An incremental rollout reduces risk and gives teams time to refine roles and ope
 10. Complete backup, restore, upgrade, capacity, security, and incident exercises before wider use.
 
 This sequence keeps the first implementation understandable. It also exposes weaknesses in playbook idempotence, repository controls, inventory ownership, credential boundaries, and execution-environment maintenance before AWX becomes a critical shared service.
-### Operational priorities
+## Operational priorities
 Reliable AWX operation depends on more than successful job launches. Administrators should establish:
 - tested database and encryption-key backups
 - controlled upgrades and rollback plans

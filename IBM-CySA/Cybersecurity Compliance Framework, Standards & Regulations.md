@@ -1,296 +1,331 @@
-# Cybersecurity Compliance Framework, Standards & Regulations
+# Cybersecurity Compliance Frameworks, Standards, and Regulations
 > [!NOTE]
-> How organisations use GRC, ITIL, risk and asset management, global regulations, industry standards, and security audits to build compliant, resilient cybersecurity programmes.
-## Introduction to Information Security and Compliance
-### Governance, Risk and Compliance and Cybersecurity Management
-Summary of how organisations coordinate governance, risk management, compliance, and core security practices to keep operations lawful, resilient, and aligned with business objectives.
-### Governance, Risk and Compliance (GRC)
-GRC integrates how an organisation sets direction, manages uncertainty, and proves conformance with external and internal requirements, including across information technology.
+> Effective cybersecurity compliance integrates governance, risk management, service management, technical standards, legal obligations, and independent assurance into a coherent operating model.
+## Governance, risk, and compliance
+### Governance, risk, and compliance operating model
+Governance, risk, and compliance (GRC) integrates the way an organisation sets direction, manages uncertainty, and demonstrates compliance with internal and external requirements.
 
-- Governance: sets policies, goals, decision rights, and accountability to support ethical and transparent operations
-- Risk management: identifies and treats financial, operational, cybersecurity, and regulatory risks to protect objectives and support informed decisions
-- Compliance: meets laws, regulations, standards, and internal rules through monitoring, audit evidence, and training
+- Governance establishes objectives, decision rights, accountability, oversight, and ethical expectations
+- Risk management identifies, analyses, evaluates, treats, monitors, and communicates risks that could affect organisational objectives
+- Compliance identifies applicable obligations, implements controls, monitors performance, and retains evidence of conformance
 
-Benefits commonly include reduced duplication, clearer risk visibility, more consistent decision-making, stronger audit outcomes, and improved stakeholder confidence. Weak implementation, limited integration, or poor leadership support can create high cost, fragmented effort, and limited insight into threats and control gaps.
-### Governance components within a GRC framework
-#### Guidelines, policies, and standards
-- Guidelines recommend practices to meet risk and compliance objectives
-- Policies define permitted and prohibited behaviour, often covering acceptable use, information security, continuity, disaster recovery, and incident response
-- Standards specify measurable criteria to make controls repeatable, such as password rules, multi-factor authentication, physical security controls like closed-circuit television and secure entry systems, and encryption requirements like TLS for data in transit and AES for data at rest
-#### Procedures and oversight
-Procedures turn intent into repeatable execution, such as change management, onboarding and offboarding, and operational playbooks. Governance also considers jurisdictional legal duties and industry expectations, with oversight commonly provided by boards, committees, and regulators.
-### GRC tools and common use cases
-GRC tools support control mapping, workflow automation, evidence capture, and reporting. Common platforms include IBM OpenPages, RSA Archer, and MetricStream.
+An effective GRC model reduces duplicated work, improves risk visibility, supports consistent decisions, strengthens assurance, and increases stakeholder confidence. Fragmented ownership, weak leadership support, poor data quality, and disconnected tools can increase cost and obscure control gaps.
+### Governance instruments and oversight
+Organisations use several governance instruments for different purposes.
 
-They are commonly used for:
-- Regulatory change management and gap identification
+- Policies state mandatory principles, responsibilities, and rules
+- Standards translate policies into specific, measurable, and mandatory requirements
+- Procedures define the steps, roles, records, and escalation paths needed to perform work consistently
+- Guidelines recommend flexible practices where circumstances may require judgement
+
+Policies commonly address acceptable use, information security, business continuity, disaster recovery, incident response, data handling, and third-party access. Supporting standards may specify authentication, secure configuration, physical access, logging, encryption, cryptographic key management, and retention requirements.
+
+Boards and executives set risk appetite and accountability. Management committees coordinate implementation. Control owners operate and monitor controls. Internal audit provides independent assurance, while regulators and external practitioners exercise authority within their mandates.
+### GRC platforms
+GRC platforms support obligation registers, control mapping, workflow automation, evidence collection, issue management, and reporting. Examples include IBM OpenPages, Archer, and MetricStream.
+
+Organisations commonly use these platforms for:
+- Regulatory change management and compliance gap analysis
 - Cybersecurity control monitoring and risk reporting
-- Third-party and vendor risk assessment
-- Audit planning, evidence collection, issue tracking, and reporting
-### NIST Cybersecurity Framework (CSF) 2.0
-The NIST CSF 2.0 organises cybersecurity outcomes into six connected functions.
+- Third-party and supplier risk management
+- Audit planning, evidence collection, finding management, and remediation tracking
 
-- Govern: define strategy, roles, policies, oversight, and supply chain risk expectations
-- Identify: understand assets, dependencies, and the risk context
-- Protect: implement safeguards such as access controls, training, and data security
-- Detect: monitor for events and indicators of compromise
-- Respond: contain incidents, communicate impacts, and coordinate remediation
-- Recover: restore services and strengthen resilience after disruption
+A platform supports governance but does not replace accountable decisions, reliable evidence, or effective controls.
+## NIST Cybersecurity Framework 2.0
+The NIST Cybersecurity Framework (CSF) 2.0 organises cybersecurity outcomes into six connected Functions.
 
-Implementation tiers describe maturity.
+- Govern: establish strategy, policy, roles, oversight, and cybersecurity supply chain expectations
+- Identify: understand assets, dependencies, vulnerabilities, threats, and the risk context
+- Protect: apply safeguards such as identity management, access control, awareness, platform security, and data security
+- Detect: monitor for anomalies, indicators of compromise, and other adverse events
+- Respond: manage incidents, analyse effects, communicate, contain activity, and coordinate mitigation
+- Recover: restore assets and operations, communicate recovery status, and incorporate lessons learned
 
-- Tier 1, Partial: largely ad hoc and reactive practices
-- Tier 2, Risk Informed: risk-aware decisions with uneven adoption
-- Tier 3, Repeatable: approved policies and consistent processes
-- Tier 4, Adaptive: continuous improvement and rapid adjustment to changing threats
+Organisations use a Current Profile to describe present outcomes and a Target Profile to define selected outcomes. The gap between the profiles helps leaders prioritise actions. The CSF describes outcomes rather than prescribing technologies, controls, or a fixed implementation sequence.
 
-Alignment typically uses a cycle of posture assessment and gap analysis, senior leadership sponsorship, tailored control design, stakeholder and supplier collaboration, and continuous improvement. A common applied pattern is to establish governance and policy, catalogue critical assets, strengthen protection with multi-factor authentication and encryption, implement detection monitoring, use an incident response plan, and practise recovery and communications.
-### Elements of effective security compliance
-External drivers include government regulation, legal exposure, sector standards, local and national context, and global factors such as geopolitics, cross-border operations, and supply chain risk. Organisations must adjust policies and procedures to meet the requirements of each operating jurisdiction while keeping a consistent internal control approach.
+Implementation Tiers characterise the rigour of an organisation's cybersecurity risk governance and management practices. They are not maturity levels, and the highest Tier is not automatically the appropriate target.
 
-Consequences of non-compliance can include fines, sanctions, reputational harm, loss of licences, and contractual penalties.
+- Tier 1 - Partial: practices are largely informal, ad hoc, and reactive
+- Tier 2 - Risk Informed: leaders understand risk, but practices remain inconsistent across the organisation
+- Tier 3 - Repeatable: approved policies and organisation-wide practices support consistent risk management
+- Tier 4 - Adaptive: the organisation uses lessons, indicators, and changing conditions to improve and adjust its practices
 
-Monitoring and assurance commonly rely on due diligence, attestation, incident acknowledgment, internal audits and training, independent external reviews, and automation for tasks such as vulnerability scanning and patch management.
+Leaders select an appropriate Tier by considering objectives, legal duties, supply chain requirements, acceptable risk, and resources. They can map CSF outcomes to detailed controls through Informative References.
+## Compliance operations
+### Obligations, monitoring, and assurance
+Laws, regulations, licences, contracts, industry rules, internal policies, and operating jurisdictions can all create compliance obligations. Cross-border operations, geopolitical conditions, and supply chain dependencies can change the applicable duties and risk profile.
+
+Non-compliance may lead to enforcement action, fines, litigation, contractual remedies, loss of a licence or market access, operational disruption, and reputational harm. Compliance with a requirement does not establish that every relevant security risk is controlled, and strong security does not establish compliance with every applicable obligation.
+
+Organisations maintain compliance through:
+- An obligation register linked to responsible owners, controls, evidence, and review dates
+- Due diligence, control self-assessments, and management attestations
+- Internal audit and independent external assurance
+- Incident reporting and regulatory or contractual notification
+- Workforce education, exercises, and role-specific training
+- Continuous control monitoring and periodic control testing
+- Issue management, corrective action, and remediation validation
+
+Automation can collect evidence, test configurations, scan for vulnerabilities, and track patch status. These activities support monitoring and control operation, but they do not provide independent assurance by themselves.
 ### Standardised processes, automation, and change control
-Standardised cybersecurity processes are documented and applied consistently across teams to improve reliability and compliance.
+Organisations document and apply standardised processes to improve reliability, traceability, and compliance.
 
-- Network configuration baselines to reduce misconfiguration risk and speed troubleshooting
-- Identity and access management using centralised accounts, single sign-on, and multi-factor authentication
-- Vulnerability and patch management using regular scanning and prompt patching
-- Incident response and recovery using tested procedures and post-incident review
-- Continuous improvement through audits, feedback loops, and training
+- Network and cloud configuration baselines reduce misconfiguration and accelerate investigation
+- Identity and access management centralises accounts, single sign-on, multi-factor authentication, and access review
+- Vulnerability and patch management identifies exposures, prioritises remediation by risk, and verifies completion
+- Incident response and recovery use tested procedures, defined communications, exercises, and post-incident review
+- Continual improvement uses metrics, audit results, lessons learned, feedback, and training
 
-Automation performs tasks with minimal human effort. Orchestration coordinates automated steps across systems. In practice this supports user provisioning, role-based access control, access changes during onboarding and offboarding, ticketing and escalation workflows, and integration through application programming interfaces. Benefits include faster delivery, fewer manual errors, consistent baselines, secure scaling, improved service reliability, and better use of limited staffing.
+Automation performs defined tasks with limited human intervention. Orchestration coordinates automated tasks across systems. Organisations use both for provisioning, role-based access, onboarding and offboarding, ticketing, escalation, evidence collection, and integration through application programming interfaces.
 
-Change management controls system modifications through approval, impact analysis, testing, backout planning, maintenance windows, and strong documentation. Technical impacts commonly considered include allow and deny rules, restricted activities during rollout, downtime, service restarts, legacy compatibility, and dependencies across systems.
-### Asset management
-Asset management tracks assets from acquisition to disposal to support cost control, security, and compliance.
+Change control governs modifications through authorisation, impact and security analysis, testing, implementation planning, rollback planning, maintenance windows, segregation of duties, and documentation. Reviewers consider service interruption, rule changes, restricted activities, restarts, legacy compatibility, dependencies, monitoring, and recovery requirements before approval.
+### Asset and configuration management
+Asset management identifies and governs assets throughout their lifecycle. Cybersecurity asset management covers data, hardware, software, systems, facilities, services, people, and suppliers according to their importance and risk.
 
-- Acquisition and procurement: define need, evaluate options, confirm compatibility, and align to budgets and strategy
-- Monitoring and tracking: maintain inventory accuracy, deter loss, optimise use, and support audits through tagging, inventory systems, reconciliation, and lifecycle tracking
-- Disposal and decommissioning: protect the environment and data by securely erasing or destroying storage media and meeting electronic waste obligations
-## Foundations of IT Service Management and Risk Governance
+- Acquisition: the organisation defines the need, evaluates security and compatibility, assigns ownership, and records the asset
+- Operation and maintenance: owners classify the asset, manage access, monitor status, maintain licences and warranties, patch components, and reconcile inventories
+- Reassignment: custodians update ownership, access, configuration, location, and records when the asset changes use
+- Disposal: owners remove access, retain required records, sanitise media, dispose of electronic waste responsibly, and confirm completion
+
+For media reuse or disposal, organisations select clear, purge, or destroy methods according to information sensitivity, media type, and intended destination. Deleting files or performing an ordinary erase does not necessarily sanitise media.
+
+A configuration management database (CMDB) records selected configuration items and their relationships. Configuration items can include physical devices, software, cloud resources, documentation, service agreements, and configuration baselines. A CMDB supports incident, problem, change, release, risk, and service-impact analysis.
+
+A CMDB does not replace an asset register, financial record, software licence repository, or document management system. An asset register tracks ownership, financial, contractual, and lifecycle information, while a CMDB focuses on the configuration and relationships needed to deliver products and services. Integrated service management tools may link these records.
+## IT service and cybersecurity risk management
 ### ITIL and IT service management
-ITIL, originally known as the Information Technology Infrastructure Library, is a set of guidance and practices for planning, delivering, supporting and continually improving IT services so they meet business needs. It began in the 1980s in the United Kingdom public sector and has since been adopted internationally as a service management framework.
+IT service management (ITSM) covers the policies, practices, roles, and activities used to plan, deliver, support, and improve IT services. ITIL is one framework within that broader discipline.
 
-IT service management (ITSM) is the broader discipline covering the policies, processes and activities used to design, run and improve IT services. ITIL is one commonly used set of ITSM practices.
-#### Configuration management database
-A configuration management database (CMDB) is a managed data store that records key information about configuration items (CIs) and the relationships between them. It supports a shared view of the IT environment, including:
-- Physical assets such as servers, end user devices, network equipment and peripherals
-- Non physical assets such as software versions and licences, documentation, service agreements and configuration baselines
-- Relationships and dependencies, including which components support which services and how changes affect upstream and downstream systems
+ITIL began as the Information Technology Infrastructure Library in the United Kingdom public sector in the late 1980s. ITIL now provides guidance for digital product and service management. ITIL Version 5 entered a phased release in 2026. It retains established value-system concepts and guiding principles, and adds integrated product and service lifecycle guidance, digital experience, and support for AI-enabled environments.
 
-Using a CMDB improves incident response and problem resolution by accelerating identification of affected components. It also supports change and release planning, asset lifecycle management, compliance reporting and security risk identification.
-### ITIL processes and practices
-In ITIL v3, service management is commonly described through five lifecycle stages:
-1. Service strategy, which defines value, target customers, service portfolios, funding and high level risk management
-2. Service design, which designs new or changed services and the controls that make them reliable, scalable and cost effective, including service levels, capacity, availability, continuity, information security and supplier arrangements
-3. Service transition, which moves changes into operation through controlled change management, service asset and configuration management, release and deployment management and knowledge management
-4. Service operation, which delivers and supports services day to day through the service desk and operational processes such as incident, problem, event, request, and access management
-5. Continual service improvement, which uses measurement and feedback to prioritise and deliver ongoing improvements, often applying the Plan-Do-Check-Act cycle
+The ITIL Value System connects guiding principles, governance, value-chain activities, management practices, and continual improvement. Four dimensions support a balanced operating model:
+- Organisations and people
+- Information and technology
+- Partners and suppliers
+- Value streams and processes
 
-ITIL 4 reframes this into a Service Value System and a set of practices rather than a strict lifecycle, but many organisations still use the lifecycle language to organise work.
-### Implementing ITIL aligned processes
-Successful implementation is treated as organisational change rather than a documentation exercise. Common practice includes:
-- Assessing current process maturity to identify gaps and priorities
-- Securing executive sponsorship to enable resourcing and decision making
-- Defining scope, objectives and measures that align to business outcomes
-- Building a phased roadmap, piloting before wider rollout, then iterating based on evidence
-- Training staff and stakeholders so roles, responsibilities and expected behaviours are understood
-- Selecting supporting ITSM tools that fit the operating model and reporting needs
-- Establishing key performance indicators and regular reviews to drive continual improvement
-- Maintaining clear, consistent communication with stakeholders
+ITIL v3 used five service lifecycle stages: service strategy, service design, service transition, service operation, and continual service improvement. ITIL 4 replaced the strict lifecycle with a Service Value System and management practices. ITIL Version 5 retains a value-system approach and adds unified lifecycle guidance for digital products and services. Legacy operating models may still use v3 terminology, but that terminology does not describe the current structure.
+
+Organisations implement ITIL-aligned practices by:
+- Assessing current capability, pain points, and priorities
+- Securing executive sponsorship, resources, and decision authority
+- Defining scope, outcomes, responsibilities, measures, and interfaces
+- Building a phased roadmap, piloting changes, and improving them from evidence
+- Training staff and stakeholders on expected roles and behaviours
+- Selecting tools that fit the operating model, integrations, and reporting needs
+- Reviewing performance and communicating results to stakeholders
 ### Cybersecurity risk management
-Risk management identifies, assesses and controls risks that could affect an organisation’s objectives, including financial, legal, operational and security risks. In cybersecurity, the focus is on protecting information assets and maintaining business continuity.
+Cybersecurity risk management identifies, assesses, responds to, monitors, and communicates risks that could affect objectives, operations, assets, individuals, other organisations, and stakeholders.
 
-A practical flow includes:
-1. Risk identification, using expert input, historical incidents, tooling and structured methods such as SWOT analysis
-2. Risk assessment, estimating likelihood and impact using ad hoc, recurring, one time or continuous approaches
-3. Risk prioritisation, ranking risks to direct effort to the most consequential exposures
-4. Risk tolerance and risk appetite, defining the level of risk the organisation will accept to achieve its goals
-5. Risk treatment, selecting an approach such as transfer, acceptance, avoidance or mitigation
+A practical process includes:
+1. The organisation establishes context, scope, criteria, ownership, and decision authority.
+2. Risk owners identify assets, dependencies, threat sources, threat events, vulnerabilities, predisposing conditions, existing controls, and legal requirements.
+3. Analysts estimate likelihood and impact, determine risk, record assumptions and uncertainty, and prioritise the results.
+4. Leaders select a response such as acceptance, avoidance, mitigation, sharing, or transfer, then approve actions and residual risk.
+5. Control owners implement the response and monitor risk indicators, control performance, environmental changes, and emerging threats.
+6. Risk owners communicate results, review decisions at defined intervals and after significant change, and update records.
 
-Risk analysis is commonly:
-- Qualitative, which categorises risks by severity and likelihood without relying on precise numbers
-- Quantitative, which estimates financial exposure using measures such as exposure factor, single loss expectancy, annualised rate of occurrence and annualised loss expectancy
+Risk appetite describes the types and amount of risk an organisation broadly accepts while pursuing value. Risk tolerance sets acceptable boundaries for a specific objective or outcome.
+
+Qualitative analysis uses defined categories for likelihood, impact, and severity. Quantitative analysis uses numerical estimates and should expose assumptions and uncertainty. One loss-estimation method uses these measures:
+- Exposure factor: the estimated proportion of asset value lost in one event
+- Single loss expectancy: asset value x exposure factor
+- Annualised rate of occurrence: the estimated number of events per year
+- Annualised loss expectancy: single loss expectancy x annualised rate of occurrence
 ### Third-party and supply chain risk
-Vendor assessment evaluates third parties against security and compliance expectations. Typical components include penetration testing, contractual rights to audit, evidence of internal audits and independent security assessments.
+Third-party due diligence examines the service, data access, dependencies, security practices, incident history, contract terms, vulnerability management, recovery capability, and relevant independent assurance. An organisation reviews penetration-test reports or conducts testing only when the supplier explicitly authorises the scope, timing, method, and rules of engagement.
 
-Supply chain analysis focuses on resilience and integrity through vendor selection, due diligence on financial and governance stability, and the management of conflicts of interest.
+Cybersecurity supply chain risk management addresses products and services throughout design, development, integration, deployment, operation, and disposal. It considers malicious functionality, counterfeit components, vulnerable products, poor development or manufacturing practices, concentration risk, subprocessor risk, fourth-party dependencies, and limited visibility into upstream suppliers.
 
-Common agreement types used to formalise expectations include service level agreements, master service agreements, statements of work or work orders, non disclosure agreements, memoranda of agreement, memoranda of understanding and business partner agreements.
+Contracts allocate responsibilities and establish enforceable requirements. Common instruments include master services agreements, service-level agreements, statements of work, work orders, non-disclosure agreements, data processing agreements, business associate agreements where HIPAA applies, memoranda of agreement, and memoranda of understanding.
 
-Ongoing vendor management relies on performance monitoring, structured questionnaires and clear rules of engagement for communication, review cadence and responses to non compliance.
-### AI ethics and the EU AI Act
-AI is widely embedded in everyday systems such as predictive text, recommendation engines, biometric identification, navigation and smart home devices. Key ethical concerns include privacy and data security, algorithmic bias and unfair outcomes, surveillance and consent, limited transparency, and workforce disruption from automation.
+Ongoing management includes performance monitoring, control reviews, assurance reports, incident notification, vulnerability disclosure, change notification, resilience testing, remediation tracking, exit planning, and secure data return or destruction.
+## AI governance and the EU AI Act
+AI systems can improve productivity and decision-making, but they can also create risks involving privacy, security, discrimination, surveillance, opaque decisions, human autonomy, safety, and employment.
 
-Principles used in practice often emphasise AI that augments human decision making, clear data governance and transparent, explainable systems. Trustworthiness can be assessed through pillars such as explainability, fairness, robustness, transparency and privacy. Implementation typically includes governance rules, technical guardrails, diverse training data and bias evaluation tooling.
+Trustworthy AI practices address human agency and oversight, technical robustness and safety, privacy and data governance, transparency, diversity and fairness, social and environmental wellbeing, and accountability. Organisations assign responsibility, assess risks and effects before deployment, maintain oversight proportionate to risk, document data provenance and system limitations, test performance across relevant groups and operating conditions, monitor systems after deployment, and provide routes for review and redress.
 
-The European Union’s Artificial Intelligence Act, adopted in 2024, uses a risk based approach. It prohibits certain harmful uses, sets transparency requirements for some AI outputs, and imposes stronger obligations on high risk systems, including human oversight, record keeping, conformity assessments and registration in an EU database. Application dates are phased, so organisations operating in the EU usually plan compliance work across the transition period.
-## Understanding Cybersecurity Laws and Regulations
-### Cybersecurity law and service management summary
-Cybersecurity laws and standards set expectations for preventing cybercrime, protecting personal information, and operating digital services.
-#### Core United States laws
-- Computer Fraud and Abuse Act 1986: targets unauthorised access to computers and misuse of access
-- Electronic Communications Privacy Act 1986: regulates interception and access to electronic communications, including stored data
-- Health Insurance Portability and Accountability Act 1996: privacy and security obligations for protected health information
-- Children’s Online Privacy Protection Act 1998: parental consent and notice for collection of data from children under 13
-- Identity Theft and Assumption Deterrence Act 1998: criminalises identity theft
-- Gramm-Leach-Bliley Act 1999: safeguards and transparency for customer information in financial services
-- Federal Information Security Management Act (FISMA) 2002: information security program requirements for federal agencies and key contractors
-- Homeland Security Act 2002 and Cybersecurity Information Sharing Act of 2015: coordination and voluntary sharing of threat indicators
-- USA PATRIOT Act 2001 and USA FREEDOM Act 2015: surveillance authorities and limits on bulk collection
-- Sarbanes-Oxley Act 2002 and consumer protection laws: controls for records and deceptive online conduct
-#### HIPAA Security Rule essentials
-- Privacy Rule: governs permitted use and disclosure of protected health information
-- Security Rule: protects electronic protected health information using administrative, physical, and technical safeguards
-- Covered entities and business associates assess risk, control access, and respond to incidents
-- HHS provides a Security Risk Assessment Tool and NIST publishes guidance and checklists for implementation
-#### Practical HIPAA controls
-- Conduct risk assessments routinely and after major change
-- Use role based access, logging, and encryption where feasible
-- Train staff and maintain an incident response plan
-- Patch systems and review alerts and logs
-### Global privacy and cybersecurity frameworks
-- General Data Protection Regulation: EU and EEA rules for lawful processing, data subject rights, privacy by design, and breach notification
-- Network and Information Systems Directive and NIS2: EU cybersecurity duties for critical and important sectors
-- California Consumer Privacy Act: consumer privacy rights and transparency requirements
-- Data Protection Act 2018 and UK GDPR: United Kingdom privacy framework
-- Personal Information Protection and Electronic Documents Act: Canadian private sector privacy law
-- Privacy Act 1988: Australian privacy framework based on the Australian Privacy Principles
-- Cybersecurity Law of the People’s Republic of China and Information Technology Act 2000: examples of national regimes covering security and cyber offences
-- PCI DSS: payment card security standard for organisations that handle card data
-#### Cross jurisdiction compliance practices
-- Map data flows and apply the strictest applicable requirements where practical
-- Build a common baseline, then add local controls and supplier contractual requirements
-- Audit and update controls as threats and laws change
-### ITIL, risk management, and third parties
-ITIL is a set of IT service management practices used to align IT services with business needs. A configuration management database records configuration items and their relationships, supporting faster incident diagnosis, change planning, asset lifecycle management, and compliance.
+Representative, fit-for-purpose data can reduce some risks, but dataset composition alone cannot establish fairness. Organisations also test outcomes, controls, security, robustness, and human oversight.
 
-Cybersecurity risk management typically includes identification, assessment, prioritisation, appetite and tolerance setting, and treatment through avoidance, mitigation, transfer, or acceptance. Analysis may be qualitative or quantitative, using measures such as exposure factor, single loss expectancy, and annualised loss expectancy.
+Regulation (EU) 2024/1689, the Artificial Intelligence Act, uses a risk-based framework. It prohibits specified AI practices, regulates high-risk AI systems, imposes transparency duties on specified systems and synthetic content, and sets separate obligations for providers of general-purpose AI models.
 
-Third-party risk management includes vendor due diligence, security testing where appropriate, contractual audit rights, evidence of independent assessments, and ongoing monitoring. Common agreements include service level agreements, master service agreements, statements of work, and non disclosure agreements.
-### AI ethics and the EU AI Act
-AI can improve productivity, but it also creates risks including privacy loss, bias, opaque decisions, surveillance, and job displacement. Controls include human oversight, transparent data handling, diverse training data, bias testing, and guardrails that prevent harmful use.
+Requirements for high-risk systems include risk management, data governance, technical documentation, logging, information for deployers, human oversight, accuracy, robustness, and cybersecurity. Providers complete the applicable conformity assessment and register systems when the Act requires it. Deployers have separate obligations for use, oversight, monitoring, information, and impact assessment in specified cases.
 
-The European Union Artificial Intelligence Act uses a risk based model. It bans certain harmful uses, requires transparency for some AI generated content, and imposes stronger obligations on high risk systems, including documentation, oversight, conformity assessment, and registration where required.
-## Understanding Cybersecurity Standards and Audits
-### Industry standards in IT
-Information technology standards support interoperability, security and consistent performance across systems. Standards are typically developed by recognised bodies and industry groups and are applied across hardware, networks, software and security controls.
-#### Hardware standards
-Hardware standards help devices work together and meet safety and performance expectations.
+The Act applies in phases:
+- 1 August 2024: the Act entered into force
+- 2 February 2025: prohibitions, definitions, and AI literacy duties began to apply
+- 2 August 2025: governance and general-purpose AI obligations began to apply
+- 2 August 2026: Article 50 transparency duties and most other applicable rules begin to apply
+- 2 December 2027: high-risk rules for Annex III systems begin to apply under the amended timetable
+- 2 August 2028: high-risk rules for systems embedded in products covered by Annex I begin to apply under the amended timetable
+## Cybersecurity laws and regulations
+Laws impose binding duties within their scope. Their application depends on jurisdiction, entity type, activity, sector, data, system, and contractual role. Regulations and implementing rules provide more detailed obligations. Standards and frameworks remain voluntary unless legislation, regulation, contract, market rules, certification, or internal policy incorporates them.
+### Core United States laws
+- Computer Fraud and Abuse Act 1986: criminalises specified conduct involving access to protected computers without authorisation or beyond authorised areas, together with related fraud, damage, extortion, and trafficking offences
+- Electronic Communications Privacy Act 1986: amended federal wiretap law and added the Stored Communications Act, which regulate interception of electronic communications and access to stored communications and subscriber records
+- Health Insurance Portability and Accountability Act 1996 and its implementing rules: the Privacy Rule governs protected health information, while the Security Rule requires safeguards for electronic protected health information
+- Children's Online Privacy Protection Act 1998 and the COPPA Rule: apply to operators of websites and online services directed to children under 13, and to other operators that know they collect personal information online from a child under 13
+- Identity Theft and Assumption Deterrence Act 1998: establishes federal offences involving the knowing transfer, possession, or use of another person's means of identification without lawful authority and with specified unlawful intent
+- Gramm-Leach-Bliley Act 1999: requires covered financial institutions to provide privacy notices and protect customer information under applicable privacy and safeguards rules
+- Federal Information Security Modernization Act 2014: updated the 2002 FISMA framework and requires federal agencies to maintain agency-wide information security programs for federal information and systems, including systems operated on an agency's behalf
+- Homeland Security Act 2002: established the Department of Homeland Security and assigned federal homeland security and critical infrastructure coordination functions
+- Cybersecurity Information Sharing Act 2015: provides a voluntary, conditional framework for sharing cyber threat indicators and defensive measures. Its current authority ends on 30 September 2026 unless Congress extends it
+- USA PATRIOT Act 2001 and USA FREEDOM Act 2015: changed national security surveillance, records, transparency, and court procedures. The temporary section 215 authority and related provisions expired on 15 March 2020
+- Sarbanes-Oxley Act 2002: requires covered issuers to assess and report on internal control over financial reporting, and includes record preservation and anti-tampering provisions
+- Federal Trade Commission Act: prohibits unfair or deceptive acts or practices in or affecting commerce and supports federal privacy and data security enforcement
+### HIPAA Security Rule
+The HIPAA Privacy Rule governs uses and disclosures of protected health information in any form by regulated entities and establishes individual rights. The Security Rule applies to electronic protected health information and requires administrative, physical, and technical safeguards.
 
-- Physical dimensions and form factors for components and connectors
-- Power requirements such as voltage and current ranges
-- Data interfaces and connectors such as USB, SATA and HDMI
-- Electromagnetic compatibility to limit interference and improve resilience
-- Safety requirements to reduce electrical, thermal and mechanical risks
-#### Communication standards
-Communication standards enable reliable data exchange across diverse systems and networks.
+Covered entities and business associates must:
+- Conduct an accurate and thorough risk analysis
+- Apply reasonable and appropriate measures to manage identified risks
+- Control access, review system activity, and respond to security incidents
+- Evaluate safeguards periodically and after environmental or operational changes
+- Maintain workforce training, incident procedures, contingency plans, patch management, records review, and remediation processes proportionate to risk
 
-- Network and application protocols such as TCP/IP, HTTP and FTP
-- Bandwidth and speed definitions to manage throughput and avoid bottlenecks
-- Security requirements such as TLS for encrypted sessions and WPA2 or WPA3 for Wi-Fi
-- Wireless specifications such as IEEE 802.11 and Bluetooth profiles
-- Quality of service rules to prioritise time critical traffic such as voice and video
-#### Security standards
-Security standards establish baseline controls for protecting confidentiality, integrity and availability.
+The Security Rule treats encryption as an addressable implementation specification. A regulated entity implements it when reasonable and appropriate. If it is not reasonable and appropriate, the entity documents its assessment and implements an equivalent alternative when reasonable and appropriate. Addressable does not mean optional without analysis and documentation.
 
-- Cryptography for data at rest and in transit such as AES and TLS
-- Authentication and authorisation patterns such as OAuth, OpenID Connect and SAML
-- Integrity controls such as hashing with SHA-256 and SHA-3
-- Security testing approaches including vulnerability scanning and penetration testing
-- Incident handling guidance covering detection, analysis, containment, eradication and recovery
-- Governance and assurance frameworks such as ISO/IEC 27001 and PCI DSS, plus privacy regulation such as the EU GDPR
-#### Software standards
-Software standards improve quality, security and compatibility across development and deployment.
+The United States Department of Health and Human Services and the Office of the National Coordinator for Health Information Technology provide a Security Risk Assessment Tool. NIST SP 800-66 Rev. 2 provides voluntary implementation guidance. The Security Rule amendments proposed in December 2024 do not form part of the current rule unless the rulemaking process finalises them.
+### Global privacy and cybersecurity regimes
+- General Data Protection Regulation: governs lawful personal data processing, individual rights, data protection by design and by default, security, and qualified breach notification across the EU and EEA, with specified extraterritorial reach
+- NIS2 Directive: required EU Member States to transpose cybersecurity risk-management, governance, and incident-reporting duties for covered essential and important entities. It repealed the original NIS Directive from 18 October 2024
+- California Consumer Privacy Act, as amended by the California Privacy Rights Act: gives California consumers rights to know, delete, correct, opt out of sale or sharing, and limit specified uses of sensitive personal information, while imposing duties on covered businesses
+- UK GDPR and Data Protection Act 2018, as amended by the Data (Use and Access) Act 2025: govern personal data processing in the United Kingdom
+- Personal Information Protection and Electronic Documents Act: governs private-sector handling of personal information in Canadian commercial activities within federal scope, subject to exemptions for substantially similar provincial laws
+- Privacy Act 1988: regulates personal information handling by Australian Privacy Principle entities and includes the Notifiable Data Breaches scheme
+- Security of Critical Infrastructure Act 2018: imposes risk-management, registration, incident-reporting, and other obligations on specified Australian critical infrastructure entities and assets
+- Cybersecurity Law of the People's Republic of China: regulates network operations, critical information infrastructure, network information security, monitoring, and incident response. Amendments effective from 1 January 2026 strengthen penalties and add provisions concerning artificial intelligence
+- Information Technology Act 2000: provides India's core electronic transactions, intermediary, cybersecurity, and cyber-offence framework
+- Digital Personal Data Protection Act 2023 and Digital Personal Data Protection Rules 2025: establish India's digital personal data regime through phased commencement
+### Cross-jurisdictional compliance
+Organisations operating across jurisdictions:
+- Identify each legal entity, establishment, regulated activity, service, system, data category, individual, and supplier relationship
+- Map data flows, storage locations, transfers, subprocessors, and access paths
+- Record each obligation, applicability test, regulator, owner, control, evidence source, and deadline
+- Build a compatible common control baseline and add jurisdiction-specific overlays
+- Analyse conflicts, localisation rules, transfer restrictions, secrecy duties, and competing notification requirements
+- Maintain incident decision trees for regulatory, contractual, insurer, customer, and law-enforcement notifications
+- Review legal developments, contracts, control performance, and operating changes regularly
 
-- Coding conventions that promote readability and maintainability
-- API specifications that enable service interoperability
-- Secure development practices for encryption, authentication and safe data handling
-- Quality assurance methods for testing, benchmarking and defect management
-- Standard data formats such as JSON, XML and HTML
-- Compatibility expectations across platforms and versions
-- Accessibility guidance to support people with disability and legal obligations
+Applying the strictest requirement as a universal rule can create conflicts or unnecessary processing. A common baseline can reduce variation, but it does not replace an analysis of each applicable regime.
+## Cybersecurity standards and guidance
+Recognised bodies such as ISO, IEC, IEEE, IETF, W3C, and industry councils develop or maintain technical and management standards. Standards support interoperability, security, safety, quality, and consistent performance.
+### Hardware and communications standards
+Hardware standards address:
+- Physical dimensions, form factors, and connector specifications
+- Electrical ratings, power requirements, and energy management
+- Data interfaces such as USB, SATA, and HDMI
+- Electromagnetic compatibility and resilience
+- Electrical, thermal, mechanical, and functional safety
+
+Communications standards and specifications address:
+- Network and application protocols such as IP, TCP, HTTP, DNS, and secure file-transfer options
+- Link rates, media, signalling, and interoperability
+- Secure transport through supported, securely configured protocols such as TLS
+- Wireless LAN specifications such as IEEE 802.11 and Wi-Fi security programs such as WPA2 and WPA3
+- Quality-of-service mechanisms for time-critical traffic such as voice and video
+
+Plain FTP does not encrypt credentials or content. Secure deployments use a suitable protected alternative, such as SFTP or FTPS, when file transfer requires confidentiality and integrity.
+### Security and software standards
+Security standards and specifications address:
+- Cryptographic algorithms, protocols, modes, key management, and module assurance
+- Authentication, authorisation, and federation through mechanisms such as OAuth 2.0, OpenID Connect, and SAML
+- Authenticated integrity through message authentication codes or digital signatures
+- Secure configuration, vulnerability management, testing, and incident handling
+- Information security management, privacy management, and payment-account data protection
+
+AES is a block cipher rather than a complete data-at-rest control. Secure use also requires an approved mode, sound key management, access control, and integrity protection where needed. SHA-256 and SHA-3 produce cryptographic hashes, but an unkeyed hash alone cannot provide authenticated integrity against an attacker who can replace both the data and its hash.
+
+Software standards and guidance address:
+- Coding conventions and secure development practices
+- API contracts, interoperability, and versioning
+- Data formats such as JSON, XML, and HTML
+- Testing, benchmarking, quality assurance, and defect management
+- Platform compatibility and lifecycle support
+- Accessibility guidance for people with disability
 ### OWASP resources
-The Open Web Application Security Project is a global non profit community that publishes free application security resources.
+The Open Worldwide Application Security Project is a not-for-profit foundation that develops free, community-led software security resources.
 
-- OWASP Top 10 outlines common web application risks and mitigation priorities
-- Application Security Verification Standard defines security requirements by assurance level
-- Mobile Application Security Verification Standard defines a baseline for mobile app security
-- Software Assurance Maturity Model guides incremental improvement of secure development practices
-- OWASP Testing Guide provides a structured approach to web application security testing
-- OWASP Cheat Sheet Series offers short, practical secure coding guidance
-### NIST, ISO/IEC and IEEE in cybersecurity
-#### NIST
-The National Institute of Standards and Technology is a US government agency that grew from the National Bureau of Standards established in 1901 and was renamed in 1988. It publishes widely used cybersecurity guidance, including the NIST Cybersecurity Framework for managing security risk.
+- OWASP Top 10:2025 is an awareness document covering critical web application security risks, not a complete verification standard
+- Application Security Verification Standard provides technical security requirements and a basis for web application verification
+- Mobile Application Security Verification Standard defines control groups for mobile application security
+- Software Assurance Maturity Model supports assessment and improvement of secure software development practices
+- Web Security Testing Guide provides structured guidance for testing web applications and web services
+- Cheat Sheet Series provides focused implementation guidance
+### NIST publications
+The National Institute of Standards and Technology develops cybersecurity standards and guidance for the United States Government and wider use. Common publications include:
+- FIPS 140-3 - Security Requirements for Cryptographic Modules
+- SP 800-53 Rev. 5 - Security and Privacy Controls for Information Systems and Organizations
+- SP 800-63-4 - Digital Identity Guidelines
+- SP 800-37 Rev. 2 - Risk Management Framework for Information Systems and Organizations
+- SP 800-30 Rev. 1 - Guide for Conducting Risk Assessments
+- SP 800-61 Rev. 3 - Incident Response Recommendations and Considerations for Cybersecurity Risk Management
+- SP 800-88 Rev. 2 - Guidelines for Media Sanitization
+### PCI DSS
+PCI DSS v4.0.1 defines baseline technical and operational requirements for protecting payment account data. It applies to environments where entities store, process, or transmit payment account data, and to systems that can affect the security of those environments.
 
-Key NIST publications commonly used in practice include:
-- FIPS 140-3 for cryptographic module security requirements
-- SP 800-53 for security and privacy controls
-- SP 800-63 for digital identity guidelines
-- SP 800-37 for applying the Risk Management Framework
-- SP 800-30 for conducting risk assessments
-- SP 800-61 for incident handling
-- SP 800-88 for media sanitisation
-#### ISO/IEC
-The International Organization for Standardization, working with the International Electrotechnical Commission, publishes international standards. The ISO/IEC 27000 family supports an information security management system that addresses people, process and technology.
+PCI DSS is an industry standard rather than legislation. Payment card brands, acquiring institutions, contracts, and card-scheme rules determine applicability, validation, and enforcement. Compliance validation reflects a defined scope and date or period, and does not establish compliance with privacy law or protection from every security incident.
+### ISO/IEC 27000 family
+ISO and IEC jointly publish the ISO/IEC 27000 family. ISO develops standards but does not certify organisations. Independent certification bodies conduct certification.
 
-Commonly referenced standards include:
-- ISO/IEC 27001 for establishing and improving an ISMS
-- ISO/IEC 27002 for control selection guidance
-- ISO/IEC 27005 for information security risk management
-- ISO/IEC 27017 and 27018 for cloud security and cloud privacy controls
-- ISO/IEC 27035 for incident management
-- ISO/IEC 27701 for privacy information management
-#### IEEE
-The Institute of Electrical and Electronics Engineers develops technical standards used across networking, computing and critical infrastructure.
+- ISO/IEC 27001:2022, with Amendment 1:2024, specifies requirements for establishing, implementing, maintaining, and continually improving an information security management system
+- ISO/IEC 27002:2022 provides information security control guidance and is not a certifiable management system standard
+- ISO/IEC 27005:2022 provides guidance on information security risk management
+- ISO/IEC 27017 provides cloud security control guidance
+- ISO/IEC 27018:2025 provides guidance for protecting personally identifiable information in public clouds when the cloud provider acts as a processor
+- ISO/IEC 27035 is a multipart series for information security incident management
+- ISO/IEC 27701:2025 specifies requirements and guidance for a privacy information management system
+### IEEE standards
+IEEE develops technical standards for networking, computing, storage, and critical infrastructure.
 
-Examples with cybersecurity relevance include:
-- IEEE 802.11 for Wi-Fi
-- IEEE 802.1X for network access control and device authentication
-- IEEE 802.3 for Ethernet
-- IEEE 1619 for encryption on block storage devices
-- IEEE 1686 for security capabilities of intelligent electronic devices in critical infrastructure contexts
-### Security control audits and assurance
-Auditing and assurance activities provide evidence that controls are designed appropriately and operating effectively.
+- IEEE 802.11-2024 defines wireless LAN medium access control and physical-layer specifications
+- IEEE 802.1X-2020 defines port-based network access control
+- IEEE 802.3-2022 defines Ethernet
+- IEEE 1619-2025 specifies cryptographic protection for data on block-oriented storage devices
+- IEEE 1686-2022, with Corrigendum 1-2025, defines cybersecurity capabilities for power-system intelligent electronic devices
+## Audits, assurance, and security testing
+Audits and assurance engagements evaluate defined criteria within an agreed scope. Their conclusions depend on the engagement type, evidence, date or period, and level of assurance. A design assessment does not establish that controls operated effectively over time.
+### Assurance activities
+- Internal audit provides independent and objective assurance and advice designed to strengthen governance, risk management, and control
+- Compliance audits assess conformance with defined legal, regulatory, contractual, standard, or policy criteria
+- An audit committee oversees internal audit independence and performance, external audit, financial reporting, and the risk and control responsibilities assigned by its charter
+- Control self-assessments can identify gaps but do not provide independent assurance
+- An attestation engagement uses an independent practitioner to evaluate information against suitable criteria and report a conclusion or findings under professional standards
+- Regulatory inspections establish findings within a regulator's mandate and do not automatically constitute independent assurance engagements
+### Security testing and team exercises
+Security testing can provide evidence for an audit or assessment, but it remains a distinct activity. Penetration testing attempts to identify and exploit vulnerabilities within authorised rules of engagement.
 
-- Internal audits review internal controls, methods and procedures to identify weaknesses and recommend improvements
-- Compliance audits assess adherence to laws, regulations and contractual requirements
-- Audit committees oversee audit independence, financial reporting integrity and control effectiveness
-- Self assessments identify gaps before formal audits and support continual improvement
-- Attestation provides third-party validation that stated controls and practices align with defined criteria
-- External assessments by independent auditors or regulators provide objective assurance to stakeholders
+- Physical penetration testing evaluates controls against unauthorised physical access
+- Red teams conduct objective-based adversarial exercises against people, processes, and technology
+- Blue teams defend systems, investigate activity, and respond to incidents
+- Purple teaming coordinates offensive and defensive specialists to improve prevention, detection, and response
+- Passive reconnaissance gathers information without direct interaction with the target
+- Active reconnaissance interacts with authorised systems to identify hosts, services, and exposures
 
-Penetration testing simulates attacks to identify exploitable weaknesses.
+Passive and active reconnaissance are information-gathering techniques, not separate forms of assurance. Blue teaming and purple teaming are not categories of penetration testing.
+### Security audit method
+1. Auditors establish the objectives, criteria, scope, period, exclusions, responsibilities, and required independence.
+2. Auditors understand the environment, obligations, processes, systems, data, risks, and relevant controls.
+3. Auditors develop procedures and sampling methods that can produce sufficient, appropriate evidence.
+4. Auditors examine policies, records, configurations, access, logs, diagrams, training, incidents, and control operation.
+5. Auditors use interviews, observation, sampling, reperformance, configuration review, and other authorised tests.
+6. Auditors assess findings against criteria, evaluate risk and root causes, and confirm factual accuracy with management.
+7. Auditors report scope, methods, limitations, findings, conclusions, management responses, owners, and target dates.
+8. Auditors follow up and validate remediation according to the risk and agreed assurance process.
 
-- Physical testing examines controls that prevent unauthorised physical access
-- Red teaming tests detection and response under realistic attack scenarios
-- Blue teaming strengthens defensive controls in a known environment
-- Purple teaming combines red and blue efforts to accelerate learning and remediation
-- Passive reconnaissance collects information without direct interaction
-- Active reconnaissance interacts with systems to identify hosts, services and exposures
-### Performing a security audit
-A security audit is a structured review of an organisation’s security architecture, controls and compliance position.
+Auditors use vulnerability scanning or penetration testing only when it supports the audit objectives, falls within authorised scope, and can proceed safely. A security audit does not require exploitation.
+### ISACA guidance
+ISACA develops professional guidance for audit and assurance, governance, risk, cybersecurity, privacy, and digital trust.
 
-- Define scope covering systems, sites, processes and data
-- Review policies, access controls, incident response and legal obligations
-- Collect evidence such as configurations, network diagrams, access control records and documentation
-- Identify vulnerabilities using scans, configuration reviews and penetration tests
-- Analyse risk by estimating likelihood, impact and business consequences
-- Evaluate control operation for access management, data protection and incident response
-- Report findings and recommendations, then follow up to verify remediation
-### ISACA frameworks
-ISACA is a global association focused on IT governance and assurance. Its frameworks support auditing and governance decisions.
-
-- COBIT aligns IT governance and management with enterprise objectives and stakeholder needs
-- Risk IT describes structured IT risk identification, evaluation, response and monitoring
-- Val IT supports value realisation from IT investments across the investment lifecycle
+- COBIT 2019 supports governance and management of enterprise information and technology
+- ITAF, 5th Edition, establishes standards and guidance for planning, performing, and reporting IT audit and assurance work
+- Risk IT and Val IT were separate frameworks in the COBIT 4.1 era. ISACA integrated their concepts into COBIT 5 and carried the approach into COBIT 2019
 ### SOC reports
-System and Organisation Controls reports are issued under the AICPA SOC reporting framework to provide assurance over controls at service organisations.
+System and Organization Controls is the AICPA's suite of examination services for controls at service organisations and other entities. Independent licensed CPA practitioners issue SOC reports. A SOC report is not a certification.
 
-- SOC 1 covers controls relevant to internal control over financial reporting
-- SOC 2 reports on Trust Services Criteria covering security, availability, processing integrity, confidentiality and privacy
-- SOC 3 provides a high level summary of SOC 2 style controls for public distribution
+- SOC 1 reports address controls at a service organisation that are likely to be relevant to user entities' internal control over financial reporting. They do not provide general cybersecurity assurance
+- SOC 2 reports examine controls against selected Trust Services Criteria relating to security, availability, processing integrity, confidentiality, or privacy. A report does not necessarily cover all five categories
+- SOC 3 reports address Trust Services Criteria but contain less detail than SOC 2 reports. Organisations may distribute these general-use reports freely
+- Type 1 SOC 1 and SOC 2 reports address control design at a specified date. Type 2 reports also address operating effectiveness over a specified period
 
-Typical SOC uses include cloud services assurance, vendor due diligence, regulated industry requirements and evidence of control maturity for customers and partners.
+Customers and partners use relevant SOC reports as one input to third-party risk assessment. They review the scope, period, opinion, exceptions, subservice organisations, and complementary user-entity controls before relying on a report. A SOC report does not establish overall legal compliance, cybersecurity maturity, or the absence of control failures.

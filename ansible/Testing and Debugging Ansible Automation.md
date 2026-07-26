@@ -1,4 +1,7 @@
 # Testing and Debugging Ansible Automation
+> [!NOTE]
+> Reliable Ansible automation requires layered testing, secure diagnostics, explicit validation, static analysis, representative environments, and controlled rollouts to catch defects before they reach production.
+
 Reliable Ansible automation depends on fast feedback, controlled execution, explicit validation, useful diagnostics, and automated quality checks. Teams should test on a narrow scope, inspect predicted changes, validate assumptions inside playbooks, and enforce consistent standards before production deployment.
 
 Effective use requires familiarity with Linux or Unix command-line tools, inventories, playbooks, roles, modules, variables, facts, and Git.
