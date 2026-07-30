@@ -1,11 +1,11 @@
 # *Red Hat Certified System Administrator* Course Notes
-*Release Candidate*
+*v1.0 stable release*
 ## Course Description
 These notes cover material from Pluralsight's 30 hour, self-paced [Red Hat Certified System Administrator](https://www.pluralsight.com/paths/rhcsa-red-hat-certified-system-administrator-ex200) course that teaches Linux system administration with Red Hat Enterprise Linux. They cover tools and scripting, deploying systems, daily operations and tasks, networking, security, and more. Additionally, for those interested in certification, these courses cover the topics presented by the Red Hat Certified System Administrator (RHCSA) certification and can help you prepare for the exam.
 ## Module Notes
-- [Using Essential Tools](Using%20Essential%20Tools.md) - RC
-- [Creating Shell Scripts](Creating%20Shell%20Scripts.md) - RC
-- [Operating Running Systems](Operating%20Running%20Systems.md) - RC
+- [Using Essential Tools](Using%20Essential%20Tools.md)
+- [Creating Shell Scripts](Creating%20Shell%20Scripts.md)
+- [Operating Running Systems](Operating%20Running%20Systems.md)
 - [Configuring Local Storage](Configuring%20Local%20Storage.md)
 - [Creating and Configuring File Systems](Creating%20and%20Configuring%20File%20Systems.md)
 - [Deploying, Configuring and Maintaining Systems](Deploying,%20Configuring%20and%20Maintaining%20Systems.md)
@@ -15,5 +15,5 @@ These notes cover material from Pluralsight's 30 hour, self-paced [Red Hat Certi
 - [Getting Started with Podman](Getting%20Started%20with%20Podman.md)
 ## Further Reading
 Notes are supplemented with information from third-party sources, including:
-- [Red Hat RHCSA 9 Cert Guide: EX200](https://www.oreilly.com/library/view/red-hat-rhcsa/9780138096311/) by Sander van Vugt
+- Red Hat RHCSA 9 Cert Guide: EX200, by Sander van Vugt. ([publisher page](https://www.pearsonitcertification.com/store/red-hat-rhcsa-9-cert-guide-ex200-9780138096274))
 - `man` pages (inbuilt Linux manual pages)

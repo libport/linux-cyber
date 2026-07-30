@@ -1,173 +1,360 @@
 # Deploying, Configuring and Maintaining Systems
 > [!NOTE]
 > A practical guide to deploying and maintaining RHEL systems through disciplined package management, time synchronisation, systemd boot configuration, and task scheduling.
-## Software Management in RHEL
-RHEL uses YUM as the familiar front end for software management, but YUM is backed by DNF technology. In practice, administrators can use either `yum` or `dnf` for common package tasks. The important point is consistency rather than command tribalism. Package work is repository-driven, transaction-based, and closely tied to system subscriptions.
 
-Two repositories matter most in a standard build:
-- `BaseOS` provides the core operating system content in RPM format.
-- `AppStream` provides additional user-space content in RPMs and modules.
+Red Hat Enterprise Linux 8 administrators need command-line skills and root access for package management, time synchronisation, boot configuration, and job scheduling. A registered RHEL host normally receives signed software and errata from Red Hat repositories. An installation DVD can supply packages to an isolated host, but it cannot supply later bug fixes or security updates.
+## Managing software packages
+### DNF, YUM, and repositories
+RHEL 8 uses DNF to manage RPM packages and their dependencies. The `yum` command provides a compatible interface to the same package-management stack, so most RHEL 8 documentation and scripts can use either name. Administrators should use one form consistently and should not depend on the implementation path or symbolic-link layout.
 
-This split changes how software is selected. Traditional RPM packaging remains suitable for standard installs, removals, and queries. AppStream adds modular content, which allows several supported versions of a component to coexist as streams. A module can also expose profiles so that only the required subset of packages is installed. That is useful when an administrator wants a client package without a full server stack, or a specific language runtime without whatever happens to be the default.
-### Core Package Operations
-Routine package work follows a clear pattern. An administrator can query packages, identify which package provides a binary, install software, remove software, inspect transaction history, and undo a transaction when a change causes trouble.
+BaseOS contains the core operating-system packages. AppStream contains additional applications, language runtimes, databases, and related components. AppStream distributes ordinary RPM packages and modular content:
+- A module stream selects a supported version or release line of an application stack.
+- A module profile selects a package set for a purpose such as client, server, common, or development use.
+- A system normally enables one stream for a module at a time. Modules expose alternative supported streams in the repositories, but they do not generally install several active versions of the same stack together.
 
-Useful patterns include:
-- `yum list <package>` to check whether a package is installed or merely available
-- `yum provides <path-or-command>` to find the package behind a file or executable
-- `yum install <package>` to add software
-- `yum remove <package>` to remove software
-- `yum history list` and `yum history undo <id>` to review and reverse transactions
+The available streams, profiles, and support periods depend on the RHEL 8 minor release and enabled repositories. Administrators should inspect the host rather than rely on old example versions.
 
-Standard users can perform many read-only queries because repository metadata is local once cached. Privileged access is still required for installation, removal, enabling repositories, and any change that affects the system state.
+Registration and repository access can be checked with:
 
-Transaction history is one of the more valuable administrative safeguards. Package installs often pull in dependencies, and a later rollback can reverse a whole transaction more cleanly than manually removing related packages one by one. That same history mechanism is useful after a broad update if a service stops working and a quick retreat is safer than troubleshooting under pressure.
+```bash
+$ subscription-manager identity
+$ sudo subscription-manager repos --list-enabled
+$ sudo dnf repolist
+```
 
-Administrative queries also become more effective when they start with metadata rather than guesswork. `yum provides` links files and executables back to packages, which helps when a missing command appears in a script or an unfamiliar binary turns up on a host. `yum list installed`, `yum list available`, and repository queries give a quick inventory of what is already present and what remains selectable. On production systems, that reduces unnecessary change because an administrator can verify state before reaching for an install command.
+Extra Packages for Enterprise Linux, commonly called EPEL, is a separate community repository. Red Hat does not include EPEL packages in the RHEL subscription or support them as RHEL packages.
 
-One important correction is necessary here. RHEL documentation describes package removal through `yum remove`, package group removal, and modular content removal. It does not present `yum purge` as a standard RHEL package-management command. The practical focus therefore stays on `remove`, modular removal, and transaction rollback.
-### Repositories and Subscription Awareness
-Repository access determines what can be installed and updated. On subscribed RHEL systems, repository definitions sit under `/etc/yum.repos.d/`, with Red Hat-managed content exposed through files such as `redhat.repo`. `yum repolist` shows enabled repositories, while `yum repolist --all` also exposes disabled entries. That broader view matters when a repository exists but needs to be enabled before use.
+Unprivileged users can search cached repository metadata, while installation, removal, and system-wide updates require suitable privilege. Common operations include:
 
-A subscription-backed system normally relies on online repositories. A disconnected or controlled environment can instead build a local repository from installation media. The usual method mounts the RHEL DVD or ISO, exposes the `BaseOS` and `AppStream` directories, and adds them through `yum config-manager --add-repo`. This approach works, but it has an obvious limitation. Media-based repositories provide the packaged content that ships on the image and do not deliver ongoing security fixes.
+```bash
+$ dnf list tree
+$ dnf info tree
+$ dnf provides '*/bin/tree'
+$ sudo dnf install tree
+$ sudo dnf remove tree
+$ sudo dnf check-update
+$ sudo dnf update
+```
 
-A better shared option is a local web repository. The same DVD content can be mounted under an HTTP document root such as `/var/www/html`, served with Apache, and published to other hosts over the network. This reduces external traffic and supports consistent package sources across a fleet. It still inherits the same limitation if the source is static installation media. Local convenience is not the same as live patch coverage.
-### Security Updates and Update Selection
-RHEL package metadata supports targeted updates. Administrators can inspect update information, filter security advisories, and act on severity rather than updating indiscriminately. That matters in tightly controlled environments where change windows are short and security exposure is prioritised.
+`dnf search` searches package names and descriptions. `dnf list installed` inventories installed packages, while `dnf list available` shows content from enabled repositories. `dnf provides` identifies the package that supplies a path. Quoting a wildcard such as `'*/bin/tree'` prevents the shell from expanding it before DNF receives it.
 
-Useful commands include:
-- `yum updateinfo` to list available update classes
-- `yum updateinfo list security` to focus on security notices
-- `yum update --advisory <RHSA-id>` to install fixes tied to a specific advisory
-- `yum update --sec-severity=Important` to apply only updates at a chosen security severity
+Administrators should inspect the transaction summary before accepting an installation, removal, or update. The summary identifies packages, dependencies, repository sources, download size, and disk-space effects. The `-y` option accepts the proposal without prompting and therefore suits a reviewed automation workflow, not exploratory administration.
 
-This method supports a more disciplined patching model. A team can respond to a single RHSA notice, apply only high-severity fixes, or inspect which packages an advisory affects before committing to change. When a larger update introduces instability, `yum history undo` provides a controlled rollback path.
+DNF checks RPM signatures against trusted keys when `gpgcheck` remains enabled. A signature failure can indicate a damaged package, an incorrect repository, or an untrusted signing key. Disabling signature checking hides the control rather than resolving the cause. Administrators should correct the repository or key configuration and should obtain keys through an authenticated channel.
 
-The same selective approach is useful during maintenance windows. A broad `yum update` may still be appropriate for standard lifecycle maintenance, but advisory-driven updates fit environments where approval is tied to a security bulletin or where an application owner wants the smallest practical change set. RHEL makes that possible without abandoning the normal package toolchain.
+`dnf remove` removes the named package and can remove dependencies that no installed package needs. RHEL 8 DNF does not provide a standard `purge` operation equivalent to the Debian command. RPM can preserve modified configuration files during package transactions, so administrators should review application data and retained files separately before deleting them.
 
-Kernel handling deserves a brief distinction. RHEL generally installs new kernel packages alongside existing ones rather than replacing the running kernel in place. That preserves fallback boot entries and aligns with safer recovery practice.
-### Modules, Streams, and Profiles
-Modules extend package management beyond a single version track. A stream represents a supported version line of an application stack. A profile defines the package set within that stream. Administrators use `yum module list` to examine what is available and `yum module install <module>:<stream>/<profile>` to choose an explicit combination.
+DNF treats kernels and other packages listed by the `installonlypkgs` setting differently from ordinary updates. It installs a new kernel alongside retained kernels, subject to the configured limit. The running system continues to use the old kernel until the next boot selects the new one.
+### Transaction history
+DNF records package transactions. Administrators can inspect the record and reverse suitable installation or removal transactions:
 
-This matters when an application depends on a specific runtime version, such as a particular Ruby stream, or when database tooling should include only the client side. A default stream can simplify routine deployment, but explicit stream selection gives predictable results and makes builds more reproducible.
-## Time Configuration and Synchronisation
-Accurate time is operationally critical. Authentication systems, logs, certificates, job schedulers, and distributed services all rely on clocks that agree. RHEL uses `chronyd` from the `chrony` package as its NTP implementation. It replaces the older emphasis on `ntpd` while still using the NTP protocol.
+```bash
+$ sudo dnf history
+$ sudo dnf history info 17
+$ sudo dnf history undo 17
+$ sudo dnf history rollback 12
+```
 
-Chrony suits modern systems well. It synchronises quickly, handles unstable or intermittent connectivity better than older approaches, and copes more gracefully with systems that suspend, resume, or carry uneven load. The package is `chrony`, the daemon is `chronyd`, and the command-line client is `chronyc`.
-### Checking and Setting Time
-`timedatectl` is the central administrative tool for date, time, timezone, and clock status. It can display the current local time, UTC, RTC setting, timezone, and synchronisation state. It also sets the timezone cleanly with `timedatectl set-timezone <zone>`.
+`history undo` reverses one transaction. `history rollback` reverses later transactions until the system reaches the state associated with the selected transaction number. Both operations require the relevant package versions to remain available.
 
-A sound RHEL configuration keeps the hardware clock in UTC and applies the timezone as an offset for local display. That avoids daylight saving problems and keeps behaviour predictable across regions and dual-boot or virtualised environments. If the RTC is set to local time, `timedatectl` warns about it. Administrators should correct that instead of adjusting the hardware clock twice each year.
+Administrators should not use transaction history as a general system rollback mechanism. Red Hat does not support downgrading core system packages such as the kernel, `glibc`, SELinux packages, and their critical dependencies through `history undo` or `history rollback`. A tested backup, snapshot, or deployment rollback process provides safer recovery for broad updates.
+### Local and web repositories
+Repository definitions reside in `/etc/yum.repos.d/` as files ending in `.repo`. One file can define several repositories, and `dnf repolist --all` displays enabled and disabled definitions.
 
-The distinction between local time and UTC should stay conceptually clear. Users and logs may display local time for readability, but service coordination depends on a stable underlying clock. When hosts move between regions, snapshots are restored, or virtual machines are cloned, a UTC-based RTC prevents a long tail of confusing offsets and daylight saving errors.
+A RHEL installation DVD already contains repository metadata for its BaseOS and AppStream trees. An administrator can mount the media read-only and add both locations:
 
-Timezone selection is usually simple because `timedatectl list-timezones` exposes the valid names and `timedatectl set-timezone` applies the chosen zone. Manual relinking of `/etc/localtime` should be treated as a fallback or troubleshooting step, not the normal first option.
-### Managing Chrony as a Service
-Chrony behaves like any other systemd-managed service. The minimum checks are whether it is installed, running, and enabled for boot. The common commands are:
-- `yum list chrony`
-- `systemctl status chronyd`
-- `systemctl enable --now chronyd`
-- `systemctl disable --now chronyd`
-- `systemctl restart chronyd`
+```bash
+$ sudo mkdir -p /mnt/rhel8
+$ sudo mount -o ro /dev/sr0 /mnt/rhel8
+$ sudo dnf install dnf-plugins-core
+$ sudo dnf config-manager --add-repo file:///mnt/rhel8/BaseOS
+$ sudo dnf config-manager --add-repo file:///mnt/rhel8/AppStream
+$ sudo dnf makecache
+```
 
-`systemctl cat chronyd` reveals the current unit definition and any local overrides. `systemctl edit` creates an override, while `systemctl edit --full` creates a full local copy of the unit file under `/etc/systemd/system/`. That distinction matters because a drop-in is usually cleaner than copying a complete service unit unless a full replacement is truly necessary.
+The directory names and URL paths are case-sensitive. A file repository remains available only while the media or copied content remains mounted at the configured path.
 
-Chrony configuration lives in `chrony.conf`. The file often carries many comments and blank lines, which can obscure active settings during administration at scale. A small `sed` script can strip comments, remove empty lines, insert a preferred local or regional time source, and delete obsolete defaults. This is a practical example of repeatable configuration hygiene. The aim is not cleverness for its own sake. The aim is a predictable file state across many systems.
-### Monitoring Synchronisation
-`chronyc` exposes the live state of the time client. `chronyc tracking` shows the current reference source, offset, frequency correction, and overall synchronisation information. `chronyc sources` shows the candidate time sources in use, and `chronyc sources -v` explains the columns more fully.
+Administrators can also create a repository definition directly. A BaseOS definition for mounted installation media can contain:
 
-This gives administrators immediate answers to practical questions:
-- Is the host synchronised
-- Which source is currently preferred
-- Which fallback sources are reachable
-- How far off is the system clock
+```ini
+[local-baseos]
+name=RHEL 8 local BaseOS
+baseurl=file:///mnt/rhel8/BaseOS/
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+```
 
-That visibility is valuable during incident work. It distinguishes a bad clock from an application issue and shows whether a host is drifting, isolated, or simply waiting for a better source. It also gives quick evidence when a host has network reachability but still lacks a usable time source, which is a different failure from a service that is stopped or disabled.
-## Systemd Targets and Boot Behaviour
-Systemd targets define system states through groups of related units. They replace the older runlevel model with names that better reflect intent, such as `multi-user.target`, `graphical.target`, `rescue.target`, and `emergency.target`.
+The bracketed identifier must remain unique across configured repositories. `name` supplies a readable label, `baseurl` identifies the repository root, `enabled` controls normal use, and `gpgcheck` enforces package-signature verification. AppStream needs a separate definition that points to its own tree.
 
-A target is not a single service. It is a grouping and synchronisation point. When a system enters a target, systemd starts the units that target requires and the targets beneath it. That is why several targets can appear active at once. A graphical system, for example, also includes the services associated with multi-user operation.
-### Reading Current and Default Targets
-Legacy tools still exist. `runlevel` can display a translated view for administrators who learned earlier RHEL versions. The more accurate modern approach is through `systemctl`:
-- `systemctl list-units --type target --state active` shows active targets
-- `systemctl get-default` shows the default target for boot
-- `systemctl cat <unit>` shows how a service is attached to a target
+Administrators can isolate a test to selected repositories without permanently changing the definitions:
 
-A service such as `chronyd` can be wanted by `multi-user.target`, which illustrates the purpose of targets. The kernel and init system do not need to name every service individually. They need to reach the correct target, and the dependency chain does the rest.
-### Changing the Default or Current Target
-Default and current targets solve different problems.
+```bash
+$ sudo dnf --disablerepo='*' --enablerepo=local-baseos repolist
+$ sudo dnf --disablerepo='*' --enablerepo=local-baseos list available
+```
 
-`systemctl set-default <name>.target` changes what the system will use on the next boot. It updates the `default.target` symlink under `/etc/systemd/system/`. The current session does not switch immediately unless the system is rebooted or the default target is isolated.
+`dnf clean metadata` discards cached metadata when a repository changes. `dnf makecache` then retrieves a fresh copy. Removing a repository normally means deleting or disabling its specific `.repo` definition, followed by a metadata refresh.
 
-`systemctl isolate <name>.target` changes the target for the current boot. Systemd starts the new target and its dependencies and stops services that the new target does not require. This is useful when moving between graphical and command-line states or when entering a reduced environment for maintenance.
+An organisation can publish the same repository trees through an HTTP server and configure base URLs such as `http://repo.example.com/rhel8/BaseOS/` and `http://repo.example.com/rhel8/AppStream/`. The server must expose the RPMs and `repodata` directories, and its firewall, file permissions, and SELinux policy must permit HTTP access. `dnf makecache` tests metadata retrieval, but an installation test confirms package access.
 
-A concise rule helps here:
-- Use `set-default` to change future boots.
-- Use `isolate` to change the running system now.
+DVD content reflects the release recorded on the media. It does not replace access to current Red Hat errata. Organisations that mirror current content should use a supported repository-management or mirroring process.
+### Security updates and advisories
+RHEL repository metadata identifies security advisories, bug fixes, and enhancements. Administrators can review security errata before changing the system:
 
-`rescue.target` and `emergency.target` serve different recovery needs. Rescue mode provides a single-user environment with more of the base system mounted and available. Emergency mode is more minimal and is reserved for harder failure cases. Both are maintenance tools, not everyday operating states.
+```bash
+$ sudo dnf updateinfo summary
+$ sudo dnf updateinfo list --security
+$ sudo dnf updateinfo info RHSA-YYYY:NNNN
+```
 
-This distinction matters during boot failures and repair work. A host that still mounts local filesystems and starts essential services can often be repaired in rescue mode. A host with deeper startup problems may need emergency mode so that an administrator can intervene before more of the system stack comes online. Choosing the lighter or heavier mode should follow the severity of the failure, not habit.
-### Kernel Arguments and grubby
-Targets can also be selected through kernel arguments. `grubby --info=ALL` lists GRUB boot entries and their current arguments. Administrators can add or remove arguments across all entries or a selected kernel entry.
+DNF can apply all available security updates, restrict an update to a severity, or apply a named Red Hat Security Advisory:
 
-That is useful when a system should boot into a specific state without changing the long-term default. A graphical target can be forced for certain entries, while another entry can remain command-line only. This is safer than constantly rewriting the default target on hosts that need alternate boot paths for recovery or administrative work.
+```bash
+$ sudo dnf update --security
+$ sudo dnf update --security --sec-severity=Important
+$ sudo dnf update --advisory=RHSA-YYYY:NNNN
+```
 
-The corrected principle here is that `grubby` changes GRUB entry arguments, while `systemctl set-default` changes the systemd default target symlink. They are related but not interchangeable. One adjusts boot entry parameters. The other changes the systemd default destination after boot begins.
-## Scheduling Work in RHEL
-RHEL offers three practical schedulers in this scope:
-- `at` for one-off work
-- `cron` for recurring work in traditional Unix style
-- systemd timer units for recurring work with better service integration and status visibility
+An advisory can update several packages, and one package transaction can address several advisories. Administrators should review the proposed transaction, test changes where operational risk warrants it, and reboot when a new kernel or affected service requires activation.
 
-Choosing the right scheduler is mostly about intent. A command that should run once next Tuesday belongs in `at`. A nightly rotation or weekly report belongs in `cron` or a timer unit. Administrators should not treat the tools as rivals. They solve slightly different problems.
-### One-Off Scheduling with at
-The `at` package provides both the `at` command and the `atd` daemon. If it is not installed, it must be added and the service enabled. Access is governed by `/etc/at.allow` and `/etc/at.deny`. If `at.allow` exists, only listed users may schedule jobs. If it does not exist, users not denied in `at.deny` may use the scheduler.
+`dnf update --security` installs the latest available versions of packages that have applicable security errata. `dnf update-minimal --security` instead installs the minimum package versions that resolve the applicable errata. An organisation should choose between those approaches through its patch policy rather than by command-line convenience.
 
-`at` opens an interactive prompt for commands to be executed at a chosen time. After entering one or more commands, `Ctrl+D` ends input and queues the job. Administrators can then:
-- list jobs with `atq`
-- inspect a queued job with `at -c <id>`
-- remove a job with `atrm <id>`
+Severity filtering supports risk-based prioritisation, but severity alone cannot express local exposure. Administrators should also consider whether the vulnerable component is installed, enabled, reachable, or protected by another control. Red Hat advisory identifiers provide a stable unit for change records, maintenance approvals, and verification.
 
-This is well suited to ad hoc administrative work such as deferred file copies, a one-time report run, or a temporary corrective command that should execute outside business hours.
-### Recurring Scheduling with Cron
-Cron remains the classic recurring scheduler. Its system-wide configuration is built around `/etc/crontab`, the extension directory `/etc/cron.d`, and convenience directories such as `/etc/cron.hourly`, `/etc/cron.daily`, `/etc/cron.weekly`, and `/etc/cron.monthly`.
+Before an update, the host should have enough free space, a recoverable configuration, and a tested path to restart affected workloads. After the update, administrators should review the transaction, service health, relevant logs, and the running kernel version. Automated updates can use `dnf-automatic`, but production policy should define download behaviour, installation windows, exclusions, notifications, and reboots.
+### Application Streams
+Module commands show the content available on the current host:
 
-System cron entries define schedule fields, the user account that should run the job, and the command. User crontabs differ in one key way. They omit the user field because the crontab already belongs to a specific user.
+```bash
+$ dnf module list
+$ dnf module info NAME:STREAM
+$ sudo dnf module install NAME:STREAM/PROFILE
+$ sudo dnf module reset NAME
+```
 
-The schedule fields are:
-- minute
-- hour
-- day of month
-- month
-- day of week
+The colon separates a module name from its stream, and the slash separates a stream from its profile. If the command omits a stream or profile, DNF uses an applicable default. A reset removes the stream selection but does not remove installed packages. Stream changes can alter dependencies, so administrators should follow the documented switching procedure and confirm that the destination stream supports the application.
 
-Administrators can use numbers, ranges, lists, or wildcard patterns to express timing. That flexibility supports fine-grained schedules, but it also makes mistakes easy. Reading `/etc/crontab` and the `crontab(5)` manual page remains one of the quickest ways to confirm the exact field order before committing a change.
+Enabling a stream and installing its packages are separate operations. `dnf module enable NAME:STREAM` selects a stream without necessarily installing its profile. `dnf module remove NAME:STREAM/PROFILE` removes packages associated with an installed profile, subject to dependency review. `dnf module disable NAME` prevents DNF from using all streams of that module. Administrators should always inspect the transaction because modular and non-modular packages can share dependencies.
+## Configuring time services
+Accurate time supports log correlation, authentication, certificate validation, clustered services, and incident analysis. RHEL 8 implements NTP through `chronyd`, supplied by the `chrony` package. RHEL 8 does not support the former `ntpd` implementation.
+### Time zones, clocks, and services
+The following commands install and activate chrony, display the current time configuration, and set a time zone:
 
-User cron access is controlled by `/etc/cron.allow` and `/etc/cron.deny`. The `crontab` command manages the per-user file:
-- `crontab -e` edits it
-- `crontab -l` lists it
-- `crontab -r` removes it
+```bash
+$ sudo dnf install chrony
+$ sudo systemctl enable --now chronyd
+$ timedatectl
+$ timedatectl list-timezones
+$ sudo timedatectl set-timezone Australia/Sydney
+```
 
-Editor choice can matter in mixed teams. If the default editor is not suitable, an `EDITOR` environment variable can override it for a single command or persistently through shell configuration.
+Linux systems should normally keep the hardware real-time clock in UTC and derive local civil time from the configured time zone. This arrangement handles daylight-saving changes without rewriting the hardware clock:
 
-The practical difference between system and user cron entries should stay explicit. A file under `/etc/cron.d` behaves like system policy and names the user account that runs the job. A personal crontab behaves like user-owned automation and inherits the user identity automatically. Mixing those two models carelessly can produce permission problems or run work under the wrong account.
-### Systemd Timer Units
-Timer units provide a more service-oriented scheduling model. A timer activates a corresponding service unit, which means the scheduled action is tied directly into systemd. The configuration lives in timer unit files rather than in the cron field syntax.
+```bash
+$ sudo timedatectl set-local-rtc 0
+```
 
-The main administrative views are:
-- `man 5 systemd.timer` for format details
-- `systemctl list-unit-files --type=timer` to see timer definitions
-- `systemctl cat <timer>.timer` to inspect timer contents
-- `systemctl status <service>.service` to inspect the service the timer triggers
-- `systemctl list-timers --all` to see when timers last ran and when they will run next
+`timedatectl set-timezone` manages `/etc/localtime`. Administrators should not routinely replace that link by hand. If the command fails, they should investigate the error, confirm that the time-zone database exists, and repair the underlying configuration.
 
-The built-in `dnf-makecache.timer` is a useful example. It refreshes package metadata after boot and then on a recurring interval. By inspecting the timer and its paired service, an administrator can tell when metadata last refreshed and when the next run is due.
+`systemctl` controls both the current service state and its boot-time enablement:
 
-That visibility is where timer units stand out. Cron can schedule work effectively, but `systemctl list-timers --all` provides a clearer operational dashboard. Timer units suit administrators who want schedules integrated with service management, dependency handling, and systemd reporting.
-## Operational Patterns That Matter
-Across all four areas, the same administrative habits keep RHEL manageable.
+```bash
+$ systemctl status chronyd
+$ sudo systemctl restart chronyd
+$ sudo systemctl disable --now chronyd
+$ sudo systemctl enable --now chronyd
+$ systemctl cat chronyd
+```
 
-Choose explicit state over assumption. Select the required module stream instead of accepting a default. Set the timezone directly instead of inferring it from an image. Confirm the default target rather than assuming the host boots to the expected state. Inspect queued and recurring jobs instead of trusting memory.
+`systemctl disable` alone changes boot-time enablement but does not stop a running service. The `--now` option also changes the current state. `systemctl cat` shows the vendor unit and any overrides. Administrators should normally use `systemctl edit chronyd` to create a focused drop-in override. `systemctl edit --full` creates a complete replacement under `/etc/systemd/system/`, which can hide later vendor-unit changes and therefore requires deliberate maintenance.
+### Chrony configuration and verification
+RHEL stores the main chrony configuration in `/etc/chrony.conf`. A client can use one named server or a DNS pool:
 
-Prefer reversible changes. Package history, advisory-scoped updates, service enablement through systemd, and isolated target changes all support controlled rollback. Where a host needs alternate operating modes, separate GRUB entries or explicit timer units are clearer than fragile one-line edits made under pressure.
+```text
+server time.example.com iburst
+pool 2.rhel.pool.ntp.org iburst
+```
+
+The `iburst` option accelerates initial synchronisation when a source becomes reachable. Administrators should select trusted sources that suit the organisation's network, geography, and security requirements. Network Time Security can authenticate supported NTP sources where the deployment requires it.
+
+Comments in the packaged configuration explain important defaults and provide operational context. Removing every comment and blank line adds little value and can make later maintenance harder. Administrators should back up the file, change only the required directives, and use a configuration-management template or targeted edit when many hosts need the same settings. They should then restart `chronyd` and verify the result:
+
+```bash
+$ sudo systemctl restart chronyd
+$ chronyc tracking
+$ chronyc sources -v
+$ timedatectl
+```
+
+`chronyc tracking` reports the selected reference, system offset, frequency correction, leap status, and stratum. `chronyc sources -v` reports all candidate sources and their selection states. A stratum 1 server connects directly to a reference source. Stratum 16 indicates an unsynchronised source, not a usable tier. The interactive `chronyc` shell exposes the same commands, but direct subcommands suit scripts and routine checks.
+
+Several common directives shape client behaviour. `driftfile` stores the measured clock-frequency error so chrony can compensate after a restart. `makestep` permits a large initial correction during a limited number of early updates. `rtcsync` asks the kernel to copy system time to the hardware clock periodically. Administrators should retain suitable vendor defaults unless a documented requirement justifies a change.
+
+A host that supplies NTP to other systems needs an `allow` directive for the authorised client network and firewall access to UDP port 123. The default client configuration does not grant unrestricted server access. Administrators should limit permitted networks, prefer authenticated sources where available, and avoid exposing an internal time service to the public internet.
+
+Immediately after a restart, `chronyc tracking` can show an unsynchronised state while chrony samples and selects sources. Persistent failure requires checks of DNS, routing, firewall policy, source reachability, configuration syntax, and service logs. `journalctl -u chronyd` provides the service record.
+## Working with systemd targets
+A systemd target groups units into an operational state. Targets replace the central role that SysV runlevels held in earlier RHEL releases, although compatibility commands still map common targets to runlevel numbers. `multi-user.target` broadly corresponds to runlevel 3, and `graphical.target` broadly corresponds to runlevel 5.
+
+Several targets can remain active because a high-level target pulls in supporting targets. Administrators can list active targets and inspect the configured default:
+
+```bash
+$ systemctl list-units --type=target --state=active
+$ systemctl get-default
+$ systemctl cat multi-user.target
+```
+
+Targets express dependencies through directives such as `Wants=` and `Requires=`, and ordering through directives such as `After=` and `Before=`. A target does not contain a linear script of services. Systemd builds a dependency graph, starts independent work concurrently, and records each unit's state.
+
+`systemctl list-dependencies multi-user.target` shows the units pulled into a target. `systemctl is-enabled NAME.service` reports boot-time enablement, while `systemctl is-active NAME.service` reports current state. These properties differ. A service can run while disabled, or remain stopped while enabled for the next boot.
+
+Administrators can manage ordinary services with `start`, `stop`, `restart`, `reload`, `enable`, and `disable`. `reload` asks a service to reread its configuration without a full restart and works only when the unit implements that action. `restart` stops and starts the service, which can interrupt clients. `enable --now` combines boot-time enablement with an immediate start.
+
+The default target controls a normal boot when no kernel argument overrides it:
+
+```bash
+$ sudo systemctl set-default multi-user.target
+```
+
+`set-default` changes later boots but does not change the current state. `isolate` starts the named target and stops units that the target does not require:
+
+```bash
+$ sudo systemctl isolate graphical.target
+```
+
+Isolation can close sessions, stop network services, or disrupt workloads. An administrator should confirm console or recovery access before isolating a target on a remote or production host.
+
+The `grubby` utility displays boot entries and edits their kernel arguments:
+
+```bash
+$ sudo grubby --info=ALL
+$ sudo grubby --update-kernel=ALL --args="systemd.unit=graphical.target"
+$ sudo grubby --update-kernel=ALL --remove-args="systemd.unit"
+```
+
+The correct kernel parameter is `systemd.unit`, with a full stop between the words. A temporary GRUB edit can apply the parameter to one boot. A persistent change to `ALL` affects every current kernel entry, so the default target usually provides the simpler system-wide choice. A distinct GRUB entry suits a genuine alternative boot path.
+## Scheduling jobs
+RHEL 8 provides three principal scheduling mechanisms. `at` runs one-off jobs, cron runs compact recurring schedules, and systemd timers integrate recurring or boot-relative work with unit dependencies and the journal.
+
+| Scheduler | Best fit | Main inspection command |
+| --- | --- | --- |
+| `at` | One-off work at a specified time | `atq` |
+| cron | Simple, recurring calendar schedules | `crontab -l` or file inspection |
+| systemd timer | Recurring or boot-relative work that needs unit controls and journal integration | `systemctl list-timers --all` |
+
+The scheduler starts a command, but the command still needs safe locking, error handling, idempotent behaviour where appropriate, and useful output. A scheduler should not launch a second copy of a job that cannot run concurrently. The job can use an application lock, `flock`, or a service design that rejects overlapping execution.
+### One-off jobs with at
+The `at` package supplies the `at` client and the `atd` service:
+
+```bash
+$ sudo dnf install at
+$ sudo systemctl enable --now atd
+$ at 17:00 tomorrow
+at> /usr/local/sbin/archive-data >>/var/log/archive-data.log 2>&1
+at> <Ctrl-D>
+```
+
+`at` accepts natural time expressions and reads one or more commands until end-of-file. It runs the saved job non-interactively, so commands should use absolute paths, explicit redirection, and any required environment settings.
+
+Administrators and users can inspect or remove queued jobs:
+
+```bash
+$ atq
+$ at -c 4
+$ atrm 4
+```
+
+`/etc/at.allow` and `/etc/at.deny` control user access. If `at.allow` exists, only listed users may submit jobs. Otherwise, `at.deny` excludes listed users. If neither file exists, only root may use `at`. Root retains administrative control.
+
+`at -c JOB_ID` displays the generated job script, including the captured environment and working directory. This output helps confirm the exact command but can also expose environment values, so administrators should handle it carefully. Secrets should not appear on a command line or in a saved job body.
+### Recurring jobs with cron
+The `crond` service reads system schedules from `/etc/crontab` and `/etc/cron.d/`, and user schedules managed by `crontab`. A system entry contains six scheduling and identity fields before the command:
+
+| Field | Valid form |
+| --- | --- |
+| Minute | `0` to `59` |
+| Hour | `0` to `23` |
+| Day of month | `1` to `31` |
+| Month | `1` to `12`, or a supported name |
+| Day of week | `0` to `7`, with Sunday as `0` or `7`, or a supported name |
+| User | Account that runs a system job |
+
+This system schedule runs a backup at 07:15 each Saturday:
+
+```cron
+15 7 * * 6 root /usr/local/sbin/weekly-backup
+```
+
+A user crontab omits the user field because the owner supplies the execution identity:
+
+```bash
+$ EDITOR=nano crontab -e
+$ crontab -l
+$ crontab -r -i
+```
+
+An every-five-minutes expression uses `*/5`, not `*-5`:
+
+```cron
+*/5 * * * * /usr/local/bin/check-space
+```
+
+When both day-of-month and day-of-week contain restricted values, traditional cron runs the job when either field matches. A job that requires both conditions should test the second condition in a script or use a systemd calendar expression that states the intended date.
+
+Files in `/etc/cron.d/` should use simple names containing letters, digits, hyphens, and underscores. A name such as `sales.cron` can be ignored because of its full stop. System cron files should belong to root, should not permit writes by untrusted users, and should include the execution user. Jobs should use absolute paths because cron supplies a limited environment. Administrators should also confirm that `crond` runs and should direct output to a log, monitoring system, or mail destination.
+
+`/etc/cron.hourly/` contains executable scripts that `run-parts` invokes. RHEL commonly uses Anacron to run daily, weekly, and monthly work that does not require an exact clock time. Anacron can run missed periodic work after a host returns to service, while a plain cron entry normally loses an activation that occurred during downtime. Script filenames in these directories must satisfy the `run-parts` naming rules.
+
+A crontab can define variables such as `SHELL`, `PATH`, and `MAILTO` before job entries. Explicit values reduce differences between an interactive shell and the scheduled environment. Commands should send failures to a monitored destination, and administrators should test the underlying script directly before testing the schedule.
+### Recurring jobs with systemd timers
+A systemd timer activates a service unit with the same base name unless `Unit=` names another unit. Calendar timers use `OnCalendar=`, while monotonic timers use settings such as `OnBootSec=` or `OnUnitInactiveSec=`. `Persistent=true` causes an eligible missed calendar activation to run after downtime. `RandomizedDelaySec=` spreads load across hosts.
+
+Calendar expressions can describe weekdays, dates, and times. For example, `OnCalendar=Mon..Fri 03:30` runs on weekdays at 03:30. Administrators can validate an expression before installing a unit:
+
+```bash
+$ systemd-analyze calendar 'Mon..Fri 03:30'
+```
+
+Monotonic timers measure time from an event. `OnBootSec=10m` schedules an activation ten minutes after boot, while `OnUnitInactiveSec=1h` schedules an hour after the activated service last became inactive. Combining calendar and monotonic settings can create more than one trigger, so each directive needs an intentional purpose.
+
+For example, `cache-report.service` defines the work:
+
+```ini
+[Unit]
+Description=Generate cache report
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cache-report
+```
+
+`cache-report.timer` defines the schedule:
+
+```ini
+[Unit]
+Description=Run the cache report daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=10m
+Unit=cache-report.service
+
+[Install]
+WantedBy=timers.target
+```
+
+Both files belong in `/etc/systemd/system/`. The administrator then reloads the manager, enables the timer, and checks its schedule and service log:
+
+```bash
+$ sudo systemctl daemon-reload
+$ sudo systemctl enable --now cache-report.timer
+$ systemctl list-timers --all
+$ systemctl status cache-report.timer
+$ journalctl -u cache-report.service
+```
+
+`systemctl list-timers --all` shows the last and next activations, the timer unit, and the service it triggers. The journal records service output and failures. These features make timers suitable when jobs need dependency ordering, missed-run handling, central logs, resource controls, or clear operational status.
+
+Enabling a timer does not enable its service as a normal boot service. The timer activates the service at the scheduled point. A timer does not restart a service that remains active when the activation occurs, so a repeatable oneshot service should normally become inactive after completion. Administrators should test both units, inspect `systemctl status`, and confirm a successful second activation.

@@ -1,267 +1,244 @@
 # Managing Users and Groups
 > [!NOTE]
 > A practical guide to securely managing RHEL users, groups, passwords, account lifecycles, and delegated privileges through accurate identity inspection and least-privilege administration.
-## RHEL user, group and privilege management
-RHEL manages local access through four linked areas: user accounts, password policy, group membership and delegated privilege. The system stores identity data in plain text databases, applies account defaults from configuration files, and enforces access rules through ownership, group membership and `sudo`. Effective administration depends on reading those data stores accurately, choosing the right command for each task and avoiding shortcuts that weaken security.
 
-The administrative model is simple in structure but detailed in practice. A user record points to a primary group and a login environment. Password data sits in a separate protected file. Supplementary groups extend access to shared resources. `sudo` overlays role-based control so staff can perform specific privileged tasks without a shared root password. Each layer solves a different problem, and each layer has its own files, commands and risks.
-## Core account files
-| Path | Purpose |
+Red Hat Enterprise Linux 8 controls access through user identities, group identities, authentication data, file permissions, and delegated administrative privileges. Sound administration keeps local identity records consistent, applies account policy deliberately, and grants each person or service only the access it requires.
+## Identity databases and lookups
+RHEL stores local identity data in four colon-delimited files.
+
+| File | Purpose |
 | --- | --- |
-| `/etc/passwd` | Stores account names, UIDs, primary GIDs, home directories and login shells |
-| `/etc/shadow` | Stores password hashes and password ageing data |
-| `/etc/group` | Stores group names, GIDs and supplementary group members |
-| `/etc/gshadow` | Stores protected group data, including group passwords and group administrators |
-| `/etc/default/useradd` | Stores default settings used by `useradd -D` |
-| `/etc/login.defs` | Stores broader login and password defaults such as home directory creation and password ageing |
-| `/etc/skel` | Provides the template files copied into a new home directory |
-| `/etc/sudoers` and `/etc/sudoers.d/` | Store delegated privilege rules for `sudo` |
+| `/etc/passwd` | Stores the login name, password placeholder, UID, primary GID, comment field, home directory, and login shell |
+| `/etc/shadow` | Stores the password hash or lock marker, password-age values, and account expiry |
+| `/etc/group` | Stores the group name, password placeholder, GID, and explicit supplementary members |
+| `/etc/gshadow` | Stores group-password data, group administrators, and group members |
 
-Name lookups do not rely only on local files. `getent` queries the Name Service Switch, which may read local databases, SSSD-backed sources or external directory services, depending on `nsswitch.conf`. That distinction matters because a local `grep` only sees flat files, while `getent` can return the effective account or group view used by the system.
+Regular users can read `/etc/passwd` and `/etc/group` because programs need to translate numeric IDs into names. Access to `/etc/shadow` and `/etc/gshadow` remains restricted because their hashes support offline password attacks if disclosed.
 
-A practical rule follows from that design. Flat files show raw local records. `getent` shows what the system actually resolves. On a stand-alone host the results may match. On a centrally managed host they may differ significantly.
-## Listing and interpreting users
-Administrators inspect accounts first through `/etc/passwd`. Each entry records the login name, a placeholder in the password field, the numeric UID, the primary GID, the account comment field, the home directory and the login shell. Modern Linux systems keep password hashes out of `/etc/passwd` and store them in `/etc/shadow`, which keeps sensitive data out of a world-readable file.
+The Name Service Switch configuration in `/etc/nsswitch.conf` determines where applications obtain user and group records. A RHEL host can consult local files, the System Security Services Daemon (SSSD), systemd, and other configured sources. SSSD can connect the host to LDAP, Red Hat Identity Management, Active Directory, or Kerberos services.
 
-A short inspection sequence covers most account checks.
+`getent` queries the configured NSS databases and should take precedence over direct file searches when an account might come from a central service:
 
-```text
-getent passwd
-getent passwd vagrant
-cut -d: -f1,3 /etc/passwd
-awk -F: '/^vagrant:/ {print $1, $3}' /etc/passwd
+```console
+$ getent passwd alice
+$ getent group developers
+$ id alice
+$ groups alice
 ```
 
-`grep`, `cut` and `awk` remain useful for fast inspection. `cut -d: -f1,3 /etc/passwd` extracts usernames and UIDs. `awk -F: '/^name:/ {print $1, $3}' /etc/passwd` performs the same job in one process and scales better when filtering or reformatting larger datasets.
+`getent passwd` without a key enumerates only sources that support and permit enumeration. SSSD commonly resolves a named remote user even when it does not enumerate every remote account. Administrators therefore should not treat an empty full listing as proof that no remote account exists.
 
-`getent passwd username` improves on direct file parsing because it returns the account record as the operating system resolves it. That method suits mixed environments that combine local users with LDAP or Active Directory. It also avoids guessing whether a missing result reflects an absent account or a lookup path that bypasses `/etc/passwd`.
+The seven `/etc/passwd` fields are the login name, `x` password placeholder, UID, primary GID, GECOS comment, home directory, and login shell. The `x` directs password-aware tools to `/etc/shadow`. The primary GID controls the user's initial group and often influences the group ownership of files that the user creates. Directory setgid permissions can override that ownership behaviour for shared directories.
 
-Primary and supplementary groups need clear separation. The primary group appears in field four of `/etc/passwd` and determines the default group ownership of newly created files. Supplementary groups appear in `/etc/group` and extend access to shared resources. They are not the same thing, and they are not stored in the same place.
+Administrators can filter resolved records without bypassing NSS. `cut` selects known fields, while `awk` can apply numeric or textual conditions:
 
-That separation affects troubleshooting. A user can appear to belong to a group in `id` output because the group is primary, while `/etc/group` shows no member list for that same group. The records are still correct. They simply live in different databases.
-## Creating user accounts
-`useradd` creates local accounts. With default RHEL settings, a new user usually receives the next available UID, a private primary group with the same name as the account, a home directory under `/home`, and `/bin/bash` as the login shell. The `id` command confirms the resulting UID, primary GID and supplementary memberships.
-
-Several files shape that behaviour.
-
-- `useradd -D` displays the default `useradd` settings
-- `/etc/default/useradd` holds defaults such as the base home path and default shell
-- `/etc/login.defs` influences broader behaviour such as `CREATE_HOME` and `USERGROUPS_ENAB`
-- `/etc/skel` supplies the initial contents of a new home directory
-
-Private user groups are enabled by default in typical RHEL setups. As a result, `useradd` may report `GROUP=100` in its defaults while still creating a unique primary group for each new account when `USERGROUPS_ENAB` is enabled. The defaults and the policy file work together, so both need inspection before changing account creation behaviour.
-
-Non-default creation options let administrators shape accounts at the point of creation.
-
-- `-c` sets the comment field, often used for a full name
-- `-g` sets a specific primary group
-- `-G` assigns one or more supplementary groups
-- `-M` avoids creating the home directory
-- `-m` forces home directory creation
-- `-N` disables private group creation and uses the configured default group instead
-- `-r` creates a system account from the system UID range
-
-A typical creation workflow looks like this:
-
-```text
-useradd user1
-id user1
-getent passwd user1
-
-useradd -N -g users -G wheel -c "User Two" user2
-id user2
-getent passwd user2
+```console
+$ getent passwd alice | cut -d: -f1,3,4,6,7
+$ getent passwd | awk -F: '$3 >= 1000 && $3 <= 60000 {print $1, $3}'
 ```
 
-The first account follows system defaults. The second account overrides them by using the shared `users` group as the primary group, joining `wheel` as a supplementary group and writing a comment field. That pattern matters in environments that separate ordinary staff accounts from service roles or operational teams.
+The first command prints Alice's login name, UID, primary GID, home directory, and shell. The second prints accounts in RHEL's default regular UID range from sources that allow enumeration. A direct command such as `grep '^alice:' /etc/passwd` examines only the local file and can miss a central identity. It can also find a different result from `getent` when NSS source order or account overrides apply.
 
-System accounts differ from ordinary login accounts because they generally serve services rather than people. They normally draw from a lower UID range and often require different password and expiry policies. Administrators should create them intentionally and avoid treating them as interchangeable with human login accounts.
+Account-management commands lock and update related files consistently. Administrators should not edit `/etc/passwd`, `/etc/shadow`, `/etc/group`, or `/etc/gshadow` with an ordinary text editor. `vipw` and `vigr` provide locking when exceptional manual repair becomes necessary. `pwck` and `grpck` check structural consistency, although a clean structural check does not prove that account policy or ownership remains correct.
+## Creating and maintaining users
+`useradd` creates a local account. On a standard RHEL 8 host, it assigns the next available regular UID, creates a user private group with the same name, creates a home directory, copies initial files from `/etc/skel`, and assigns the configured shell.
 
-The home directory policy also deserves deliberate control. `-M` suppresses immediate home directory creation, which can help when provisioning many accounts at once or when home directories are generated on first login through PAM-based tooling. `-m` forces home directory creation when the default policy would otherwise skip it. In both cases, `/etc/skel` still defines the template content when a home directory is actually created.
-## Modifying and deleting users
-`usermod` changes existing accounts with options that mostly mirror `useradd`. It can update the comment field, switch the primary group, adjust the shell or move the account into new supplementary groups.
-
-The most important group option is `-aG`. `-G` alone replaces the current supplementary group list. `-aG` appends one or more groups to the existing list. Administrators who forget `-a` often remove required access by accident.
-
-```text
-id user1
-usermod -c "User One" -g users -aG wheel user1
-id user1
+```console
+# useradd alice
+# passwd alice
+# id alice
+# getent passwd alice
 ```
 
-That sequence confirms the original state, applies the change and verifies the result immediately. It also makes the change visible in a shell transcript or change record.
+RHEL normally reserves UIDs and GIDs below 1000 for system users and groups. `/etc/login.defs` defines ranges such as `UID_MIN`, `UID_MAX`, `SYS_UID_MIN`, and `SYS_UID_MAX`. Administrators should avoid hard-coding IDs unless shared storage, containers, or cross-system consistency requires stable values.
 
-`userdel` removes accounts. Without `-r`, the command deletes the account record but leaves the home directory and mail spool behind. That can preserve data for review, but it also leaves orphaned files. `userdel -r` removes the home directory and mail spool as part of the deletion. A cautious process checks for files still owned by the deleted UID before final cleanup.
+Several sources control account defaults:
+- `useradd -D` displays and changes selected defaults.
+- `/etc/default/useradd` defines values such as the base home path, default shell, skeleton directory, and password-inactivity default.
+- `/etc/login.defs` defines UID and GID ranges, password-age defaults, home creation, and user private group behaviour.
+- `/etc/skel` supplies files and directories for a newly created home.
 
-A sensible lifecycle therefore separates identity removal from data retention. Temporary retention may suit legal review, handover or incident response. Immediate cleanup may suit temporary lab accounts or service accounts with no retained business value. The command choice should match that purpose.
-## Password storage and ageing
-`/etc/shadow` stores password hashes and account ageing data in a protected file that ordinary users cannot read. A typical entry contains the login name, password hash, last password change date, minimum password age, maximum password age, warning period, inactivity period and optional account expiry date.
+The `INACTIVE` value does not measure time since the user's last login. It specifies the grace period after password expiry before the account becomes inactive. `CREATE_HOME` controls default home creation, and `USERGROUPS_ENAB` helps control user private groups.
 
-The most important shadow fields are these:
+Command-line options override defaults for one account:
+
+```console
+# useradd -c "Carla Nguyen" -G developers,qa carla
+# useradd -M batchrunner
+# useradd -N -g users shareduser
+# useradd -r -s /sbin/nologin serviceagent
+```
+
+`-c` writes the descriptive GECOS field. `-G` sets supplementary groups. `-M` suppresses home creation. `-N` suppresses creation of a user private group, while `-g` chooses an existing primary group. `-r` selects the system UID range. A system account does not receive a home directory unless the administrator also requests one. Service identities should normally use a locked password and a non-interactive shell unless the service design requires interactive authentication.
+
+Other useful creation options include `-u` for an explicit UID, `-d` for a non-default home path, `-m` to require home creation, `-s` for a login shell, and `-e` for an account-expiry date. An administrator should confirm that an explicit UID or GID does not collide with a local, remote, container, or storage identity. Reusing an old numeric ID can silently give a new account access to files that still carry that ID.
+
+The user private group's name commonly matches the login name, and its GID commonly matches the user's UID. Linux does not require the numeric values to match. The private group reduces accidental sharing in ordinary home directories while allowing administrators to create collaborative directories with group ownership, setgid inheritance, and an appropriate umask.
+
+`usermod` changes an existing local account. The distinction between the primary group and supplementary groups is essential:
+
+```console
+# usermod -g developers alice
+# usermod --append -G wheel,qa alice
+# usermod -G developers,qa alice
+```
+
+`-g` changes the single primary group. `--append -G` adds groups without removing existing supplementary memberships. `-G` without `--append` replaces the entire supplementary group list. An omitted group therefore disappears from the user's supplementary memberships.
+
+Running processes retain the credentials and group list that they received at session creation. A user normally needs to log out and back in before a changed membership affects a new session. An administrator can inspect the database immediately with `id alice`, but that output does not alter credentials in an existing shell.
+
+Account renaming and home relocation require coordinated options. `usermod -l newname oldname` changes the login name but does not automatically rename the home directory. `usermod -d /home/newname -m newname` changes the configured path and moves the existing home content. Administrators must also review mail aliases, scheduled jobs, application configuration, SSH authorisation, SELinux contexts, and external identity references.
+
+`userdel` removes an account record. `userdel -r` also removes the user's home directory and mail spool when the tool can identify them. It does not guarantee removal of every file, scheduled task, process, or resource owned by the UID. Before deletion, an administrator should record the UID, stop or reassign processes, locate files on relevant file systems, preserve business records, and decide whether another owner should receive them. Deleting the account before recording its UID can leave numeric ownership that is harder to interpret.
+
+A staged departure process often locks access first, preserves the account while records transfer, terminates active sessions, and deletes the identity only after approval. This sequence gives administrators time to distinguish personal files from organisational records and to prevent a later UID reuse from inheriting abandoned ownership.
+## Passwords, ageing, and account state
+RHEL stores password verifiers as salted, one-way hashes rather than reversible passwords. A modular crypt string commonly has the form `$id$salt$hash`. In RHEL 8, `$6$` identifies SHA-512 crypt where that algorithm remains configured. The salt causes identical passwords to produce different stored strings, which prevents a simple comparison from revealing shared passwords. During authentication, the system applies the recorded algorithm and salt to the supplied password, then compares the resulting hash with the stored hash.
+
+Some hash formats include parameters such as work factors, so scripts should not assume that every valid field has exactly three components. PAM and account-management configuration choose the format used for newly set local passwords. Changing that configuration does not automatically rehash existing passwords. The system normally upgrades a stored verifier only when a user changes the password or another authorised process resets it.
+
+The nine `/etc/shadow` fields have distinct roles.
 
 | Field | Meaning |
 | --- | --- |
 | 1 | Login name |
-| 2 | Password hash or lock marker |
-| 3 | Last password change in days since 1 January 1970 |
-| 4 | Minimum days before another password change |
-| 5 | Maximum days before password expiry |
-| 6 | Warning days before expiry |
-| 7 | Inactive days after expiry before disabling password login |
-| 8 | Account expiry date in days since 1 January 1970 |
+| 2 | Password hash, empty value, or lock marker |
+| 3 | Date of the last password change, counted in days from 1970-01-01 |
+| 4 | Minimum password age |
+| 5 | Maximum password age |
+| 6 | Warning period before password expiry |
+| 7 | Grace period after password expiry before account inactivity |
+| 8 | Account expiry date, counted in days from 1970-01-01 |
+| 9 | Reserved field |
 
-Several of those fields matter operationally.
+An exclamation mark at the start of field 2 locks the Unix password. It does not necessarily disable the account because SSH keys, Kerberos, or another authentication method can still succeed. Field 7 concerns time after password expiry, not time after the last login. Field 8 expires the account itself and blocks login independently of the password's age.
 
-- A password field that starts with `!` indicates a locked password
-- The date fields use days since 1 January 1970
-- Minimum age restricts how quickly a user can change a password again
-- Maximum age defines when a password expires
-- Warning age controls how many days before expiry the system starts warning the user
-- Inactivity counts the days after password expiry before the account is disabled for password authentication
-- Account expiry disables the account itself on a fixed date
+Root can inspect shadow records through NSS. A user can normally list that user's own ageing information:
 
-`chage -l username` presents the same ageing data in a more readable format. It is safer and faster than manually interpreting raw shadow fields during routine administration.
-
-Defaults for new accounts come from `/etc/login.defs`. Settings such as `PASS_MAX_DAYS`, `PASS_MIN_DAYS` and `PASS_WARN_AGE` affect accounts created after the change. They do not retroactively rewrite existing shadow entries, so current accounts need separate updates through `chage`.
-
-A clean policy workflow uses both levels:
-
-```text
-grep '^PASS_' /etc/login.defs
-chage -l user1
-chage -M 45 -W 7 user1
+```console
+# getent shadow alice
+$ chage -l "$USER"
 ```
 
-The configuration file defines the baseline for future accounts. `chage` adjusts the actual record for an existing account. Confusing those two layers leads to inconsistent password policy across the host.
-## Setting passwords and understanding authentication
-`passwd` remains the standard interactive password tool. Root can set another user’s password without knowing the existing one. Ordinary users can change only their own password and normally need to enter the current password first.
+`chage` applies per-account ageing and expiry values:
 
-RHEL-based systems also support `passwd --stdin`, which reads a password from standard input. That is convenient in controlled scripts, though it still requires careful handling to avoid exposing secrets in shell history or process listings. `chpasswd` provides a broader non-interactive method and accepts `user:password` pairs from standard input. That approach suits batch resets across multiple accounts.
-
-```text
-echo 'Password1' | passwd --stdin user1
-echo 'user1:Password1' | chpasswd
-printf 'user1:Password1\nuser2:Password2\n' | chpasswd
+```console
+# chage -m 0 -M 90 -W 14 alice
+# chage -I 7 alice
+# chage -E 2027-12-31 contractor
+# chage -d 0 alice
 ```
 
-`passwd -S username` reports password status. `passwd -l username` locks password authentication for an account, and `passwd -u username` unlocks it. Those actions affect password use, not every possible authentication method. An expired or locked password does not necessarily disable SSH keys or Kerberos if those methods are configured separately.
+The first command permits immediate password changes, requires a change after 90 days, and starts warnings 14 days before expiry. The second command allows a seven-day grace period after password expiry. The third expires a contractor account on a stated date. The fourth forces a password change at the next login.
 
-Linux does not store recoverable passwords. It stores one-way hashes. The hash field embeds the algorithm identifier, the salt and the resulting hash value. During authentication, the system combines the entered password with the stored salt, applies the same hashing algorithm and compares the result with the stored hash. Matching hashes confirm the password without revealing the original text.
+Those numbers serve as syntax examples, not universal security settings. An organisation should follow its current risk, regulatory, contractual, and identity-provider requirements. A minimum age only delays rapid changes. It does not implement password history. PAM modules or a central identity service enforce password quality and reuse controls. On RHEL 8, PAM and `pam_pwquality` govern password strength through files such as `/etc/security/pwquality.conf`, rather than the obsolete `PASS_MIN_LEN` setting in `/etc/login.defs`.
 
-That model explains two important security properties. First, administrators cannot read a user’s original password from `/etc/shadow`. Second, two users with the same password can still have different stored hashes because each account uses a different salt.
+Values such as `PASS_MIN_DAYS`, `PASS_MAX_DAYS`, and `PASS_WARN_AGE` in `/etc/login.defs` affect newly created local accounts. Changing them does not rewrite existing shadow records. Administrators use `chage` when an existing account needs revised values.
 
-A simplified hash breakdown looks like this:
+`passwd` changes a password and performs other password-state operations:
 
-```text
-$6$salt$hash
+```console
+# passwd alice
+# passwd -S alice
+# passwd -l alice
+# passwd -u alice
 ```
 
-In that structure, `6` identifies SHA-512, the middle field stores the salt and the last field stores the resulting hash. The exact format can vary by algorithm, but the principle remains the same. Authentication compares computed hashes rather than decrypting stored passwords.
+`passwd -S` reports whether the account has a usable, locked, or absent Unix password and displays ageing values. `passwd -l` locks only the Unix password. `passwd -u` restores the previous hash when it can do so safely.
 
-System accounts may need separate treatment. A service account created with `useradd -r` may not need forced password rotation, interactive login or any password at all. Applying human password policy to service identities without review can break applications or create unnecessary maintenance work.
+An ordinary user changes only that user's password and normally supplies the current password first. Root can reset another local user's password without knowing the old value. That reset can affect encrypted home directories, key rings, or applications that derived secrets from the previous login password, so an administrator should assess those dependencies before forcing a reset.
+
+An administrator who must disable all login should use account expiry or another complete access-control procedure, then terminate active sessions and revoke other credentials where policy requires it:
+
+```console
+# usermod --expiredate 1 alice
+# usermod --expiredate -1 alice
+```
+
+The first command places the account expiry in the past. The second removes that expiry. A complete offboarding process also addresses SSH keys, Kerberos tickets, API credentials, running jobs, delegated access, and centrally managed identities.
+
+`chpasswd` can set passwords for several local users from `user:password` input, while RHEL's `passwd --stdin` can read one password from standard input. Automation must keep cleartext passwords out of command histories, process arguments, logs, source repositories, and long-lived files. A secret-management system or a controlled provisioning mechanism provides safer input than an exposed `echo` pipeline.
+
+System accounts usually should not authenticate interactively. A locked password, a shell such as `/sbin/nologin`, restricted file permissions, and service-specific confinement reduce exposure. Password ageing provides little benefit to an identity that has no usable password. Administrators should rotate the actual credentials used by the service, such as keys, certificates, or tokens, under the controls designed for those credential types.
 ## Managing groups
-`/etc/group` stores group names, GIDs and supplementary members. `groupadd` creates new groups, usually with the next available GID unless an explicit value is required. `usermod -aG group user` adds an existing user to a supplementary group. The change affects the account immediately at the database level, though a current login session may need a new login to pick up the new group set.
+A user has one primary group and can have several supplementary groups. `/etc/passwd` records the primary GID in field 4. `/etc/group` records explicit supplementary members in field 4 of the group entry. Consequently, an empty member list in `/etc/group` does not prove that no user has the group as a primary group.
 
-A short group workflow illustrates the pattern:
+RHEL's user private group model creates a group for each regular user. The user receives that group as the primary group, although the user's name need not appear in the member list in `/etc/group`. Administrators should describe this relationship as primary membership, not supplementary membership.
 
-```text
-groupadd marketing
-usermod -aG marketing vagrant
-id vagrant
+The following commands create a group and maintain memberships:
+
+```console
+# groupadd marketing
+# usermod --append -G marketing alice
+# gpasswd -a bob marketing
+# gpasswd -d bob marketing
 ```
 
-If the current shell still shows the old group list, that does not mean the change failed. The account database is updated immediately, while the session’s supplementary groups are refreshed at login.
+`groupadd` creates the local group. `usermod --append -G` adds the group to a user's existing supplementary list. `gpasswd -a` and `gpasswd -d` add or remove one user from one local group. These tools update local files and do not modify LDAP, Active Directory, or other remote groups.
 
-Primary group membership is less obvious than supplementary membership. A shared primary group may have no member list in `/etc/group` even when several users rely on it. To list those users, administrators match the group’s GID from `/etc/group` against field four in `/etc/passwd`. That method matters on systems that use a shared primary group such as `users` instead of private user groups.
+`getent group marketing` shows the explicit supplementary member list returned through NSS. For a local or enumerable database, an administrator can identify users whose primary GID matches the group:
 
-The logic looks like this:
-
-```text
-gid=$(awk -F: '/^users:/ {print $3}' /etc/group)
-awk -F: -v gid="$gid" '$4 == gid {print $1}' /etc/passwd
+```console
+$ gid=$(getent group marketing | cut -d: -f3)
+$ getent passwd | awk -F: -v gid="$gid" '$4 == gid {print $1}'
 ```
 
-That sequence pulls the GID for the `users` group and then prints the accounts whose primary GID matches it. This is cleaner than guessing from names and more reliable than reading only the member list in `/etc/group`.
+The result depends on NSS enumeration. A central directory that disables enumeration requires a directory-specific query or a known user lookup.
 
-`gpasswd` complements `usermod` by focusing on the group side of administration.
+`gpasswd -A alice marketing` assigns local group administration to Alice. A group administrator can manage that group's local membership without general root access. `/etc/gshadow` stores the administrator list, group-password data, and members. Delegation should match the sensitivity of the resources controlled by the group.
 
-- `gpasswd -a user group` adds a member to a group
-- `gpasswd -d user group` removes a member
-- `gpasswd -A user group` assigns a group administrator
+`gpasswd -M alice,bob marketing` replaces the complete local member list. As with `usermod -G`, replacement can remove access unintentionally. Add and delete operations provide safer changes when an administrator intends to alter one membership. After any change, `getent group marketing`, `id alice`, and a fresh login session provide complementary checks.
 
-Group administrators can manage membership for designated groups without receiving full root access. That model can suit departmental resources where a manager needs limited control over access.
+Group passwords weaken accountability because several people share one secret. When a non-member supplies a valid group password to `newgrp` or `sg`, the command changes group credentials for a new shell or command. It does not add a persistent member entry to `/etc/group`. Administrators should prefer explicit, attributable membership and should normally restrict or remove group passwords.
+## Privilege elevation
+UID 0 carries root authority. Administrators can change identity with `su` or execute authorised commands with `sudo`.
 
-`/etc/gshadow` stores protected group data, including group passwords, group administrators and the member list used for secured group operations. It is the group equivalent of `/etc/shadow`.
+`su` without a target selects root and starts a non-login shell. It preserves much of the caller's environment and current directory. `su -` or `su -l` starts a login shell with the target user's login environment and home directory. An unprivileged caller normally supplies the target account's password. Root can use `su - alice` to test an account without Alice's password.
 
-Group passwords deserve caution. A password on a group creates a self-service path into that group for anyone who knows the shared secret. That weakens accountability and usually weakens security. In most environments, direct membership management through `usermod` or `gpasswd` is safer than sharing a group password.
-## Privilege escalation with `su`
-`su` changes identity to another account, most commonly root. Without an explicit target, `su` switches to root. `su -` and `su -l` start a full login shell, while plain `su` starts a non-login shell.
+Sharing the root password weakens individual accountability and complicates offboarding. `sudo` normally authenticates the caller with the caller's own password, applies policy to the requested command, and records the caller's identity. It therefore supports granular delegation and stronger audit trails.
 
-That distinction matters. A non-login shell may leave environment variables and the current working directory largely unchanged. A login shell resets the environment more completely and changes to the target account’s home directory. Administrative work is generally more predictable with `su -`.
+RHEL commonly grants broad administrative access through the `wheel` group:
 
-A simple comparison shows the effect:
-
-```text
-su
-pwd
-echo $USER
-
-su -
-pwd
-echo $USER
+```console
+# usermod --append -G wheel alice
 ```
 
-The first form can leave the original user’s environment partly intact. The second form behaves like a proper login for the target account. For shell initialisation, mail paths and other environment-dependent behaviour, the login form is the safer choice.
+The default sudoers rule usually resembles `%wheel ALL=(ALL) ALL`. The percent sign identifies a group. `ALL` in the host position refers to the host on which `sudo` executes, not the workstation from which a person connected.
 
-`su` also has a structural drawback. It relies on the target account’s password. If multiple administrators need root access through `su`, they all need the root password. Shared root passwords are hard to audit, hard to rotate and risky when staff change. That weakness makes `sudo` the preferred model for most managed environments.
+Administrators should place custom policy in files under `/etc/sudoers.d` and edit each file with `visudo`:
 
-Root can also use `su - username` to test a new account without setting the user’s password first. That is useful for verifying home directory creation, shell selection and environment setup.
-## Delegating privilege with `sudo`
-`sudo` grants controlled privilege without handing out the root password. The main policy file is `/etc/sudoers`, and the preferred place for local custom rules is `/etc/sudoers.d/`. Drop-in files reduce the risk of local changes being lost during package updates and keep policy changes easier to review.
-
-All edits should go through `visudo`. It opens the policy for editing and performs syntax checks before saving. A malformed `sudoers` file can break delegated access system-wide, so syntax validation is essential. Keeping an existing root shell open while editing provides a safe recovery path if a policy change fails.
-
-`sudoers` rules can be narrow or broad. A rule can target an individual user or a group, restrict access by host, require or skip password prompts, and limit the allowed commands. Group names begin with `%`. A helpdesk rule, for example, can permit members of a helpdesk group to run `/usr/bin/passwd` for ordinary accounts while explicitly denying `/usr/bin/passwd root`.
-
-A compact rule looks like this:
-
-```text
-%helpdesk ALL=(root) /usr/bin/passwd, !/usr/bin/passwd root
+```console
+# visudo -f /etc/sudoers.d/webops
+# visudo -cf /etc/sudoers.d/webops
 ```
 
-That policy grants one administrative task rather than broad root-equivalent power. It is easier to audit, easier to justify and much safer than a blanket `ALL=(ALL) ALL` rule for staff who only need password reset duties.
+`visudo` checks syntax before installing an edit, and `-c` validates existing policy. Fragment names should not contain a period or end with a tilde because the default include rule can ignore such names.
 
-`sudo -l` shows the commands available to the current user under the active policy. `sudo` also caches credentials for a short period by default, which reduces repeated password prompts during a maintenance task. That convenience should not be confused with unrestricted access. The cache expires, and the command policy still applies on each invocation.
+A safe policy change keeps a verified administrative recovery path available until validation and delegated-user testing succeed. The administrator should check the whole policy with `visudo -c`, inspect the target account's view with `sudo -l -U alice`, and test each permitted and denied operation. Syntax validation catches parse errors but cannot establish that a rule grants the intended scope.
 
-A practical privilege model therefore follows three principles.
+A sudoers rule identifies the subject, execution host, run-as identity, and permitted command:
 
-- Give the minimum command set needed for the role
-- Prefer group-based rules for teams that share the same duties
-- Deny especially sensitive actions explicitly when a broader command pattern might otherwise allow them
-## Environment handling and editor selection
-`sudo` resets much of the calling environment by default. That behaviour protects the privileged session from untrusted variables, but it also means user-defined values such as `EDITOR` do not automatically carry across.
-
-Administrators can work around that in two ways. `sudo -i` starts an interactive root shell, after which the root environment can be set directly. A cleaner long-term option is a `sudoers` default such as `Defaults env_keep += "EDITOR"`, which preserves the editor choice across `sudo` for authorised users. That allows `visudo` to open in the preferred editor without weakening the rest of the environment policy.
-
-This pattern keeps the policy clear:
-
-```text
-Defaults env_keep += "EDITOR"
-export EDITOR=nano
-sudo visudo
+```sudoers
+%webops ALL=(root) /usr/bin/systemctl status httpd, /usr/bin/systemctl restart httpd
 ```
 
-The preserved variable changes only what the policy explicitly allows. It does not disable the broader environment reset, which remains valuable for security.
-## Operational guidance
-A reliable RHEL account management workflow follows a consistent order.
+This rule lets members of `webops` run two exact operations as root on hosts that contain the rule. Administrators should specify absolute command paths and required arguments, then test the policy with `sudo -l` from the delegated account.
 
-- Inspect identity data with `getent`, `id` and the account files before making changes
-- Review `useradd -D`, `/etc/default/useradd` and `/etc/login.defs` before altering account creation policy
-- Use `usermod -aG` when adding supplementary groups to an existing account
-- Use `chage` to manage existing password ageing rather than assuming new defaults will apply retrospectively
-- Avoid shared group passwords except in narrow legacy cases
-- Prefer `sudo` over shared root passwords and maintain local policy in `/etc/sudoers.d/`
-- Edit privilege policy only with `visudo`
-- Leave a recovery root shell open while changing `sudo` rules
+Rules should grant the smallest practical command set. Broad access to shells, editors, interpreters, package managers, file-copy tools, or commands with escape features can become equivalent to full root access. A broad allow rule followed by a negated exception can often be bypassed through another path or argument form. A positive allow list or a tightly controlled root-owned wrapper provides a safer design.
 
-That workflow keeps the administrative model coherent. It starts with observation, uses the system’s own data structures rather than guesswork, applies the smallest effective change and verifies the result. On a busy RHEL host, that discipline prevents most avoidable account and privilege mistakes.
+`NOPASSWD` removes an authentication barrier and requires a documented operational reason. Sudo's credential cache also affects reauthentication and uses a configurable timeout. A user can run `sudo -k` to invalidate the cached credential. `sudo -i` starts a root login shell and should remain limited to administrators who genuinely require unrestricted access.
+
+Sudo resets much of the caller's environment by default. This behaviour reduces the risk that variables such as `PATH`, library paths, or language-specific settings alter a privileged program. `visudo` uses the editor allowed by sudoers policy. Administrators who require a standard editor can configure a fixed value such as `Defaults editor=/usr/bin/vim`. Retaining a user-controlled `EDITOR` variable through `env_keep` expands trust in the caller's environment and should follow an explicit policy decision.
+## Verification and audit
+Identity administration requires checks at both the database and session levels. `getent` confirms the record selected by NSS, `id` resolves current group assignments for a named account, and a fresh login proves that a new session receives the intended credentials. File ownership checks confirm that account changes did not strand important data under an obsolete UID or GID.
+
+Periodic reviews should identify duplicate numeric IDs, unexpected interactive shells, missing or incorrectly owned home directories, expired temporary accounts, dormant privileged accounts, unnecessary supplementary groups, and sudo rules that exceed current duties. Central and local records also require comparison because a local account can shadow a remote name according to NSS order.
+
+An administrator should retain evidence of the requested change, approval, commands, verification results, and rollback or recovery action. The record should distinguish a password lock from account expiry, a database membership from credentials held by an existing process, and a sudo syntax check from a successful authorisation test. These distinctions prevent a technically successful command from creating an incomplete security outcome.
+## Administrative controls
+- Administrators should resolve identities with `getent`, `id`, and `groups` before changing them.
+- Account changes should preserve required files, UID and GID consistency, active workloads, and audit records.
+- Password locks, password expiry, account expiry, and session termination should remain separate controls.
+- Group changes should distinguish primary membership from supplementary membership.
+- Sudo policy should use `visudo`, positive allow rules, absolute paths, exact arguments, and independent recovery access.
+- Central identity systems should remain the system of record for remote users and groups.

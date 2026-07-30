@@ -1,177 +1,353 @@
 # Configuring Local Storage
 > [!NOTE]
 > How to configure, manage, persist, and expand RHEL local storage using block devices, loop devices, partitions, file systems, stable identifiers, LVM, and swap.
-## Linux block storage
-A Linux block storage path starts with hardware or a disk image and ends with a device file in `/dev`. The kernel presents storage through device drivers, and user space works with the resulting block device like any other file. Common examples include SATA, SCSI, USB, SSD, iSCSI, and loop-backed devices.
 
-`lsblk` lists block devices, their sizes, mount points, and their relationships. It can show a whole-tree view, a single device, or a reverse path back to the parent device. `lsmod` shows loaded kernel modules, and `modinfo` reports details about a specific driver. In a typical RHEL installation, the `sd_mod` driver handles many disk types that appear as `/dev/sdX` devices.
+Red Hat Enterprise Linux 8 presents local storage through block devices. An administrator can inspect those devices, create file-backed lab disks, partition storage, build filesystems, configure persistent mounts, manage Logical Volume Manager 2 storage, and provide swap space. Most operations require root privileges, and partitioning, filesystem creation, and LVM initialisation can destroy existing data. The administrator should identify every target with `lsblk`, confirm that required data has a backup, and test configuration changes before rebooting.
+## Block devices, drivers, and device numbers
+Linux represents storage devices as special files under `/dev`. Applications use normal input and output operations against these files, while the kernel and a device driver communicate with the underlying hardware or virtual device. Common examples include:
+- `/dev/sda` for a disk handled through the SCSI disk layer
+- `/dev/sda1` for the first partition on that disk
+- `/dev/loop0` for a loop device backed by a regular file
+- `/dev/mapper/vg-lv` for a device-mapper volume such as an LVM logical volume
 
-Major and minor numbers identify device classes and instances. The major number maps a device to its driver, while the minor number distinguishes individual devices and partitions within that driver class. This matters for inspection and troubleshooting, but day-to-day administration usually relies on stable device names, UUIDs, labels, and LVM paths rather than on the numbers themselves.
+The `sd_mod` module provides the SCSI disk upper layer. Linux also routes many SATA, USB mass-storage, and iSCSI devices through the SCSI subsystem, but it does not route every storage technology through `sd_mod`. NVMe devices, for example, use NVMe drivers and names such as `/dev/nvme0n1`.
 
-A baseline installation often shows a physical disk with a small boot partition and an LVM-backed root and swap layout beneath a larger partition. `lsblk` makes that hierarchy clear because it displays the parent disk, its partitions, and any child device-mapper volumes. That view helps an administrator answer three questions quickly. Which device holds the data. Which layer exposes the consumable block device. Where the storage is mounted.
+Several commands reveal the relationship between devices and drivers:
 
-Inspection usually starts before any change. A block layout that looks obvious from device names alone can become less obvious after new storage appears, after a loop device is attached, or after a VG begins to expose several LVs. Reading the tree before editing it prevents mistakes, especially when a lab mixes physical disks, loop devices, partitions, and logical volumes on the same host.
-## Loop devices
-A loop device maps a regular file to a block device. That mapping makes an ordinary file behave like a disk, which is useful for labs, testing, ISO access, and temporary storage workflows. `losetup` creates, lists, and detaches loop devices.
+```bash
+lsmod
+modinfo sd_mod
+lsblk
+lsblk /dev/sda
+lsblk -s /dev/sda2
+```
 
-A common pattern uses `losetup -f` to find the next available loop device and attach it to an image file. After attachment, `lsblk` shows the loop device, and `mount` can mount it if the file contains a recognised file system. ISO images are a simple example because they can be attached to a loop device and mounted read-only at `/mnt`.
+`lsmod` lists loaded kernel modules. `modinfo` reports a module's metadata, parameters, aliases, and file location. `lsblk` displays block-device topology, including names, sizes, types, mount points, and major and minor device numbers. The `-s` option reverses the dependency view and traces a child device towards its parent.
 
-Loop devices also provide a safe way to rehearse destructive operations. A regular file can be partitioned, turned into an LVM PV, reformatted, extended, or discarded without touching the host system disk. That makes loop-backed storage a useful teaching tool because the workflow stays close to real administration while the risk stays low.
+A major number identifies the kernel device class or driver interface associated with a device node. A minor number selects a device or subdivision managed through that interface. The pair identifies a device node, although Linux can assign major numbers dynamically and can allocate several major-number ranges to one subsystem.
 
-Loop devices persist only while the mapping exists. Unmounting a file system does not detach the loop device. Detachment requires `losetup -d <device>` for one loop device or `losetup -D` for all loop devices.
-## Creating raw disk files
-A lab can create disk images with either `dd` or `fallocate`.
+Traditional `sd` device numbering reserves 16 minor numbers for each disk. The whole disk uses one number, leaving up to 15 partition numbers for that `/dev/sdX` device. The next disk starts at the next group of 16. This device-node allocation limit does not define the capacity of the partition-table format itself.
+## Loop devices and file-backed storage
+A loop device exposes a regular file as a block device. It supports useful lab work when a system has no spare disk, and it also provides access to filesystem images and ISO images. A loop device remains an abstraction over the backing file. It does not copy the file or create new storage.
 
-- `dd` writes data block by block, often from `/dev/zero`, and creates a fully written file.
-- `fallocate` allocates space quickly and usually creates large empty files much faster.
-- `time` measures each command and makes the performance difference obvious.
+The administrator can associate an ISO image with the next available loop device and display the selected name:
 
-For empty lab disks, `fallocate` is usually the quicker and simpler choice. After creation, `losetup` can attach the file to a named loop device such as `/dev/loop1`. Named attachment improves consistency in demonstrations and automation because the storage path stays predictable.
-## Partitioning strategy
-A disk does not need partitions. A file system can sit directly on a whole disk or loop device. Partitioning becomes useful when a system needs separate areas for boot files, root, variable data, home directories, or swap, or when an administrator wants clearer isolation and easier recovery.
+```bash
+sudo losetup --find --show --read-only image.iso
+sudo losetup --list
+sudo mount -o ro /dev/loop0 /mnt
+```
 
-RHEL commonly works with two partition table formats.
+ISO 9660 images normally mount read-only. After use, the administrator should unmount the filesystem before detaching the loop device:
 
-- MBR, also called MS-DOS, supports up to four primary partitions, or three primary partitions plus one extended partition that can contain logical partitions. Its practical size limit is about 2 TiB for standard 512-byte sectors.
-- GPT supports very large disks and far more partitions, and it is the modern default for most systems.
+```bash
+sudo umount /mnt
+sudo losetup --detach /dev/loop0
+```
 
-Partitioning is a design choice rather than a reflex. A separate boot partition can simplify bootloader requirements. A separate `/var` can protect the root file system from log growth. A separate home area can isolate user data from system files. At the same time, too many small fixed partitions can create future bottlenecks that LVM would avoid. Good partitioning reflects system purpose rather than habit.
+The `--detach-all` option detaches all unused loop devices, but broad cleanup can affect unrelated work. A named detach operation provides safer control.
 
-`fdisk` offers an interactive workflow that suits manual work. `parted` supports both an interactive shell and direct non-interactive commands, which makes it better for scripting and automation. A normal workflow creates a disk file, attaches it to a loop device, writes a partition table, creates one or more partitions, and then informs the kernel of the changes.
-## Updating the kernel after partition changes
-The kernel does not always pick up new partition information immediately. `partprobe` tells the kernel to re-read the partition table. On loop-backed disks, this step is especially important after recreating a loop mapping or after changes to partitions. Without it, the parent device may appear, but partition devices such as `/dev/loop1p1` may not.
-## File systems, labels, and UUIDs
-A partition or whole device becomes usable only after a file system or swap header is written. For ordinary data storage, a common RHEL choice is XFS. A file system can also receive a label.
+Raw backing files support partitioning and filesystem exercises. `dd` writes data through the normal input and output path, while `fallocate` asks the filesystem to preallocate space. `fallocate` often completes much faster because it need not write every zero-filled block:
 
-A label is readable and convenient, but it is not guaranteed to be unique. A UUID is designed to be unique and is the safer persistent identifier for mounts. `blkid` displays UUIDs, labels, and file system types.
+```bash
+time dd if=/dev/zero of=/var/disks/dd.disk bs=1M count=500 status=progress
+time fallocate -l 500M /var/disks/fa.disk
+```
 
-This distinction matters because device names can change. A disk that appears as `/dev/sda` at one boot might appear differently after hardware changes, storage reordering, or use of the next available loop device. Mounting by UUID avoids that fragility. In `/etc/fstab`, a UUID-based entry keeps a file system mount stable even if the underlying device name changes.
+These commands do not guarantee identical allocation behaviour on every filesystem. A sparse or copy-on-write backing file can also affect performance and reported disk usage.
 
-A normal persistent mount entry specifies the source, mount point, file system type, mount options, dump field, and fsck field. For XFS, the final fsck pass field is normally `0` because `fsck.xfs` does not perform the kind of boot-time check used for ext file systems.
+When the backing file contains a partition table, `losetup --partscan` asks the kernel to scan it during attachment:
 
-The same persistence logic applies during troubleshooting. A mount that fails because a directory is missing or an entry is malformed is easy to repair. A mount that fails because a transient device name no longer points to the expected file system is harder to diagnose. Stable identifiers reduce that uncertainty, especially on hosts that add and remove removable media, virtual disks, or loop-backed images.
-## Persisting loop-backed storage
-A loop-backed lab device disappears across a reboot unless the system recreates it. A persistent setup can use a small `systemd` service.
+```bash
+sudo losetup --find --show --partscan /var/disks/disk1
+lsblk /dev/loop0
+```
 
-The service should run after udev has detected hardware and before local file systems mount. A practical design uses `Type=oneshot`, runs `losetup` to recreate the mapping, then runs `partprobe` so the kernel sees the partition table. Enabling the service under `local-fs.target` integrates the loop mapping into the boot sequence.
+The kernel then exposes partitions with names such as `/dev/loop0p1`. If the loop device already exists, `partprobe /dev/loop0` can request another partition-table scan. The logical sector size influences that scan, so a non-default image may also require `losetup --sector-size`.
 
-This approach solves only the device recreation problem. File systems still mount most safely by UUID. If the loop number changes unexpectedly, UUID-based mounts continue to work after the service recreates the backing device and the kernel re-reads the partition table.
-## Logical Volume Manager
-LVM adds a flexible abstraction layer over block storage.
+Loop assignments normally disappear at reboot. An administrator should not place a loop partition in `/etc/fstab` unless the boot process creates the loop device before the dependent mount. A fixed name such as `/dev/loop1` can also collide with another consumer, so fixed loop numbers suit controlled labs better than general-purpose systems.
+## Partition tables and partitions
+A filesystem can occupy a whole block device, but partitions divide a device into independently managed regions. Separate filesystems can isolate capacity for `/boot`, `/home`, `/var`, and application data. Isolation can prevent one workload from exhausting the root filesystem, although it also divides available capacity.
 
-- Physical volumes, or PVs, represent the underlying storage devices or partitions.
-- Volume groups, or VGs, pool free space from one or more PVs.
-- Logical volumes, or LVs, carve usable block devices from the pooled VG space.
+RHEL 8 commonly uses two partition-table formats:
 
-RHEL commonly installs the root and swap areas on LVM by default. `lsblk` and `dmsetup` show these device-mapper relationships. LVs appear as block devices and can be formatted, mounted, extended, or used as swap.
+| Format | Main characteristics |
+| --- | --- |
+| MBR, also called DOS | Supports four primary entries. One entry can act as an extended partition that contains logical partitions. With 512-byte logical sectors, its 32-bit sector fields address about 2 TiB. |
+| GPT | Stores primary and backup headers, identifies partitions with GUIDs, and uses 64-bit logical block addresses. With 512-byte logical sectors, its theoretical address space approaches 8 ZiB. The table records its own number of entries, so GPT has no fixed limit of 255 partitions. Common implementations initially allocate 128 entries. |
 
-A useful mental model separates storage roles clearly. PVs store real data and LVM metadata. VGs aggregate capacity. LVs present the consumable block devices. Device-mapper then exposes those volumes under `/dev/mapper` and through convenient symbolic links such as `/dev/<vg>/<lv>`.
+The operating system, driver, hardware, and management tools can impose lower limits than the on-disk format. A `/dev/sdX` device still exposes no more than 15 partition minors under the traditional `sd` allocation described above.
 
-This arrangement turns fixed storage into a pool that can be reassigned when requirements change. Instead of binding an application permanently to one partition on one disk, the administrator can allocate only the needed space, add capacity later, and reshape the layout without replacing every higher-level reference. That is the central reason LVM remains valuable on general-purpose Linux systems.
-## Marking partitions for LVM
-A partition intended for LVM can carry the LVM flag. In `parted`, that flag documents the partition's intended role and helps tools recognise the layout. The flag does not by itself create a PV or make the partition part of a VG. Actual LVM membership starts only when an LVM command writes the required metadata.
-## Core LVM commands
-The LVM command set follows a clear naming pattern.
+`fdisk` provides an interactive interface and supports both MBR and GPT on RHEL 8. `parted` can run interactively or accept subcommands, and `sfdisk` provides a script-oriented interface. Automation should use explicit, reviewable input rather than feeding keystrokes to an interactive session.
 
-- `pvs`, `pvdisplay`, and `pvcreate` manage physical volumes.
-- `vgs`, `vgdisplay`, `vgcreate`, and `vgextend` manage volume groups.
-- `lvs`, `lvdisplay`, `lvcreate`, and `lvextend` manage logical volumes.
+The following sequence creates a GPT and one partition on a disposable loop device:
 
-These commands provide both concise and detailed views. Scan commands such as `pvs`, `vgs`, and `lvs` summarise the current state quickly. Display commands expand the view and expose details such as metadata copies, extent size, free space, and logical volume attributes.
-## Creating an LVM layout
-A typical LVM workflow follows these steps.
+```bash
+sudo parted --script /dev/loop0 mklabel gpt
+sudo parted --script /dev/loop0 mkpart primary 1MiB 256MiB
+sudo partprobe /dev/loop0
+lsblk /dev/loop0
+```
 
-1. Create or identify a partition or whole device for LVM.
-2. Initialise it as a PV with `pvcreate`, or let `vgcreate` initialise it automatically when no special PV options are needed.
-3. Create a VG with `vgcreate`.
-4. Create one or more LVs with `lvcreate`.
-5. Put a file system or swap header on each LV as required.
-6. Mount file-system LVs or activate swap LVs.
+Starting at 1 MiB normally gives suitable alignment. `parted` accepts percentages, but explicit binary units give clearer boundaries. `parted print` or `fdisk -l` verifies the result.
 
-An LV can be addressed through `/dev/<vg>/<lv>` or `/dev/mapper/<vg>-<lv>`. Both paths normally resolve to the same device-mapper node. Because those names are stable within the file system namespace, they are often practical mount sources.
-## Physical extents and LV sizing
-LVM allocates storage in physical extents. The extent size belongs to the volume group and is set when the VG is created. The default is commonly 4 MiB, though it can be changed with `vgcreate -s`.
+An LVM partition type or flag records the intended use of a partition. LVM does not require the flag before `pvcreate`, but the metadata helps installers, discovery tools, and administrators interpret the layout:
 
-This affects LV sizing.
+```bash
+sudo parted /dev/loop0 set 1 lvm on
+```
 
-- `lvcreate -L` specifies a human-readable size such as megabytes or gigabytes.
-- `lvcreate -l` specifies a count or percentage of extents.
+Changing a partition table can erase access to existing data. The administrator should unmount affected filesystems, disable affected swap, deactivate dependent LVM volumes, and verify the device name before writing the table.
+## Filesystems, identifiers, and persistent mounts
+RHEL 8 supports XFS and ext4 as its principal local filesystems. `mkfs.xfs` creates XFS, and `mkfs.ext4` creates ext4. A filesystem can carry a human-readable label and a generated universally unique identifier:
 
-When an LV size does not divide evenly into the extent size, LVM rounds it to an extent boundary. That behaviour explains why a requested size such as 100 MiB may become slightly larger in the final LV.
+```bash
+sudo mkfs.xfs -L DATA /dev/loop0p1
+sudo blkid /dev/loop0p1
+```
 
-Extent sizing also affects planning. Smaller extents allow finer-grained allocation. Larger extents reduce metadata overhead and may align better with specialised designs. On ordinary systems, the default usually works well, but understanding extents explains why LVM sometimes reports sizes that differ slightly from the requested number.
-## Viewing and activating logical volumes
-`lvs` reports LV state and attributes. In a new lab VG, an LV may exist before it carries a file system or mount point. After formatting and mounting, it becomes an online storage resource. `vgchange -ay <vg>` activates all logical volumes in a volume group if activation is needed.
+A device name such as `/dev/sda1` can change when hardware detection order changes. A filesystem label remains easier to read, but Linux does not enforce label uniqueness. A filesystem UUID gives a stronger persistent identifier. GPT also gives each partition a PARTUUID, which differs from the UUID stored inside a filesystem.
 
-Once active, an LV can receive an XFS or ext4 file system, mount to a chosen directory, and behave like any other block device. Stable LV paths often make explicit UUID use optional for those mounts, though UUIDs remain valid and portable.
-## Online growth of logical volumes
-The main practical advantage of LVM is online growth.
+An administrator can mount a filesystem by device name, label, or UUID:
 
-When a file system begins to run short of space, the administrator first checks whether the VG still has free extents. `vgs` or `vgdisplay` shows that information. If free space exists, `lvextend` can enlarge the LV.
+```bash
+sudo mkdir -p /data
+sudo mount UUID=12345678-1234-1234-1234-123456789abc /data
+findmnt /data
+```
 
-With `lvextend -r`, RHEL can grow the file system at the same time for supported file systems such as XFS and ext4. This reduces disruption because the LV and its file system grow together while mounted. The workflow usually looks like this.
+`/mnt` suits temporary mounts, while a dedicated directory such as `/data` suits an ongoing service. A persistent entry in `/etc/fstab` contains the device specification, mount point, filesystem type, options, dump field, and filesystem-check field:
 
-1. Check free space in the VG.
-2. Extend the LV by size or by extents.
-3. Allow `-r` to resize the file system.
-4. Verify the result with `lvs`, `vgs`, and `df -h`.
+```text
+UUID=12345678-1234-1234-1234-123456789abc /data xfs defaults 0 0
+```
 
-The command can extend by a fixed amount, such as `+104M`, or by available extents, such as `+100%FREE` when using the extent form. This makes capacity management far more flexible than traditional fixed partitions.
+The administrator should create the mount point, run `systemctl daemon-reload` after editing `fstab`, and validate the entry with `mount -a` before rebooting. `findmnt --verify` provides another useful check. XFS entries normally use `0` in the final field because the generic boot-time `fsck` sequence does not repair XFS.
+## Boot-time loop setup
+A systemd oneshot service can attach a loop-backed lab disk before a dependent filesystem mounts. The service should run `losetup --partscan`, stay active after its setup commands finish, and detach the device when stopped. `RemainAfterExit=yes` retains the active state. A value of `no` would let the oneshot unit return to an inactive state after successful setup.
 
-The workflow stays safe because growth works upward through clear layers. First the VG must have free extents. Then the LV can grow. Then the file system can claim the new space. Verification at each layer matters because a larger LV without a larger file system still leaves the mounted capacity unchanged from the user's perspective.
-## Extending a volume group
-If the VG has no free extents, the LV cannot grow until the VG grows first. `vgextend` adds capacity by enrolling another PV into the VG. That PV can be a newly prepared partition, disk, or loop-backed lab device.
+The service must order itself before the dependent mount. The mount must also require and follow the service, rather than relying only on a broad target order. If the image resides below a separately mounted `/var`, the service must start after that backing filesystem becomes available. A controlled lab can use the following unit:
 
-After `vgextend`, the new free extents become available to all LVs in the group. The administrator can then run `lvextend` on the target LV and, if needed, grow the file system in the same operation.
+```ini
+[Unit]
+Description=Attach loop-backed lab disk
+RequiresMountsFor=/var/disks
+Before=data.mount
 
-This model avoids the old pattern of replacing one full disk with a larger disk and copying data across. Instead, LVM allows incremental growth by adding storage to the VG and assigning only the required extra space to the LV that needs it.
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/losetup --partscan /dev/loop1 /var/disks/disk1
+ExecStop=/usr/sbin/losetup --detach /dev/loop1
+RemainAfterExit=yes
+
+[Install]
+WantedBy=local-fs.target
+```
+
+This example belongs in `/etc/systemd/system/loop-storage.service`. The `Before=data.mount` line identifies the mount unit for `/data`. Another mount point requires the correctly escaped mount-unit name, which `systemd-escape --path --suffix=mount` can generate. `RequiresMountsFor=/var/disks` ensures that systemd can reach the backing file before it runs `losetup`. The `fstab` mount options should include `x-systemd.requires=loop-storage.service`, which adds `Requires=` and `After=` dependencies to the generated mount unit. The administrator should choose an unused loop number and update both the unit and every dependent configuration entry.
+
+After creating or changing the unit, the administrator runs:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now loop-storage.service
+systemctl status loop-storage.service
+```
+
+This arrangement supports a controlled training environment. Dedicated block storage, managed virtual disks, or purpose-built image units usually provide a stronger production design.
+## LVM2 structure and creation
+LVM2 adds a flexible allocation layer above block devices:
+
+| Layer | Function | Common commands |
+| --- | --- | --- |
+| Physical volume | Initialises a disk, partition, or loop device for LVM and stores LVM metadata | `pvcreate`, `pvs`, `pvdisplay`, `pvremove` |
+| Volume group | Pools capacity from one or more physical volumes | `vgcreate`, `vgs`, `vgdisplay`, `vgextend`, `vgremove` |
+| Logical volume | Allocates a block device from a volume group | `lvcreate`, `lvs`, `lvdisplay`, `lvextend`, `lvremove` |
+
+Device Mapper presents logical volumes to userspace. `dmsetup ls --tree` shows device-mapper relationships, while `lsblk`, `pvs`, `vgs`, and `lvs` provide progressively more LVM-specific views. `pvmove` relocates allocated extents between physical volumes within the same volume group. It does not move a physical volume between volume groups.
+
+An explicit creation sequence keeps each layer visible:
+
+```bash
+sudo pvcreate /dev/loop0p1
+sudo vgcreate vg1 /dev/loop0p1
+sudo lvcreate -n data -L 200M vg1
+sudo lvs
+```
+
+`vgcreate` establishes the physical extent size for the group. The default is 4 MiB, and every physical volume in that group uses the same extent size. An administrator can choose another size with `vgcreate -s`, but ordinary linear volumes rarely need a custom value.
+
+`lvcreate -L 200M` requests a size in ordinary units and rounds it to whole extents. Lower-case `-l` requests a number or percentage of extents. For example, `-l 100%FREE` allocates all unassigned extents in the volume group.
+
+LVM normally activates volume groups during boot. A loop device attached after boot may require explicit activation:
+
+```bash
+sudo vgchange -ay vg1
+sudo mkfs.xfs /dev/vg1/data
+sudo mkdir -p /srv/data
+sudo mount /dev/vg1/data /srv/data
+```
+
+Both `/dev/vg1/data` and `/dev/mapper/vg1-data` normally resolve to the same device-mapper volume. LVM names remain stable across ordinary disk detection changes, provided the volume-group and logical-volume names remain unique in the active system.
+
+LVM stores configuration metadata on its physical volumes. Additional metadata copies can improve recovery options, but they consume space and do not replace backups. An administrator should use `vgcfgbackup`, maintain independent data backups, and test recovery procedures.
+## Extending storage online
+A volume group needs free extents before it can enlarge a logical volume. `vgs` shows group capacity and free space. If the group lacks room, the administrator can initialise another block device and add it:
+
+```bash
+sudo pvcreate /dev/loop0p2
+sudo vgextend vg1 /dev/loop0p2
+vgs vg1
+```
+
+The plus sign in an extension request means "add this amount". Without it, LVM treats the value as the requested final size:
+
+```bash
+sudo lvextend -r -L +1G vg1/data
+```
+
+`-r`, or `--resizefs`, enlarges the logical volume and then grows a supported filesystem through the appropriate helper. RHEL 8 can grow mounted XFS and ext4 filesystems online. The administrator should still confirm free space, review the target path, keep a current backup, and check the result with `lvs`, `findmnt`, and `df -h`.
+
+XFS can grow but cannot shrink. Ext4 can shrink only while unmounted and through a separate, carefully ordered procedure. Storage growth therefore offers less risk than reduction, but a wrong device or interrupted infrastructure operation can still cause data loss.
 ## Swap space
-Swap extends virtual memory by providing disk-backed pages when RAM pressure rises. In RHEL, swap can live on a partition, a regular file, or an LV. Systems often use an LV for swap by default.
+Disk-backed swap provides space for memory pages that the kernel can evict from RAM. It supports the virtual-memory system, but it does not turn storage into RAM and usually operates much more slowly. Capacity planning should follow workload needs, memory pressure, hibernation requirements, and storage performance.
 
-Swap does not use a normal file system. `mkswap` writes the swap area header and creates the UUID and label metadata that tools use to identify the swap device. `swapon` enables swap, `swapoff` disables it, and `free -h` or `swapon --show` reports current usage.
+RHEL 8 can use a partition, an LVM logical volume, or a regular file as swap. `mkswap` writes a swap signature and UUID, while `swapon` activates the area:
 
-A practical workflow for an additional swap LV is straightforward.
+```bash
+sudo lvcreate -n swap_extra -L 2G vg1
+sudo mkswap /dev/vg1/swap_extra
+sudo swapon /dev/vg1/swap_extra
+swapon --show
+free -h
+```
 
-1. Create the LV.
-2. Run `mkswap` on the LV.
-3. Add an entry to `/etc/fstab` if the swap should persist across reboots.
-4. Enable it with `swapon -a` or a direct `swapon` command.
+A persistent `fstab` entry uses `none` as the mount point and `swap` as the type:
 
-Swap priority influences which swap areas the kernel prefers. Higher priority values are used first. That can matter when a system combines multiple swap areas with different performance characteristics.
+```text
+/dev/vg1/swap_extra none swap defaults,pri=10 0 0
+```
 
-Swap should be sized and used deliberately. A system that never touches existing swap usually does not need more just because free VG space exists. The administrator should inspect real memory pressure before adding or extending swap. In practice, swap configuration is part of performance policy rather than a substitute for adequate RAM.
-## Choosing identifiers for mounts and swap
-Persistent storage configuration should prefer identifiers that remain stable across reboots and hardware changes.
+The kernel prefers an active swap area with a higher numeric priority. It can distribute pages across areas with equal priority. Fast storage can improve swap performance, but extra swap does not help a system that never experiences memory pressure.
 
-- Use UUIDs for ordinary partitions, loop-backed file systems, and swap entries when device names may change.
-- Use LV paths when the VG and LV naming scheme is stable and unambiguous.
-- Avoid hard-coding transient names such as `/dev/loop0` unless a boot service recreates them predictably.
+`swapoff` removes an area from active use:
 
-This principle runs through the entire storage workflow. The more dynamic the lower layers become, the more valuable stable identifiers become at the mount and activation layer.
-## Practical command set
-The storage workflow relies on a compact set of commands.
+```bash
+sudo swapoff /dev/vg1/swap_extra
+```
 
-- Inspection uses `lsblk`, `lsmod`, `modinfo`, `blkid`, `pvs`, `vgs`, `lvs`, `vgdisplay`, `lvdisplay`, `free -h`, and `swapon --show`.
-- Loop work uses `losetup`, `mount`, `umount`, and `partprobe`.
-- Disk-image creation uses `fallocate`, `dd`, and `time`.
-- Partitioning uses `fdisk` and `parted`.
-- LVM work uses `pvcreate`, `vgcreate`, `vgextend`, `lvcreate`, `lvextend`, and `vgchange`.
-- Swap work uses `mkswap`, `swapon`, and `swapoff`.
+The administrator must ensure that RAM can absorb the resident pages before disabling swap. `swapoff -a` disables every active swap area and can trigger severe memory pressure, so targeted operations provide safer control. Resizing an LVM swap volume requires `swapoff`, an LVM resize, a new `mkswap` signature, and `swapon`.
+## Verification and safe sequencing
+Storage administration works best as a repeated cycle of inspection, one controlled change, and verification. Each command views a different layer, so no single report proves that the whole configuration works.
 
-These commands cover most of the administrative path from a blank disk image to an online file system or swap device.
-## Administrative pattern
-A disciplined storage workflow follows a repeatable order.
+| Question | Useful command |
+| --- | --- |
+| Which block devices and dependencies exist? | `lsblk -o NAME,MAJ:MIN,SIZE,TYPE,FSTYPE,MOUNTPOINT` |
+| Which signatures and identifiers exist? | `blkid` or `lsblk -f` |
+| Which filesystems are mounted? | `findmnt` |
+| How much filesystem capacity remains? | `df -h` |
+| How much LVM capacity remains? | `pvs`, `vgs`, and `lvs` |
+| Which swap areas are active? | `swapon --show` and `free -h` |
 
-1. Inspect the current block layout.
-2. Create or attach storage.
-3. Partition only where partitioning adds value.
-4. Write the file system or swap header.
-5. Mount or enable the storage.
-6. Persist the configuration with stable identifiers.
-7. Extend capacity later at the VG and LV layers rather than redesigning the whole layout.
+Before creating a filesystem, partition table, physical volume, or swap signature, the administrator should confirm that the target has no required mount, holder, or existing signature. `lsblk`, `findmnt`, and `wipefs --no-act` support that check without writing to the device. After the change, the same reports should show the intended result.
 
-This pattern reduces ambiguity, keeps boot behaviour predictable, and makes later expansion far simpler.
-## Summary
-RHEL local storage administration begins with block devices and device drivers, then moves through loop devices, partitioning, file systems, persistent identifiers, LVM, and swap. `lsblk` reveals the storage tree. `losetup` turns files into block devices for labs and test workflows. `fdisk` and `parted` write partition tables. UUIDs stabilise mounts when device names move. `systemd` can recreate loop-backed storage during boot. LVM pools capacity into VGs, presents LVs as flexible block devices, and allows online growth with minimal disruption. Swap extends virtual memory and can live on partitions, files, or logical volumes.
+Configuration files require functional tests. `findmnt --verify` checks `fstab` syntax and references, while `mount -a` attempts eligible mounts. `systemctl status` and `journalctl -u` reveal service failures. A successful command exit does not prove that boot ordering works, so a disposable lab should include a reboot test after the administrator confirms that emergency access remains available.
+## End-to-end disposable lab
+A disposable lab can combine loop devices, GPT partitions, XFS, LVM, online growth, and swap without adding a physical disk. The administrator should run the exercise only on newly created image files and should never substitute a production device without a verified plan.
+### Create and attach the first image
+The first image supplies one ordinary filesystem partition and one LVM partition:
 
-The overall design favours abstraction without losing control. Files can stand in for disks. Partitions can document intent. UUIDs can outlast device renumbering. LVM can absorb new storage and grow live file systems. Taken together, those features make RHEL local storage both methodical and adaptable.
+```bash
+sudo mkdir -p /var/disks
+sudo fallocate -l 1GiB /var/disks/disk1
+sudo losetup --partscan /dev/loop1 /var/disks/disk1
+lsblk /dev/loop1
+```
+
+`fallocate` reserves the requested length quickly. The fixed `/dev/loop1` name simplifies later commands in this isolated lab. `losetup --find --show` provides safer allocation when no later configuration depends on a known name.
+### Partition the image
+The administrator creates a GPT, reserves the first 256 MiB for XFS, assigns the remaining capacity to LVM, and requests a fresh kernel scan:
+
+```bash
+sudo parted --script /dev/loop1 mklabel gpt
+sudo parted --script /dev/loop1 mkpart primary xfs 1MiB 256MiB
+sudo parted --script /dev/loop1 mkpart primary 256MiB 100%
+sudo parted --script /dev/loop1 set 2 lvm on
+sudo partprobe /dev/loop1
+sudo parted /dev/loop1 print
+lsblk /dev/loop1
+```
+
+The 1 MiB starting offset leaves room for GPT metadata and aligns the first partition. The second partition starts at the first partition's stated end. `parted print` and `lsblk` should show `/dev/loop1p1` and `/dev/loop1p2` before the exercise continues.
+### Create and mount XFS
+The first partition receives an XFS filesystem and a label:
+
+```bash
+sudo mkfs.xfs -L LABDATA /dev/loop1p1
+sudo mkdir -p /data
+sudo mount /dev/loop1p1 /data
+findmnt /data
+sudo blkid /dev/loop1p1
+```
+
+The `blkid` output supplies the filesystem UUID for a persistent `fstab` entry. The administrator should not add that entry until the systemd loop service can create `/dev/loop1p1` before `data.mount`. After both configurations exist, `systemctl daemon-reload`, `mount -a`, and `findmnt /data` test the dependency without a reboot.
+### Build LVM storage
+The second partition becomes a physical volume. A new volume group pools its extents, and a logical volume receives 300 MiB:
+
+```bash
+sudo pvcreate /dev/loop1p2
+sudo vgcreate labvg /dev/loop1p2
+sudo lvcreate -n files -L 300M labvg
+sudo mkfs.xfs /dev/labvg/files
+sudo mkdir -p /srv/files
+sudo mount /dev/labvg/files /srv/files
+sudo pvs
+sudo vgs
+sudo lvs
+```
+
+The three reports show the same storage at different layers. `pvs` associates `/dev/loop1p2` with `labvg`. `vgs` reports total and unallocated capacity. `lvs` reports the `files` logical volume. `lsblk` displays the full dependency tree from the loop device to the mounted device-mapper volume.
+
+An `fstab` entry can identify the logical volume by `/dev/mapper/labvg-files` or by its filesystem UUID. The loop service must still run before the generated mount unit because LVM cannot activate a physical volume that does not yet exist.
+### Add capacity and grow XFS
+A second image demonstrates volume-group growth. LVM can use the whole loop device as a physical volume, so this image does not require a partition table:
+
+```bash
+sudo fallocate -l 512MiB /var/disks/disk2
+sudo losetup /dev/loop2 /var/disks/disk2
+sudo pvcreate /dev/loop2
+sudo vgextend labvg /dev/loop2
+sudo lvextend --resizefs --size +256M labvg/files
+sudo vgs labvg
+sudo lvs labvg
+df -h /srv/files
+```
+
+`vgextend` adds the new physical volume to the pool. `lvextend` allocates another 256 MiB and grows XFS while it remains mounted. Existing files remain accessible throughout the operation. The reports should show a larger logical volume, a larger filesystem, and some free extents left in `labvg`.
+### Add and inspect swap
+The remaining volume-group capacity can supply a small swap logical volume:
+
+```bash
+sudo lvcreate -n swap_extra -L 128M labvg
+sudo mkswap /dev/labvg/swap_extra
+sudo swapon --priority 5 /dev/labvg/swap_extra
+swapon --show
+free -h
+```
+
+`swapon --show` confirms the device, size, usage, and priority. `free -h` reports aggregate swap capacity. A persistent entry can use the stable LVM path, but the boot dependency must ensure that both loop-backed physical volumes exist before LVM activation and swap activation.
+### Remove the lab in reverse order
+Safe removal unwinds consumers before providers. The administrator disables the added swap, unmounts both filesystems, removes any related `fstab` entries, reloads systemd, disables the loop service, and removes the LVM objects before detaching loop devices. Commands such as `lvremove`, `vgremove`, and `pvremove` erase LVM metadata and require exact targets.
+
+```bash
+sudo swapoff /dev/labvg/swap_extra
+sudo umount /srv/files
+sudo umount /data
+sudo lvremove labvg
+sudo vgremove labvg
+sudo pvremove /dev/loop1p2 /dev/loop2
+sudo losetup --detach /dev/loop2
+sudo losetup --detach /dev/loop1
+```
+
+`lvremove labvg` asks LVM to remove the logical volumes in that group. The administrator should review the prompt and stop if the listed objects differ from the lab. Backing image files remain ordinary files after loop detachment and can be removed only after the administrator confirms that no required data remains.

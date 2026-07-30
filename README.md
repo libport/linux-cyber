@@ -41,7 +41,7 @@ Cybersecurity is the practice of protecting systems, networks, and data from una
 - Trust in Computer Systems and the Cloud, by Mike Bursell. ([publisher page](https://www.wiley.com/en-us/trust-in-computer-systems-and-the-cloud-p-9781119695158))
 - Intelligent Continuous Security, by Marc Hornbeek. ([publisher page](https://www.oreilly.com/library/view/intelligent-continuous-security/9798341615908/))
 ## Custom Portfolio Projects
-- [Ansible CIS Benchmarking System](../../../ansible-linux-audit)
+- [Ansible CIS-based Auditing System for Debian OSes](../../../ansible-linux-audit)
 
 > [!WARNING]
 > Solutions to labs and projects are my own and validated as correct with tests, but are not the solutions provided by the courses and may not be optimal solutions. Solutions provided by the courses have not been provided in the notes.

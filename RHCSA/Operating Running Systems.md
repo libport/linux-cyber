@@ -1,204 +1,168 @@
 # Operating Running Systems
 > [!NOTE]
 > A practical guide to operating RHEL systems safely through controlled shutdowns, root password recovery, systemd service management, evidence-based performance tuning, and comprehensive logging.
-# Operating Running Systems on RHEL 8
-Red Hat Enterprise Linux 8 uses `systemd` to control booting, services, targets, shutdown, and the system journal. Administrators also rely on standard Linux tools to inspect processes, adjust scheduling influence, apply TuneD profiles, manage traditional logs, and transfer files securely. Safe administration requires planned changes, verified commands, suitable privileges, and access to a test or recovery console.
-## Shutting down and restarting systems
-### Planned shutdowns
-The `shutdown` command suits planned maintenance because it can schedule an action and send a wall message to logged-in users. It accepts an absolute 24-hour time, a delay in minutes, or `now`.
 
-| Action | Command |
-| --- | --- |
-| Power off at 17:00 | `sudo shutdown --poweroff 17:00 "Maintenance begins at 17:00"` |
-| Power off in 20 minutes | `sudo shutdown --poweroff +20 "Maintenance begins in 20 minutes"` |
-| Reboot in 10 minutes | `sudo shutdown --reboot +10 "Kernel update requires a restart"` |
-| Cancel a scheduled shutdown | `sudo shutdown -c` |
+Red Hat Enterprise Linux 8 uses systemd to coordinate booting, service management, targets, shutdown, and logging. Effective administration depends on controlled maintenance, accurate service-state interpretation, evidence-based performance analysis, and durable logs. Administrative commands require root privileges, usually obtained through `sudo`. An administrator should test disruptive procedures on a lab system before applying them to production.
+## Controlled shutdown and user access
+A clean shutdown lets applications stop, file systems flush pending writes, and users save their work. The `shutdown` command suits shared systems because it can schedule the event, warn logged-in users, and cancel the operation. Direct `systemctl`, `reboot`, and `poweroff` commands suit controlled situations in which no warning period is required.
 
-RHEL creates `/run/nologin` five minutes before a scheduled shutdown. Login programs that honour this file reject new non-root sessions, while existing sessions continue. The shutdown process removes the file if an administrator cancels the event.
+On RHEL 8, the familiar `reboot` and `poweroff` commands invoke systemd-compatible operations. Their short syntax does not provide the scheduling controls that make `shutdown` useful on a multi-user server. Before any planned interruption, an administrator should identify logged-in users with commands such as `who` or `w`, check active remote sessions, inspect critical jobs, and confirm that clustered or replicated applications can tolerate the change. The maintenance notice should state the reason, start time, expected duration, and contact path.
 
-An administrator can independently block new non-root logins during maintenance by creating `/etc/nologin`. Text inside the file can explain the restriction to users. The administrator must remove the file after maintenance.
+| Action | Command | Effect |
+| --- | --- | --- |
+| Power off immediately | `sudo systemctl poweroff` | Stops services and powers off the machine |
+| Reboot immediately | `sudo systemctl reboot` | Stops services, restarts the machine, and gives users no useful lead time |
+| Halt without powering off | `sudo systemctl halt` | Stops the operating system but may leave power on |
+| Power off in 20 minutes | `sudo shutdown --poweroff +20 "Maintenance begins in 20 minutes"` | Schedules a power-off and broadcasts the message |
+| Reboot at 17:00 | `sudo shutdown --reboot 17:00 "Planned restart at 17:00"` | Schedules a restart using 24-hour time |
+| Cancel a scheduled shutdown | `sudo shutdown -c` | Cancels the pending event |
 
-```bash
-sudo sh -c 'printf "%s\n" "Maintenance in progress" > /etc/nologin'
-sudo rm /etc/nologin
+The keyword `now` represents `+0`. An immediate action still follows systemd's orderly stop sequence, but users receive no time to finish work. Administrators should reserve it for emergencies, isolated lab systems, or maintenance windows whose communications have already finished.
+
+Five minutes before a scheduled shutdown, systemd creates `/run/nologin`. Login services that honour the nologin mechanism then reject new non-root sessions. Existing sessions continue, so administrators must still monitor active users and applications. Cancelling the shutdown removes the runtime file.
+
+An administrator can block new non-root logins without scheduling a shutdown by creating `/etc/nologin`. The file may contain a maintenance message:
+
+```text
+System maintenance is in progress. New logins are temporarily unavailable.
 ```
 
-Not every application checks `nologin`, so administrators must confirm the behaviour of each remote-access service. They should also preserve at least one authorised administrative session before restricting access.
-### Immediate power actions
-`systemctl poweroff`, `systemctl reboot`, `poweroff`, and `reboot` request an immediate action through `systemd`. `systemd` sends a wall message by default. These commands still provide no advance interval in which users can finish work, so `shutdown` remains the safer choice for planned multi-user maintenance. The `--no-wall` option suppresses the broadcast when an operational procedure specifically requires that behaviour.
+The administrator removes `/etc/nologin` after maintenance. This control does not disconnect existing users, and its effect depends on the login service's PAM configuration. A maintenance plan should therefore combine user communication, session checks, application-specific drain procedures, and a tested recovery path.
 
-```bash
-sudo systemctl reboot
-sudo systemctl poweroff
-```
+After the system returns, the administrator should confirm successful boot completion, service health, storage availability, network reachability, and application readiness before reopening access. `systemctl --failed`, `systemctl is-system-running`, and current-boot journal records provide useful early checks. Removing a manually created `/etc/nologin` should follow those checks rather than precede them.
+## Recovering a lost root password
+Root-password recovery requires console access and control of the boot process. That access carries the power to bypass normal authentication, so production systems should protect firmware settings, boot media, GRUB configuration, console management, and encrypted storage. Full-disk encryption can still require an independent unlock secret before the recovery environment can reach the root file system.
 
-Administrators should check for interactive users, active jobs, mounted remote storage, databases, and other stateful applications before any power action. Commands such as `who`, `w`, `loginctl list-sessions`, and service-specific status checks help establish whether shutdown can proceed safely.
+System firmware starts the boot loader. GRUB then loads the Linux kernel and an initial RAM file system, or initramfs. The initramfs supplies early user space, storage drivers, and tools needed to locate and mount the installed root file system. The `rd.break` kernel parameter stops this sequence before control passes to the installed system.
 
-A controlled maintenance sequence usually starts with a change window and a rollback plan. The administrator announces the work, checks current activity, schedules the shutdown, watches for objections, and cancels the event if the agreed conditions change. Immediately before the action, the administrator confirms that backups and replication have reached the required state. After the restart, the administrator verifies time synchronisation, network connectivity, mounted file systems, failed units, application health, and monitoring.
+SELinux applies policy-based mandatory access control through security labels. A label commonly includes user, role, type, and level fields. Type enforcement controls most routine access decisions. For example, `/etc/shadow` normally carries a type that permits authorised authentication processes to read or update it. Standard ownership, mode bits, and access control lists continue to apply, but SELinux adds an independent policy decision that also constrains root processes.
 
-```bash
-systemctl --failed
-findmnt
-ip address show
-timedatectl
-```
+`ls -Z /etc/shadow` displays the file's current SELinux context. A wrong type can prevent `passwd`, `sudo`, SSH, and other authentication paths from using the password database even when conventional permissions appear correct. This failure demonstrates why a password reset must address both file contents and security labelling. Permissive mode records policy violations but allows the associated operations, while enforcing mode records and blocks denied access.
 
-`shutdown --halt` stops the operating system but does not necessarily remove power. `shutdown --poweroff` stops the system and requests power removal. `shutdown --reboot` restarts it. Explicit long options improve the readability of operational records, even though shorter forms such as `-H`, `-P`, and `-r` remain available.
-## Recovering a root password
-A root-password reset requires authorised console access. A remote shell does not suffice because the administrator must interrupt GRUB before the operating system starts. A hypervisor console can provide the required access for a virtual machine. Full-disk encryption can still require the storage-unlock credential during boot.
-
-If an administrator can sign in through another account with `sudo` rights, the simplest recovery path avoids GRUB:
-
-```bash
-sudo passwd root
-```
-
-If no privileged account remains available, Red Hat documents an `rd.break` recovery procedure:
-1. The administrator reboots the system and presses `e` at the GRUB menu.
-2. The administrator appends `rd.break` to the end of the kernel line that begins with `linux`.
-3. `Ctrl+x` starts the modified boot entry and stops in the initial RAM file system at a `switch_root` prompt.
+The following RHEL 8 procedure resets the password and requests a complete SELinux relabel:
+1. The administrator restarts the host and presses `e` on the GRUB entry that should boot.
+2. The administrator appends `rd.break` to the end of the `linux` line.
+3. The administrator presses `Ctrl+x` to boot into the initramfs break environment.
 4. The administrator remounts the installed root file system as writable.
-5. The administrator changes root into the installed system and sets a new password.
-6. The administrator requests an SELinux relabel on the next boot.
-7. Two `exit` commands leave the changed root and continue the boot process.
+5. The administrator changes the apparent root directory to the installed system.
+6. The administrator sets a new root password.
+7. The administrator creates `/.autorelabel` so SELinux relabels files during the next boot.
+8. The administrator remounts the file system as read-only and exits the changed-root environment.
+9. The administrator exits the initramfs shell and allows the system to continue booting.
+
+The corresponding commands are:
 
 ```bash
 mount -o remount,rw /sysroot
 chroot /sysroot
-passwd
+passwd root
 touch /.autorelabel
+mount -o remount,ro /
 exit
 exit
 ```
 
-The SELinux relabel can take a long time on a large file system, and the system can reboot again when relabelling finishes. The administrator should wait for completion and then verify the new credential.
+The relabel can take substantial time, and the system restarts when it finishes. Interrupting that process can leave labels inconsistent.
 
-An alternative recovery technique adds `enforcing=0`, changes the password, runs `restorecon` on `/etc/shadow` after boot, and restores enforcing mode. That technique can work in a controlled environment, but Red Hat's current procedure requests a full automatic relabel. The full relabel reduces the risk that the recovery operation leaves another changed file with an incorrect SELinux label.
+RHEL 8 also supports a targeted alternative that avoids a full relabel. The administrator appends both `rd.break` and `enforcing=0`, resets the password, completes the boot in permissive mode, restores the policy-defined label on `/etc/shadow`, and re-enables enforcement:
 
-The edited GRUB entry normally applies to that boot only. The administrator should not save `rd.break` as a permanent kernel argument. Before leaving the recovery environment, the administrator should confirm that `passwd` reported success and that `/.autorelabel` exists inside the changed root. An unexpected mount layout, read-only storage error, or failed password update requires investigation before the administrator continues booting.
+```bash
+restorecon /etc/shadow
+setenforce 1
+getenforce
+```
 
-Physical or virtual console access can defeat an operating-system password when GRUB permits kernel-line editing. Organisations should therefore control console access, protect bootloader settings where required, encrypt sensitive storage, and audit recovery activity.
-## Managing services with systemd
-### Units and service state
-`systemd` runs as process ID 1 and manages resources through units. Common unit types include services, sockets, timers, paths, mounts, and targets. The `systemctl` command inspects and changes their state.
+`getenforce` should report `Enforcing`. This method requires disciplined execution because the system temporarily logs SELinux denials without blocking them. A full relabel provides the safer recovery path when other labels may also have changed.
 
-The following commands distinguish current runtime state from installed unit-file state:
+The `chcon` command assigns a label directly, but that change may conflict with the persistent policy and disappear during relabelling. The `restorecon` command reads the policy's expected context and restores it. Administrators should use `restorecon` for routine recovery unless a deliberate policy change requires tools such as `semanage fcontext`.
+
+Recovery should end with authentication and audit checks. The administrator should verify local root access from the console, confirm that an authorised `sudo` user can elevate privileges, review current-boot journal entries for SELinux or authentication failures, and replace any temporary password with a secret that meets organisational policy. A recovered host also warrants investigation when the password loss or access failure lacks a clear administrative explanation.
+## Managing services and systemd units
+Systemd runs as process ID 1 and manages resources as units. Common unit types include services, sockets, targets, timers, mounts, and devices. `systemctl` provides the principal administrative interface.
+
+A service has separate runtime and boot states. An active service currently runs. An enabled service participates in a dependency path that normally starts it during boot or another activation event. A service can therefore be active but disabled, or inactive but enabled. Administrators should check both states instead of treating them as one.
+
+| Purpose | Command |
+| --- | --- |
+| Show detailed status and recent journal entries | `systemctl status chronyd.service` |
+| Test the runtime state | `systemctl is-active chronyd.service` |
+| Test boot enablement | `systemctl is-enabled chronyd.service` |
+| Start or stop now | `sudo systemctl start chronyd.service` or `sudo systemctl stop chronyd.service` |
+| Restart | `sudo systemctl restart chronyd.service` |
+| Reload application configuration | `sudo systemctl reload chronyd.service` |
+| Enable for boot | `sudo systemctl enable chronyd.service` |
+| Enable and start now | `sudo systemctl enable --now chronyd.service` |
+| Disable for boot | `sudo systemctl disable chronyd.service` |
+| Disable and stop now | `sudo systemctl disable --now chronyd.service` |
+
+The `--now` option adds an immediate runtime action to enable or disable. Enabling alone does not start a service, and starting alone does not enable it for a later boot. A service may reject `reload` when it lacks reload support. In that case, an administrator can use `reload-or-restart` after checking the operational impact.
+
+`systemctl status` reports the loaded unit path, enablement state, active state, main process, control group, and recent journal entries. It provides a strong first diagnostic, but it does not replace deeper log review. The following commands distinguish loaded runtime units from installed unit files:
 
 ```bash
 systemctl list-units --type=service
-systemctl list-units --type=service --state=running
+systemctl list-units --type=service --all
 systemctl list-unit-files --type=service
-systemctl status chronyd.service
-systemctl is-active chronyd.service
-systemctl is-enabled chronyd.service
+systemctl --failed
 ```
 
-`list-units` shows units that `systemd` has loaded. `list-unit-files` shows installed unit files and their enablement state, including disabled units that are not loaded. Running `systemctl status` without a unit shows an overall system status and a unit tree. It does not serve as the precise command for listing every running service.
+`list-units` shows units that systemd has loaded, and it shows active units by default. The `--all` option adds loaded inactive units. `list-unit-files` shows installed unit files and their enablement states. `systemctl --failed` narrows the review to failed units.
 
-Starting and enabling perform different operations. `start` activates a unit in the current boot. `enable` creates the links or dependencies that start it during a later boot, but does not normally start it immediately. The `--now` option combines the runtime and boot-time operations.
+Systemd can operate on several explicitly named units in one command. An administrator may restart related services together after checking their dependencies and combined impact:
 
-| Required change | Command |
+```bash
+sudo systemctl restart crond.service chronyd.service
+```
+
+Quoted glob patterns can match loaded units, but explicit names reduce accidental scope and make change records easier to review. Unit names may omit `.service` when the service type is unambiguous, although the complete name improves precision in scripts and documentation.
+
+A failed start requires more than repeated restarts. The administrator should read the full status, inspect `journalctl -u UNIT`, validate the application's own configuration, check listening ports, review dependencies, and confirm permissions and SELinux labels. `systemctl reset-failed UNIT` clears the recorded failed state after the cause has been fixed. It does not repair the underlying service.
+### Unit files and administrative overrides
+Systemd reads unit definitions from locations with defined precedence:
+
+| Directory | Role |
 | --- | --- |
-| Start now | `sudo systemctl start atd.service` |
-| Stop now | `sudo systemctl stop atd.service` |
-| Restart now | `sudo systemctl restart atd.service` |
-| Reload supported configuration | `sudo systemctl reload service-name.service` |
-| Enable for boot | `sudo systemctl enable atd.service` |
-| Enable and start | `sudo systemctl enable --now atd.service` |
-| Disable for boot | `sudo systemctl disable atd.service` |
-| Disable and stop | `sudo systemctl disable --now atd.service` |
+| `/usr/lib/systemd/system/` | Vendor unit files installed by packages |
+| `/run/systemd/system/` | Runtime units and overrides that disappear at reboot |
+| `/etc/systemd/system/` | Persistent local units, links, and overrides with highest precedence |
 
-`systemctl status` combines state, recent journal entries, the main process ID, resource information, and the unit-file path. A green or active state does not prove that an application works end to end. An administrator must still test the service interface and inspect its logs.
+Administrators should not edit vendor files in `/usr/lib/systemd/system/` because package updates can replace them. `systemctl cat atd.service` displays the main file and any drop-ins in the order systemd applies them. `sudo systemctl edit atd.service` creates a local drop-in, usually `/etc/systemd/system/atd.service.d/override.conf`. A drop-in records only the settings that differ from the vendor definition and usually survives upgrades cleanly.
 
-Unit states describe different dimensions. `loaded` means that `systemd` found and parsed the definition. `active`, `inactive`, and `failed` describe runtime state. `enabled`, `disabled`, `static`, and `masked` describe unit-file enablement. A static unit has no normal installation instructions of its own and usually starts as another unit's dependency. It does not indicate a fault.
-
-When a start operation fails, the administrator can review the failure and the corresponding journal before resetting the recorded failed state:
+`sudo systemctl edit --full atd.service` creates a complete replacement for the main unit. That approach can be necessary for extensive changes, but it also copies vendor settings that may become stale. After `systemctl edit` closes successfully, systemd reloads its configuration automatically. An administrator who changes unit files by another editor must run:
 
 ```bash
-systemctl status example.service
-journalctl -b -u example.service
-systemctl show example.service -p Result -p ExecMainStatus
-sudo systemctl reset-failed example.service
+sudo systemctl daemon-reload
 ```
 
-`reset-failed` clears the recorded state and restart counters. It does not correct the underlying configuration, dependency, permission, resource, or application error.
+The administrator then restarts or reloads the affected service when the changed directives require a new process state.
 
-`systemctl` accepts several unit names in one command:
+Masking provides a stronger control than disabling. `systemctl mask` creates a link to `/dev/null`, so manual starts and dependency-based starts fail until the unit is unmasked. Masking without `--now` does not guarantee that an already active service stops.
 
 ```bash
-sudo systemctl restart chronyd.service crond.service
+sudo systemctl mask --now atd.service
+sudo systemctl unmask atd.service
 ```
 
-Shell wildcards can expand more broadly than intended. Administrators should inspect the matching units before applying a state-changing command to a pattern.
+Administrators should inspect dependencies before masking a shared service. A mask can prevent another unit from starting and can cause a wider outage.
 
-Dependencies and ordering shape service behaviour. Directives such as `Requires=`, `Wants=`, `After=`, and `Before=` express different relationships. `Requires=` adds a stronger activation dependency, while `Wants=` adds a weaker one. `After=` and `Before=` control ordering but do not independently pull another unit into the transaction. Administrators should inspect the effective dependency graph rather than assume that ordering also causes activation.
-
-```bash
-systemctl list-dependencies example.service
-systemctl show example.service -p Requires -p Wants -p After
-```
+Timers offer another important unit type. A timer can activate a service once or repeatedly and can replace many uses of `cron` or `at` while retaining systemd dependencies, logging, and state inspection. `systemctl list-timers --all` shows scheduled and elapsed activations. The corresponding service performs the work, while the timer defines when systemd starts it.
 ### Socket activation
-A socket unit can listen for connections and start its associated service on demand. For example, Cockpit commonly uses `cockpit.socket` on TCP port 9090. `systemd` holds the listening socket, then activates the web service when a client connects. This design can reduce the resources consumed by an idle service.
+A socket unit lets systemd open a listening socket before the associated service runs. When traffic arrives, systemd activates the service and passes the connection or listening socket to it. This design can defer process startup and reduce idle resource use.
+
+RHEL 8 Cockpit provides a common example:
 
 ```bash
+sudo dnf install cockpit
 sudo systemctl enable --now cockpit.socket
 systemctl status cockpit.socket
 sudo ss -lntp
 ```
 
-Socket activation does not remove the need for firewall rules, SELinux policy, authentication, or application security. An open local socket also does not prove that a remote client can reach the service.
+Systemd initially owns the listening socket on TCP port 9090. A connection activates Cockpit's service components. Socket activation does not suit every daemon, and administrators should enable the unit type documented by the package rather than assuming that a `.service` and `.socket` unit behave interchangeably.
+### Targets and rescue states
+Targets group units and provide synchronisation points during boot. They replace much of the operational role that SysV runlevels once served, although the mapping is an analogy rather than an identity. `multi-user.target` provides a non-graphical multi-user state, `graphical.target` adds a graphical login, `rescue.target` provides a maintenance shell with a limited set of services, and `emergency.target` provides a smaller environment with the root file system mounted read-only.
 
-Timer units provide another activation method. They can replace many recurring cron tasks and can link their execution history to the journal. `systemctl list-timers` shows the next and previous activation times. A persistent timer can catch up after downtime when its unit sets `Persistent=true`, subject to the timer's definition.
-
-```bash
-systemctl list-timers --all
-systemctl status timer-name.timer
-journalctl -u timer-name.service
-```
-### Unit files and overrides
-RHEL 8 reads system unit files from directories with a defined precedence:
-
-| Directory | Purpose and precedence |
-| --- | --- |
-| `/usr/lib/systemd/system` | Unit files supplied by installed packages |
-| `/run/systemd/system` | Runtime units and overrides, which take precedence over package files |
-| `/etc/systemd/system` | Administrator-managed units and overrides, which take highest precedence |
-
-Administrators should not edit package files under `/usr/lib/systemd/system` because a package update can replace them. `systemctl cat` shows the fragments that form the effective unit:
-
-```bash
-systemctl cat atd.service
-```
-
-`systemctl edit atd.service` normally creates a drop-in override under `/etc/systemd/system/atd.service.d/`. A drop-in changes only the required directives and leaves the vendor unit intact. `systemctl edit --full atd.service` copies the complete unit into `/etc`, which replaces the vendor definition. A full replacement demands more maintenance because later vendor changes do not flow into the copied file.
-
-After a manual unit-file change, `systemctl daemon-reload` makes the manager reread unit definitions. The administrator must then restart or reload the affected service when its changed settings require it.
-
-```bash
-sudo systemctl edit atd.service
-sudo systemctl daemon-reload
-sudo systemctl restart atd.service
-systemctl cat atd.service
-```
-
-An empty assignment in a drop-in can reset some list-valued directives before the override supplies replacement values. Unit-specific manual pages define which directives support that pattern. `systemd-delta` identifies local overrides, and `systemd-analyze verify` can expose some unit-file errors before activation.
-
-```bash
-systemd-delta
-systemd-analyze verify /etc/systemd/system/example.service
-```
-### Masking units
-Disabling a unit removes its boot-time enablement but still permits manual or dependency-driven activation. Masking links the unit name to `/dev/null`, which blocks activation by normal means. `mask` alone does not stop an already running service. `mask --now` both masks and stops it.
-
-```bash
-sudo systemctl mask --now atd.service
-systemctl is-enabled atd.service
-sudo systemctl unmask atd.service
-```
-
-Masking can prevent conflicting services from starting, but it can also block a required dependency. Administrators should record the reason for a mask and confirm its effect before using it on a production system.
-### Targets and recovery modes
-Targets group units and represent system states. `multi-user.target` broadly corresponds to the old non-graphical runlevel 3, while `graphical.target` broadly corresponds to runlevel 5. The relationship remains an approximation because targets can express dependencies more flexibly than SysV runlevels.
+The administrator can inspect and change the default target:
 
 ```bash
 systemctl get-default
@@ -206,185 +170,162 @@ systemctl list-units --type=target
 sudo systemctl set-default multi-user.target
 ```
 
-`systemctl isolate target-name.target` starts units required by the selected target and stops units that the target does not require. Isolation can terminate services and user sessions, so an administrator must confirm that the unit allows isolation and that console access remains available.
+`set-default` changes the target for later boots but does not change the current state. `systemctl isolate TARGET` changes the current state by starting the target and its dependencies, then stopping units that the target does not require. This operation can terminate services and sessions, so administrators should use it only with console access and a recovery plan.
 
-`systemctl rescue` changes the running system to rescue mode and broadcasts a message. `emergency.target` provides a smaller environment with the root file system mounted read-only. An administrator can select a one-off boot target by appending a parameter such as `systemd.unit=rescue.target` to the GRUB kernel line. Changing the kernel line for one boot does not alter the saved default target.
+Only targets whose unit files permit isolation can accept this operation. Moving from `graphical.target` to `multi-user.target` normally removes the graphical session while retaining multi-user services. Moving to `rescue.target` removes far more. The older runlevel numbers remain useful as historical comparisons, with multi-user resembling runlevel 3, graphical resembling runlevel 5, and rescue resembling runlevel 1, but systemd dependencies provide a more flexible model than a single numeric level.
 
-Rescue mode starts a limited base system and normally mounts local file systems, while emergency mode starts fewer units and gives the administrator an earlier repair environment. Network access may disappear in either mode. A remote-only administrator should not isolate either target without a tested out-of-band console.
-## Observing performance and managing processes
-### Establishing a baseline
-Performance data gains meaning when administrators compare it with the same system under a known healthy workload. A useful baseline records logical CPU count, memory, swap, storage latency, network throughput, load average, and application response time. A single command rarely identifies the cause of a slowdown.
+At the GRUB editor, the temporary kernel argument `systemd.unit=rescue.target` selects rescue mode for one boot. The rescue environment normally mounts local file systems, starts essential services, omits network activation, and asks for the root password. `systemctl rescue` changes a running system to rescue mode and warns logged-in users. `systemctl isolate multi-user.target` can return a repaired system to its normal non-graphical state when the repair leaves systemd functional.
+## Observing and tuning performance
+Performance work begins with a baseline. Administrators should record normal load, response time, memory use, I/O behaviour, user count, and service demand before changing priorities or tuning profiles. A single measurement can reveal a symptom, but comparisons across representative periods reveal whether the system has changed.
+### Uptime, load average, and top
+`uptime` displays the current time, elapsed uptime, logged-in user count, and load averages over approximately 1, 5, and 15 minutes. Linux load average counts tasks that run on a CPU, wait for CPU time, or wait in uninterruptible states such as some I/O waits. It does not report CPU utilisation as a percentage.
 
-`uptime` reports the current time, elapsed time since boot, logged-in user count, and load averages over approximately 1, 5, and 15 minutes:
+The load values are not normalised for processor count. A sustained load near the number of online logical CPUs may indicate that all logical CPUs have work available, but blocked I/O can also raise the load. Consequently, dividing load by CPU count does not produce an exact utilisation percentage.
+
+The following commands establish the available CPU topology:
 
 ```bash
-uptime
 nproc
 lscpu
+lscpu -e
 ```
 
-Load average does not equal CPU utilisation. It represents the average number of tasks that are runnable or waiting in uninterruptible sleep, commonly for input or output. A high value can therefore reflect CPU demand, blocked storage activity, or both.
+`nproc` reports processing units available to the current process. In `lscpu`, `CPU(s)` reports logical CPUs. `Core(s) per socket`, `Socket(s)`, and `Thread(s) per core` describe topology and should not be added together. Virtual machines report the topology exposed to the guest, which can differ from the host.
 
-Load averages are not normalised by CPU count. Comparing load with the number of online logical CPUs gives a rough indication of scheduling pressure, not a percentage of CPU use. On a system with four online logical CPUs, a sustained load near four suggests roughly one runnable or uninterruptible task per logical CPU. The system can still show idle CPU time if blocked tasks inflate the load.
+`top` combines load averages with task, CPU, memory, and per-process data. Its default process ordering highlights CPU consumers. Administrators should also examine I/O wait, memory pressure, swap activity, process state, and elapsed trends. A high load with idle CPU time can point towards blocked I/O rather than processor saturation.
 
-The `CPU(s)` field in `lscpu` already reports the total number of logical CPUs. It must not be multiplied by `Core(s) per socket`. A report of `CPU(s): 2` means two logical CPUs, even if another field reports two cores per socket. `nproc` provides a direct count of processing units available to the current process.
-### Using top and process listings
-`top` displays load averages, task states, CPU-use categories, memory, swap, and a refreshable process table. Its `%Cpu(s)` line measures CPU time directly and therefore complements, rather than duplicates, load average. High `wa` can indicate time waiting for input or output, while high `us` or `sy` indicates user-space or kernel CPU work.
+The first line of `top` echoes uptime and load data. Its task summary separates running, sleeping, stopped, and zombie tasks. The CPU summary distinguishes user time, system time, nice-adjusted work, idle time, I/O wait, hardware and software interrupt handling, and virtual-machine steal time. The memory summary shows physical memory and swap, but available memory provides a more useful capacity signal than the simple free value because Linux uses otherwise idle memory for caches.
 
-Memory interpretation also requires care. Linux uses otherwise idle memory for caches, so a small `free` value does not alone indicate pressure. The `available` estimate, swap activity, reclaim behaviour, and application latency provide better evidence. `free -h`, `vmstat 1`, and `pidstat` can extend a first `top` inspection. Sustained swapping, blocked tasks, or increasing input or output wait calls for storage and memory analysis rather than an immediate CPU-priority change.
+A diagnostic should correlate these fields. High user CPU time and a busy process list suggest computational demand. High system time can point towards kernel or system-call overhead. High I/O wait with blocked tasks can point towards storage latency. Sustained swap activity and low available memory can indicate pressure. Measurements from `vmstat`, `iostat`, or Performance Co-Pilot can extend the investigation when `top` identifies the direction but not the cause.
+### Shell jobs and processes
+Appending `&` starts a shell command in the background. The `jobs` command reports jobs associated with the current shell, not every process on the host. `fg` returns a selected job to the foreground, and `bg` resumes a stopped job in the background.
 
-Process state letters help separate causes. `R` identifies running or runnable work, `S` identifies interruptible sleep, `D` usually identifies uninterruptible sleep, `T` identifies stopped work, and `Z` identifies a zombie whose parent has not collected its exit status. Killing a zombie has no effect because the process has already exited. The administrator must address its parent or the parent application's defect.
-
-`ps` provides a snapshot. Explicit output fields make investigations easier to repeat:
+System-wide process tools operate independently of the shell's job table:
 
 ```bash
-ps -eo pid,ppid,user,stat,ni,pri,%cpu,%mem,comm,args --sort=-%cpu
-ps -p 1234 -o pid,ppid,user,stat,ni,pri,etime,cmd
-```
-
-`pgrep` searches process names by default, and `pgrep -f` searches full command lines. Exact matching avoids accidentally selecting similarly named processes.
-
-```bash
+ps -ef
+ps -eo pid,ppid,user,ni,pri,stat,pcpu,pmem,comm
 pgrep -a sshd
-pgrep -x sleep
-pgrep -af 'application --worker'
+pgrep -f 'complete command pattern'
 ```
 
-`pkill` sends a signal to processes selected by similar criteria. Administrators should inspect matches before signalling them.
+`pgrep` normally matches process names. The `-f` option matches the full command line. Administrators should inspect matches before using `pkill`, especially when a short pattern could select unrelated processes.
+### Niceness and signals
+Normal Linux processes use nice values from -20 to 19. Lower values give a process more favourable scheduling weight, and higher values give it less. The default is usually 0. `nice` starts a command with an adjustment, while `renice` changes the value of a running process:
 
 ```bash
-pgrep -a -x application
-pkill -TERM -x application
+nice -n 10 long-running-command &
+renice -n 15 -p 12345
 ```
 
-Broad name matches can affect unrelated users or service instances. Where systemd owns the workload, `systemctl stop unit-name.service` gives the service manager a coherent view of the change and follows the unit's configured stop behaviour.
-### Jobs and signals
-Appending `&` starts a shell job in the background. `jobs` displays jobs owned by the current shell, `fg` returns a job to the foreground, and `bg` resumes a stopped job in the background. These shell jobs differ from persistent system services and can end when the session closes.
+An unprivileged user can normally increase the nice value of an owned process, thereby reducing its CPU preference. Lowering the nice value usually requires privilege, although resource limits can grant controlled exceptions. Niceness influences CPU scheduling among applicable processes. It does not assign a percentage of CPU time, and the `PRI` field from `ps` does not show a process's position in a fixed queue.
+
+Niceness affects normal scheduling competition rather than every scheduling class. Real-time policies follow different rules and can starve ordinary work when configured badly. Administrators should adjust priority only after identifying the process, owner, workload objective, and expected effect. A priority change that hides overload without addressing capacity, faulty code, or blocked I/O can delay a proper repair.
+
+`kill` sends a signal to a process ID, and `pkill` selects processes by a name or pattern. Both commands send `SIGTERM` by default. `SIGTERM` requests an orderly exit and lets a program handle cleanup. If a process cannot or will not exit, `SIGKILL` forces termination:
 
 ```bash
-sleep 1000 &
-jobs
-fg %1
+kill 12345
+pkill -x sleep
+kill -KILL 12345
 ```
 
-`kill` sends `SIGTERM` by default. This signal asks a process to shut down cleanly and gives it an opportunity to flush data and release resources. If the process does not respond, the administrator should inspect its state, dependencies, and logs before escalating. `SIGKILL` stops a process without cleanup and can cause lost work or application corruption.
-
-```bash
-kill -TERM 1234
-kill -KILL 1234
-kill -l
-```
-
-Other signals serve application-specific purposes. `SIGHUP` often requests a configuration reload or log-file reopen, but each application defines its own response. `SIGSTOP` pauses a process and `SIGCONT` resumes it. Administrators should use the service's documented interface instead of assuming that a traditional signal has a universal meaning.
-### Niceness and scheduling influence
-For normal time-sharing processes, niceness ranges from -20 to 19. A lower value gives a process more favourable treatment, while a higher value gives it less favourable treatment relative to competing work. Niceness influences scheduler weighting. It does not place a process at a numbered position in a fixed queue, and the `PRI` value shown by `ps` should not be described as an ordinal queue position.
-
-`nice` starts a command with an adjusted value. `renice` changes an existing process:
-
-```bash
-nice -n 10 long-running-command
-renice -n 15 -p 1234
-ps -p 1234 -o pid,ni,pri,cmd
-```
-
-An unprivileged user can normally increase the nice value of that user's own processes, which lowers their scheduling preference. Lowering the nice value usually requires the appropriate privilege or resource limit. Niceness cannot guarantee a CPU share or impose a hard CPU cap. Administrators should use `systemd` resource controls or control groups when a workload requires enforceable allocation.
+`SIGKILL` cannot be caught or ignored, so it can leave temporary files, incomplete transactions, or other inconsistent state. Administrators should verify the PID, inspect the process state, try `SIGTERM`, and allow reasonable cleanup time before escalating.
 ### TuneD profiles
-TuneD applies collections of settings for workload classes such as virtual guests, virtual hosts, desktops, throughput-oriented servers, and latency-sensitive systems.
+TuneD applies coordinated settings for workloads such as virtual guests, virtual hosts, low-latency services, high-throughput servers, desktops, and power-saving systems. Profiles provide a tested starting point, but they do not replace workload measurement.
 
 ```bash
+tuned-adm active
 tuned-adm recommend
 tuned-adm list
-tuned-adm active
 sudo tuned-adm profile virtual-guest
-tuned-adm verify
 ```
 
-The recommended profile provides a starting point, not a substitute for measurements. Administrators should record the old profile, apply the new profile in a controlled window, verify it, and compare workload results. Some profile settings apply immediately, while settings that change boot parameters require a reboot before they take full effect.
+`tuned-adm recommend` identifies a profile based on detected hardware and role. `tuned-adm profile` activates a selected profile persistently. An administrator should compare measured performance before and after a change, confirm that the profile matches the workload, and return to the recommended profile when an experiment provides no benefit.
+## Logging, rotation, and secure transfer
+RHEL 8 combines `systemd-journald` with Rsyslog. Journald collects kernel messages, early boot output, service standard output, service errors, and syslog events. Rsyslog reads relevant journal events, filters them by rules, writes traditional files under `/var/log`, and can forward records to remote systems.
 
-TuneD can change several subsystems at once. A profile change can therefore improve one workload while increasing power use or latency elsewhere. `tuned-adm verify` confirms that current settings match the selected profile, but application-level measurements determine whether the profile suits the host.
-## Diagnosing services and managing logs
-### A focused diagnostic sequence
-An efficient service investigation moves from state to evidence:
-1. The administrator confirms the unit name and checks `systemctl status unit-name`.
-2. The administrator checks whether the unit is active, failed, enabled, or masked.
-3. The administrator reviews the unit's journal with an appropriate time or boot filter.
-4. The administrator checks listening sockets, dependent services, configuration syntax, permissions, storage, and network controls.
-5. The administrator changes one justified condition, tests the service, and records the result.
+Logs support service diagnosis, operational auditing, and security monitoring. A useful investigation establishes an event time, affected host, service, user, and symptom before filtering. Clock synchronisation strengthens correlation across hosts. Administrators should preserve original timestamps and avoid changing a failing system before collecting enough evidence to understand its state.
 
-Disabling an unfamiliar failed service can hide the symptom while breaking authentication or another dependency. For example, SSSD can provide remote identity and authentication through LDAP, Active Directory, Kerberos, or Identity Management. An administrator must establish whether the host uses those functions before stopping or disabling `sssd.service`.
+`systemctl status UNIT` provides recent journal entries alongside service state. It offers the fastest first check when a service fails, but `journalctl` supplies stronger filtering:
 
-Configuration validation should precede a restart whenever the application provides a checker. Web servers, SSH, Rsyslog, and many databases can parse configuration without replacing the running process. This approach preserves service availability when a proposed file contains a syntax error. The administrator should also capture the exact error, time, unit, process ID, and recent change before log rotation or a later restart removes useful context.
-### The system journal
-`systemd-journald` collects structured events from the kernel, service output, syslog interfaces, and other sources. `journalctl` reads and filters the journal without requiring the administrator to know a traditional log-file path.
+| Purpose | Command |
+| --- | --- |
+| Show all accessible journal entries | `journalctl` |
+| Follow new entries | `journalctl -f` |
+| Show the current boot | `journalctl -b` |
+| Show the previous boot | `journalctl -b -1` |
+| List recorded boots | `journalctl --list-boots` |
+| Show one unit | `journalctl -u sshd.service` |
+| Show one unit from the current boot | `journalctl -b -u sshd.service` |
+| Show the last 50 entries | `journalctl -n 50` |
+| Show entries from the last six hours | `journalctl --since "6 hours ago"` |
+| Show warning and more severe entries | `journalctl -p warning` |
+
+Users need suitable journal permissions for many system records. Administrators commonly use `sudo` when investigating service or security events.
+
+Traditional files remain useful for tools and workflows that expect text logs. RHEL 8 commonly stores general messages in `/var/log/messages`, security and authentication records in `/var/log/secure`, mail records in `/var/log/maillog`, scheduled-task records in `/var/log/cron`, and boot records in `/var/log/boot.log`. Installed applications may create additional files or subdirectories.
+
+No single traditional file contains every event. Rsyslog rules can exclude facilities from `/var/log/messages`, and applications can manage separate logs. The journal can associate records with units, process IDs, executable paths, boot IDs, priorities, and SELinux contexts. An administrator should use those fields to narrow results rather than scanning an unrestricted journal whenever the host produces substantial traffic.
+
+The `tail` command supports quick text-log review:
 
 ```bash
-journalctl -b
-journalctl -b -1
-journalctl --list-boots
-journalctl -u sshd.service
-journalctl -u sshd.service --since "6 hours ago"
-journalctl -p warning
-journalctl -n 50
-journalctl -f
+sudo tail -n 50 /var/log/messages
+sudo tail -n 0 -f /var/log/messages
 ```
 
-`-b` selects the current boot, while `-b -1` selects the previous boot when persistent records exist. `-u` selects a unit, `-p` filters by priority, `-n` limits the number of entries, and `-f` follows new entries. Relative time expressions require a valid form such as `--since "6 hours ago"`. The shortened form `--since -6` does not clearly express a six-hour interval.
+The second command shows only records appended after `tail` starts. `Ctrl+c` stops the follow operation.
+### Journal persistence
+Journald's `Storage` setting accepts `volatile`, `persistent`, `auto`, or `none`. Volatile storage uses `/run/log/journal` and disappears at reboot. Persistent storage uses `/var/log/journal`, with a temporary fallback during early boot or when the disk cannot accept writes. Under `auto`, the existence of `/var/log/journal` controls whether journald stores records persistently.
 
-Journal priorities follow syslog levels from the most urgent to the least urgent: `emerg`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, and `debug`. A single threshold such as `-p warning` selects that level and all more urgent levels. Combining boot, unit, time, and priority filters usually produces more useful evidence than paging through the entire journal.
-
-The journal records structured fields such as `_SYSTEMD_UNIT`, `_PID`, `_UID`, and the executable path. Administrators can request verbose output when those fields help correlate an event:
-
-```bash
-journalctl -b -u sshd.service -p warning -o verbose
-```
-
-On RHEL 8, the default `Storage=auto` behaviour stores the journal under `/var/log/journal` when that directory exists and otherwise uses volatile storage under `/run/log/journal`. Volatile records disappear at reboot. Administrators can create `/var/log/journal`, or they can set persistent storage explicitly in `/etc/systemd/journald.conf`:
+An administrator can enforce persistence with a local drop-in rather than editing the vendor file:
 
 ```ini
+# /etc/systemd/journald.conf.d/persistent.conf
 [Journal]
 Storage=persistent
 ```
 
-RHEL 8 applies the explicit change after an administrator restarts `systemd-journald`:
+After creating the directory and file, the administrator applies the setting and flushes eligible runtime records:
 
 ```bash
-sudo systemctl restart systemd-journald.service
-journalctl --disk-usage
-journalctl --list-boots
+sudo systemctl restart systemd-journald
+sudo journalctl --flush
+sudo journalctl --list-boots
 ```
 
-Persistent logging consumes disk space. Administrators should also review retention settings, available capacity, access permissions, and any central collection requirement.
+Persistent logging consumes disk space, so the administrator should also review retention and size controls in `journald.conf`.
+### Rsyslog rules
+Rsyslog reads `/etc/rsyslog.conf` and local `.conf` files under `/etc/rsyslog.d/`. A traditional selector combines a facility with a priority. The facility identifies a message category or source. Facilities `local0` through `local7` support locally defined uses. The priority runs from `debug` through `emerg`, with `debug` least severe and `emerg` most severe.
 
-The journal rotates its own binary files and does not use logrotate. Settings such as `SystemMaxUse=` and `SystemKeepFree=` constrain persistent journal storage. `journalctl --vacuum-time=` and `journalctl --vacuum-size=` remove archived journal files, but administrators should set a retention policy before an incident and preserve records subject to audit or legal requirements.
-### Rsyslog and traditional files
-RHEL 8 combines the journal with Rsyslog. `rsyslogd` reads syslog messages from the journal, filters them, writes selected events to files under `/var/log`, and can forward them to remote systems. Its main configuration file is `/etc/rsyslog.conf`, and administrator-supplied fragments normally use the `.conf` suffix under `/etc/rsyslog.d`.
-
-Rsyslog selectors combine a facility with a severity. A rule such as `local1.warning` selects warning and more urgent messages from the `local1` facility. `local1.=warning` selects only warning messages.
+The following rule writes `local1` messages at `warning` priority and above to a dedicated file:
 
 ```text
-local1.warning    /var/log/application.log
+local1.warning    /var/log/myapp.log
 ```
 
-Before restarting the service, the administrator should validate the complete configuration:
+The selector `.warning` includes warning and more severe priorities. An equality selector such as `.=warning` matches only that priority. A single message can match several rules and therefore appear in several destinations.
+
+After saving a rule as `/etc/rsyslog.d/myapp.conf`, the administrator validates the complete configuration before restarting the service:
 
 ```bash
 sudo rsyslogd -N 1
 sudo systemctl restart rsyslog.service
-logger -p local1.warning "application log test"
-sudo tail -n 20 /var/log/application.log
-sudo tail -f -n 0 /var/log/application.log
+logger -p local1.warning "Rsyslog test message"
+sudo tail /var/log/myapp.log
 ```
 
-The same event can appear in the journal and in more than one traditional file because several rules can match it. Duplicate storage can support different operational needs but also affects retention and disk use.
+Remote logging should prefer reliable, protected transport when record loss or exposure carries risk. TCP with queues improves delivery compared with bare UDP, while RELP or TLS can provide stronger reliability or confidentiality for suitable deployments.
 
-Facilities classify broad event sources, while severities describe urgency. The local facilities `local0` through `local7` give applications configurable namespaces. Rsyslog processes matching rules in configuration order, and an action does not automatically stop later rules from matching the same event. Administrators should use a descriptive fragment name, document custom facilities, validate syntax, and confirm file ownership and SELinux context.
+The `logger` utility also lets scripts and operators send structured syslog messages without writing directly to a log file. Facility and priority choices should reflect an agreed local convention so filters route the event correctly. Test records should carry a distinct message and should be removed from alert evaluation when they could trigger an incident workflow.
+### Log rotation
+Logrotate limits file growth through rotation, retention, compression, and removal policies. RHEL 8 normally invokes it from a daily cron task, although an administrator can run it manually for testing. Service-specific policies belong under `/etc/logrotate.d/`.
 
-For central logging, TCP provides delivery feedback that UDP lacks, and RELP can reduce the risk of message loss further. TLS protects logs in transit when the configuration authenticates peers correctly. A secure deployment also protects stored logs, synchronises system clocks, and monitors forwarding queues.
-### Rotating logs correctly
-Logrotate prevents traditional log files from growing without control. A file under `/etc/logrotate.d` can define rotation frequency, retention, compression, ownership, and application-specific post-rotation actions.
+A weekly policy that also rotates early when a file exceeds 100 MB can use `maxsize`:
 
 ```text
-/var/log/application.log {
+/var/log/myapp.log {
     weekly
     rotate 4
     maxsize 100M
@@ -392,35 +333,39 @@ Logrotate prevents traditional log files from growing without control. A file un
     missingok
     notifempty
     create 0640 root root
+    sharedscripts
+    postrotate
+        /usr/bin/systemctl kill -s HUP rsyslog.service >/dev/null 2>&1 || true
+    endscript
 }
 ```
 
-`maxsize 100M` works with `weekly` and permits an earlier rotation when the file exceeds the threshold. The `size` directive behaves differently because it is mutually exclusive with time-based criteria, and the last conflicting directive takes precedence. Combining `weekly` with `size 100M` does not reliably express "weekly or earlier at 100 MB". `maxsize` expresses that policy.
+`rotate 4` retains four old copies. `compress` reduces storage use, and `notifempty` avoids rotating an empty file. `maxsize` allows early rotation while preserving the weekly rule. By contrast, `size` is mutually exclusive with time criteria, and option order can make it override the weekly schedule.
 
-Many daemons keep a file descriptor open after logrotate renames a file. Their rotation policy should send the documented reload or signal in a `postrotate` block so the daemon reopens its log. `copytruncate` copies the current file and truncates it in place, but a small interval between those operations can lose records. Administrators should use `copytruncate` only when the application cannot reopen its log safely.
+The `postrotate` action asks Rsyslog to reopen its files after rotation. `copytruncate` copies a file and truncates the original when an application cannot reopen logs, but a small interval between copying and truncation can lose records. Service-aware reopen or reload handling provides a stronger default.
 
-The administrator can test a policy without rotating files, then force a controlled test when appropriate:
+An administrator can check policy parsing without changing files, then force a test when appropriate:
 
 ```bash
-sudo logrotate --debug /etc/logrotate.conf
-sudo logrotate --force /etc/logrotate.conf
+sudo logrotate -d /etc/logrotate.conf
+sudo logrotate -f /etc/logrotate.conf
 ```
 
-Production testing must account for current state, ownership, SELinux labels, application behaviour, available storage, and any ingestion agent that tails the file.
+The debug command reports decisions without rotating. A forced run changes files and should occur only after the administrator verifies paths, permissions, ownership, and service-reopen actions.
 
-Rotation frequency depends on how often the scheduler invokes logrotate. A `maxsize` threshold cannot trigger until logrotate runs. A rapidly growing application may therefore require a more frequent timer or an application-native rotation mechanism. Retention counts also need enough storage for compressed archives and enough history for incident investigation.
-## Transferring files with OpenSSH
-`scp` transfers files through SSH encryption and authentication. `sftp` provides an interactive alternative. Key-based authentication avoids reusable account passwords in automated transfers, but the private key still requires protection.
+Rotation does not provide archival retention by itself. The administrator should align local copy counts, age limits, compression, central forwarding, backup, legal retention, and secure deletion with operational and compliance needs. Sensitive logs require access controls because they can contain account names, network addresses, command details, and application data.
+### Secure copying with OpenSSH
+OpenSSH encrypts remote login and file-transfer traffic. `scp` copies a file through SSH, while `sftp` provides an interactive transfer interface. Key-based authentication uses a private key on the client and a matching public key in the remote account's `~/.ssh/authorized_keys`.
 
-An administrator can generate a key pair with a passphrase, install only the public key on the destination account, verify the host key, and test the login before copying data. `ssh-agent` can cache an unlocked private key for a session.
+An administrator should protect a private key with a passphrase and use `ssh-agent` when repeated entry becomes inconvenient. `ssh-copy-id` installs the public key with fewer ownership and formatting errors than manual copying:
 
 ```bash
-ssh-keygen -t rsa -b 3072
+ssh-keygen
 ssh-copy-id bob@server.example.com
-ssh bob@server.example.com
-scp report.log bob@server.example.com:/tmp/
+ssh -o PreferredAuthentications=publickey bob@server.example.com
+scp /var/tmp/report.log bob@server.example.com:
 ```
 
-The destination path follows the colon after the host name. The remote account must have write permission to that directory. Administrators should avoid blank private-key passphrases outside tightly controlled automation, restrict key scope where possible, preserve correct `~/.ssh` permissions, and verify the destination host fingerprint through a trusted channel.
+The final colon selects the remote user's home directory. A specific destination follows the colon, such as `bob@server.example.com:/tmp/`, but the remote user must have write permission there. The administrator should verify the server's host-key fingerprint when first connecting. File encryption in transit does not grant access to protected local logs or remote directories, so normal permissions and SELinux policy still apply at both ends.
 
-`scp -r` copies directory trees, but `rsync` over SSH can efficiently update large trees and retain partial transfers with suitable options when it is available. Sensitive log collections should preserve required metadata, restrict destination access, and use checksums or another integrity check when an investigation depends on exact bytes. Administrators must never copy a private key to the remote account as a substitute for installing its public key.
+Private-key permissions should prevent access by other users. On the server, the target account normally uses mode `700` for `~/.ssh` and mode `600` for `authorized_keys`. An administrator should test key authentication in a separate session before disabling password access or closing the only working administrative connection.

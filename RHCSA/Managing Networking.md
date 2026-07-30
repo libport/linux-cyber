@@ -1,326 +1,353 @@
 # Managing Networking
 > [!NOTE]
 > A practical framework for managing and securing RHEL networking through live diagnostics, persistent configuration, network isolation, firewall policies, intrusion prevention, and low-level packet filtering.
-## Networking essentials
-Networking administration centers on four linked tasks. Administrators inspect and change live network state with the `ip` command. They persist interface settings with NetworkManager and `nmcli`. They filter traffic with `firewalld`, which manages the underlying `nftables` framework. They add tighter controls with direct `nft` rules or with Fail2Ban for repeated login abuse.
 
-The `ip` command replaces the older pattern of using separate tools such as `ifconfig`, `route` and `arp`. It provides a consistent syntax for addresses, routes, links and neighbour entries. In practical terms, that means one command family handles most routine TCP/IP work on a RHEL host. Common inspections include these forms:
+Red Hat Enterprise Linux 8 separates runtime network state from persistent configuration. The `ip` utility changes the live kernel state, NetworkManager stores and activates connection profiles, and either `firewalld` or `nftables` enforces a host firewall. Administrators should test disruptive changes through a console or an out-of-band path because an address, route, profile, or firewall error can terminate a remote session.
+## Runtime networking with `ip`
+The `iproute2` suite replaces older tools such as `ifconfig`, `route`, and `arp`. Its `ip` command manages links, addresses, neighbours, routes, multicast settings, and network namespaces through a consistent object-and-action syntax.
+
+Most `ip` objects and actions accept unambiguous abbreviations. For example, `ip a` displays addresses and `ip r` displays routes because `show` is the default action. Full object names remain safer in scripts and operational records. The `-4` and `-6` options select an address family, while `-brief` presents a compact status view:
 
 ```bash
-ip a
-ip -4 a show dev eth1
-ip r
-ip neigh
-ip link
+ip -brief link
+ip -brief address
+ip -4 route show
+ip -6 route show
 ```
 
-`ip a` shows addresses because `show` is the default action. `ip r` shows the route table. `ip neigh` shows the neighbour cache, which replaces the older ARP display tools for IPv4 and also covers IPv6 neighbour discovery.
-
-Runtime changes apply immediately and disappear when the interface resets or the system restarts, unless another service persists them. A live address can be added like this:
+Unprivileged users can inspect most state. Address, route, neighbour, link, and namespace changes require elevated privileges. Successful mutation commands often produce no output, so administrators should follow each change with a separate inspection or connectivity test.
+### Addresses and routes
+The following commands inspect IPv4 and IPv6 addresses, limit output to one interface, and add or remove a temporary IPv4 address:
 
 ```bash
-sudo ip addr add 172.16.1.1/16 dev eth1
+ip address show
+ip -4 address show dev eth1
+ip -6 address show dev eth1
+sudo ip address add 172.16.1.1/16 dev eth1
+sudo ip address del 172.16.1.1/16 dev eth1
 ```
 
-That command adds a secondary address to `eth1` in the running kernel state. It does not survive reboot. This distinction between runtime and persistent state is fundamental throughout RHEL networking. Administrators use `ip` for fast testing and temporary adjustments, then use NetworkManager to keep changes.
-## Runtime addressing, neighbour state and route control
-A host needs more than an IP address to move packets on a local network. The kernel must also resolve the destination IP address to a layer 2 hardware address. On IPv4 networks, the neighbour cache stores mappings between IP addresses and MAC addresses. `ip neigh` displays those mappings and the state of each entry.
+`ip address add` changes the running system. The address disappears when the interface resets or the host restarts unless NetworkManager also stores it in a connection profile. An interface can hold several addresses, so adding an address does not normally replace an existing one.
 
-Entries usually appear as `REACHABLE` when the host has communicated with the neighbour recently, or `STALE` when the mapping still exists but has not been refreshed within the current ageing window. This behaviour matters during troubleshooting. A failed ping to a local host may point to a missing or stale neighbour entry, while successful access to a remote internet address usually uses the default gateway rather than a direct cache entry for the remote server.
+Each address includes a prefix length that defines its local subnet. `172.16.1.1/16`, for example, belongs to `172.16.0.0/16`. Omitting or misreading the prefix can create an unintended connected route and send traffic to the wrong interface. `ip -details address show` reveals lifetimes, scope, flags, and other properties when the normal display lacks enough information.
 
-Administrators can delete a neighbour entry and force fresh resolution:
+`ip route show` displays the main routing table. The kernel creates connected routes for directly attached networks, and NetworkManager or another service commonly supplies the default route. A static route must identify the correct destination prefix and either a reachable next hop or an output device:
 
 ```bash
-sudo ip neigh del 192.168.33.12 dev eth1
+ip route show
+sudo ip route add 192.168.100.0/24 via 10.0.0.1 dev veth0
+sudo ip route del 192.168.100.0/24
 ```
 
-The next packet to that local host triggers a new address resolution step. This is useful when a host has changed NICs, a virtual machine has moved, or a stale mapping is suspected.
+Private IPv4 networks can cross routers when administrators configure routes for them. Internet routers do not normally advertise these private prefixes, but the addresses remain routable inside controlled networks.
 
-Neighbour ageing is controlled by kernel parameters. The key value in this material is `gc_stale_time`, not the mistranscribed `gc_scale_time`. The default is commonly 60 seconds. A running system can inspect the value through `/proc/sys` or `sysctl`:
+Route selection uses the most specific matching prefix. When two routes have the same prefix length, metrics and policy-routing rules can influence the result. `ip route get <destination>` asks the kernel which path it would use and reports the selected interface, source address, and next hop:
 
 ```bash
-cat /proc/sys/net/ipv4/neigh/eth0/gc_stale_time
+ip route get 192.168.100.1
+```
+
+This query often exposes errors faster than a complete routing-table listing. A runtime route follows the same persistence rule as a runtime address. NetworkManager must store any route required after reconnection or restart.
+### Neighbour discovery
+The neighbour table maps network-layer addresses to link-layer addresses on the local link. IPv4 uses the Address Resolution Protocol, while IPv6 uses the Neighbour Discovery Protocol. Remote internet hosts do not appear as local neighbours. The local host instead resolves the link-layer address of the next-hop router.
+
+```bash
+ip neighbour show
+sudo ip neighbour del 192.168.33.12 dev eth1
+```
+
+Deleting an entry forces the kernel to resolve it again when traffic next needs that neighbour. States such as `REACHABLE`, `STALE`, `DELAY`, and `PROBE` describe the kernel's confidence in the cached information. A `STALE` entry can still be used while the kernel confirms reachability.
+
+Neighbour entries apply only to directly reachable peers. A successful connection to `1.0.0.1`, for example, normally creates or refreshes an entry for the default gateway rather than the remote address. DNS traffic similarly refreshes the local resolver's entry only when that resolver shares the link. The table therefore helps distinguish local link resolution from end-to-end routing.
+
+The `net.ipv4.neigh.default.gc_stale_time` sysctl defaults to 60 seconds on standard kernels. It governs when an unused neighbour entry becomes stale and eligible for garbage collection. It does not directly define the transition from `REACHABLE` to `STALE`. Neighbour Unreachability Detection uses other timers, including `base_reachable_time_ms`, for that decision.
+
+Administrators can inspect the current values with `sysctl`:
+
+```bash
+sysctl net.ipv4.neigh.default.gc_stale_time
 sysctl -a | grep gc_stale_time
 ```
 
-A temporary change can be written with `sysctl -w`, and a persistent change can be stored in `/etc/sysctl.conf` or a drop in file under `/etc/sysctl.d/`. Raising the value keeps entries marked as reachable for longer. That can reduce neighbour discovery traffic on stable networks, but it also delays refresh if an incorrect mapping appears.
+A runtime change uses `sysctl -w`, while a file under `/etc/sysctl.d/` preserves an approved value across restarts. Changing a `default` value primarily affects interfaces created later. Existing interfaces can retain interface-specific values, so administrators should inspect both the default and per-interface keys.
 
-Route inspection uses the same `ip` tool family. `ip r` shows directly connected networks and the default route. RHEL learns routes automatically for local interfaces, but additional subnets often need explicit static routes. A simple example is a host with a private lab network behind a virtual link. The host may know its local `10.0.0.0/24` segment and its default gateway, yet still lack a route to `192.168.100.0/24` behind a peer interface. A static route fixes that:
+An approved persistent override can use a file such as `/etc/sysctl.d/90-neighbour.conf`. `sysctl --system` loads all configured sysctl files, and a subsequent query confirms the effective value. Larger cache lifetimes reduce resolution traffic but can retain incorrect link-layer information longer. Smaller values increase probing and garbage-collection activity. Administrators should change defaults only for a measured operational reason.
+### Isolated network namespaces
+A network namespace provides an independent set of interfaces, addresses, routes, neighbour entries, and firewall state. Containers and virtual networking systems use namespaces to isolate network stacks. A virtual Ethernet pair connects two namespaces like a short cable.
 
-```bash
-sudo ip route add 192.168.100.0/24 via 10.0.0.1
-```
-
-In the course example, the private network sits behind a virtual Ethernet pair, so the route is added to reach a subnet inside a separate namespace. The important concept is broader. Private address ranges are not advertised on the public internet, so internal networks must be reached through explicit internal routing. When the kernel does not know a path to a private subnet, the default route is usually wrong.
-## Network namespaces and virtual links
-Network namespaces let one RHEL system run isolated network stacks side by side. Each namespace has its own interfaces, routes, neighbour table and local services. This is useful for labs, containers, testing, service isolation and software defined networking.
-
-A new namespace can be created with:
+The following sequence creates `net1`, places one end of a virtual Ethernet pair inside it, assigns addresses, and activates the links:
 
 ```bash
 sudo ip netns add net1
-ip netns show
-```
+sudo ip link add veth0 type veth peer name veth1
+sudo ip link set veth1 netns net1
 
-The host still has its default namespace even when `ip netns show` lists only custom ones. A new namespace starts almost empty. It usually contains only a loopback interface, which may need to be brought up if local testing inside that namespace matters.
-
-Namespaces become useful when a link connects them. A virtual Ethernet pair, or veth pair, acts like a patch cable with two ends. One end stays in the default namespace and the other moves into the new namespace:
-
-```bash
-sudo ip link add veth0 type veth peer name veth1 netns net1
-```
-
-After that, `veth0` exists in the default namespace and `veth1` exists inside `net1`. Each end can receive an address and be brought up independently:
-
-```bash
-sudo ip addr add 10.0.0.2/24 dev veth0
+sudo ip address add 10.0.0.2/24 dev veth0
 sudo ip link set veth0 up
 
-sudo ip netns exec net1 ip addr add 10.0.0.1/24 dev veth1
+sudo ip netns exec net1 ip link set lo up
+sudo ip netns exec net1 ip address add 10.0.0.1/24 dev veth1
 sudo ip netns exec net1 ip link set veth1 up
 ```
 
-With matching addresses on the same subnet, the default namespace can reach `10.0.0.1` and the namespace can reach `10.0.0.2`. Without those addresses and active links, the virtual cable exists but the stacks still cannot communicate.
-
-The power of namespaces appears when they model a separate routed network. The namespace can hold extra addresses and local services that the default namespace does not know yet. For example, adding `192.168.100.1/24` to `veth1` creates a new subnet inside `net1`. The default namespace still cannot reach that subnet until a static route points traffic through the peer on the shared `10.0.0.0/24` link. That is why namespaces make route concepts clearer. They create a small, self contained routing problem on a single host.
-
-Administrators can inspect namespace state with standard commands prefixed by `ip netns exec`. That keeps the toolset consistent:
+Commands run in the default namespace unless `ip netns exec` selects another one. The two endpoints can communicate after both links have addresses from the same subnet. The following commands add a second subnet inside `net1`, install the correct route in the default namespace, and test the path:
 
 ```bash
-ip netns exec net1 ip a
-ip netns exec net1 ip r
-ip netns exec net1 ping -c 1 10.0.0.2
+sudo ip netns exec net1 ip address add 192.168.100.1/24 dev veth1
+sudo ip route add 192.168.100.0/24 via 10.0.0.1 dev veth0
+ping -c 1 192.168.100.1
 ```
 
-This approach makes namespaces valuable for learning and for production style segmentation. Each namespace behaves like an independent host from the network stack's point of view.
-## Persistent network configuration with NetworkManager
-Runtime testing is useful, but RHEL needs a persistent mechanism to rebuild network settings on boot. NetworkManager provides that layer. It manages connection profiles, activates them on devices and writes the active resolver configuration.
-
-In RHEL, connection profiles commonly appear as `ifcfg-*` files under `/etc/sysconfig/network-scripts/`. Those files remain usable and NetworkManager can manage them. The source material treats them as the main persistent form, which fits RHEL. A more future facing note is that keyfile profiles support all NetworkManager settings, while the older `ifcfg` format has limits. For this RHEL workflow, however, the key idea is simple. Profiles define persistent settings and NetworkManager applies them.
-
-A profile is not the same thing as a device. A device is the physical or virtual NIC such as `eth0` or `eth1`. A connection is the software profile that binds address settings, routes, DNS behaviour and startup options to a device. One device can have different profiles for different environments.
-
-Typical profile files include values such as these:
-- device name
-- static or DHCP method
-- IP address and prefix
-- gateway
-- DNS behaviour
-- whether the profile starts on boot
-- whether NetworkManager controls it
-
-This model explains why a host can switch from one network context to another by changing the active profile on the same NIC.
-## Managing connections with nmcli
-`nmcli` is the command line interface to NetworkManager. It can list devices, list connections, create new profiles, modify existing ones and activate or deactivate them. It also writes the persistent configuration, so manual file editing is often unnecessary.
-
-Useful discovery commands include:
+The route uses `192.168.100.0/24`, not `192.168.0.0/24`, and its next hop is the peer address `10.0.0.1`, not the local address `10.0.0.2`. Deleting `net1` also removes its namespace-side devices and the associated peer:
 
 ```bash
-nmcli device
-nmcli connection
-systemctl status NetworkManager
+sudo ip netns del net1
 ```
 
-`nmcli device` shows physical and logical interfaces. `nmcli connection` shows saved profiles and indicates which one is active. `NetworkManager` must be both running and enabled for profile based startup to work consistently.
+`ip netns list` displays named namespaces, while `ip netns exec net1 ip address show` and `ip netns exec net1 ip route show` expose isolated state. Creating a namespace does not provide external connectivity. Administrators must deliberately add links, addresses, routes, forwarding, network address translation, or bridges according to the required topology. This explicit construction makes namespaces useful for testing routes and firewall rules without altering a physical network.
+## Persistent configuration with NetworkManager
+RHEL 8 uses NetworkManager by default. A device is a network interface, while a connection profile contains the settings that NetworkManager can apply to a device. Several profiles can target the same interface, but only a compatible active profile supplies its current configuration.
 
-A new static profile can be created for a specific interface with a command like this:
+```bash
+systemctl is-enabled NetworkManager
+systemctl is-active NetworkManager
+nmcli device status
+nmcli connection show
+```
+
+RHEL 8 commonly stores NetworkManager profiles in `ifcfg` format under `/etc/sysconfig/network-scripts/`. It can also use keyfile profiles under `/etc/NetworkManager/system-connections/`. The separate legacy `network-scripts` implementation is deprecated. Administrators should manage normal RHEL 8 connections through NetworkManager rather than install the legacy service.
+
+Traditional `ifcfg` profiles can contain keys such as `DEVICE`, `BOOTPROTO`, `IPADDR`, `PREFIX`, `DNS1`, and `ONBOOT`. `ONBOOT=yes` corresponds to automatic activation, while `BOOTPROTO=dhcp` requests dynamic IPv4 configuration. A profile with a static address records the address and prefix instead. Hand edits remain possible, but `nmcli` validates supported properties and keeps runtime and stored state easier to reconcile. If an administrator edits a profile file directly, `nmcli connection reload` makes NetworkManager reread stored profiles.
+### Creating a static profile
+`nmcli` writes persistent profile data and can activate it immediately. Shell completion exposes available objects and properties, which reduces errors in long commands.
 
 ```bash
 sudo nmcli connection add \
   type ethernet \
   ifname eth1 \
+  con-name cafe \
   ipv4.method manual \
-  ipv4.addresses 192.168.100.1/24 \
-  connection.id cafe
-```
+  ipv4.addresses 192.168.100.1/24
 
-This example deliberately uses a named profile to show that the administrator controls profile identity. Once created, the profile can be activated with:
-
-```bash
 sudo nmcli connection up cafe
+nmcli connection show cafe
+ip -4 address show dev eth1
 ```
 
-Activation matters because a saved profile does nothing until NetworkManager applies it. After activation, the generated `ifcfg-cafe` file records the persistent settings, and the interface starts using them immediately.
+Activating `cafe` can displace another profile on `eth1`. Administrators should confirm the profile name, interface, address, prefix, gateway, routes, and DNS settings before activation, especially over SSH. `connection.autoconnect` controls whether NetworkManager activates the profile during startup.
 
-One of `nmcli`'s main advantages is tab completion. The command exposes many properties, but shell completion removes most of the memorisation burden. That makes it practical for administrators to explore valid subcommands, property names and connection identifiers without constant reference checks.
-
-A generated `ifcfg-*` profile also shows why manual editing can feel deceptively simple. The file may only list a handful of familiar keys, but `nmcli` keeps the running state, the on disk profile and the NetworkManager view aligned. That reduces the risk of a mismatch between a hand edited file and the active connection state. For routine administration, `nmcli` is therefore the safer default, while direct file edits remain useful for review, templating and recovery.
-## DNS control and resolver priority
-A persistent connection includes more than an address. It can also define DNS servers, search domains, gateways and route preferences. In RHEL, NetworkManager writes `/etc/resolv.conf`, so that file reflects the currently active connection set rather than serving as the primary source of truth.
-
-A DNS server can be added to an existing connection with a command like this:
+The profile can also carry a gateway and persistent routes:
 
 ```bash
-sudo nmcli connection modify cafe ipv4.dns 8.8.8.8
-sudo nmcli connection up cafe
+sudo nmcli connection modify cafe ipv4.gateway 192.168.100.254
+sudo nmcli connection modify cafe +ipv4.routes "198.51.100.0/24 192.168.100.254"
 ```
 
-After the profile comes up again, `/etc/resolv.conf` includes the new server. If another active profile already contributes DNS servers, the new server might not appear first. Resolver order is controlled by DNS priority.
+The leading `+` appends to a multi-value property. Omitting it replaces the existing route list. Administrators should use documentation prefixes only in examples and substitute addresses that fit the deployed network.
 
-The important rule is straightforward. Lower values have higher priority. A standard profile defaults to `100`. VPN profiles often use lower values. Setting a profile's `ipv4.dns-priority` to `10` places its DNS server ahead of a profile that still uses `100`:
+Profile changes remain separate from ad hoc `ip` changes. `nmcli connection modify` updates the stored profile, and reactivation applies it to the device. Administrators can inspect the effective runtime state with `ip`, while `nmcli connection show` reports the stored and active NetworkManager settings.
+
+Runtime and stored settings can diverge after manual `ip` commands, direct file edits, DHCP renewal, or partial profile activation. A disciplined check compares three views: the connection profile, NetworkManager's active device data, and the kernel state. The following commands expose those layers without changing them:
 
 ```bash
+nmcli connection show cafe
+nmcli device show eth1
+ip address show dev eth1
+ip route show
+```
+
+An unexpected difference does not always indicate failure. DHCP leases, automatically generated routes, and IPv6 link-local addresses can appear only in active state. Administrators should identify which component owns each value before correcting it. Repeatedly forcing runtime values with `ip` can conceal a defective profile that fails again after the next restart.
+### DNS selection
+NetworkManager normally writes `/etc/resolv.conf`. Direct edits to that file can disappear when a connection changes. DNS servers, search domains, automatic DNS behaviour, and priority belong in connection profiles.
+
+```bash
+sudo nmcli connection modify cafe ipv4.dns "<dns-server>"
+sudo nmcli connection modify cafe ipv4.ignore-auto-dns yes
 sudo nmcli connection modify cafe ipv4.dns-priority 10
 sudo nmcli connection up cafe
 ```
 
-Negative priorities are more restrictive. A value such as `-1` does not merely push the server to the top. It excludes DNS servers from profiles that do not also use negative priority. That makes negative values useful on networks where a host must consult only a nominated resolver and no fallback should occur.
+A lower numerical DNS priority has higher precedence. The default is normally 100 for non-VPN profiles and 50 for VPN profiles when no global override applies. A negative priority excludes DNS data from active profiles with greater numerical values. If several profiles use negative priorities, only those with the lowest numerical value contribute. This behaviour can prevent DNS leakage, but an incorrect value can also remove required internal resolvers.
 
-This behaviour is significant for security and split network design. A machine on a trusted corporate VPN may need to resolve names only through internal servers. A laptop on a public network may need to favour a local resolver or a privacy preserving external service. NetworkManager can express those rules in the profile rather than relying on manual edits to `resolv.conf`, which would be overwritten.
-## firewalld, zones and runtime versus permanent rules
-RHEL secures host traffic with `firewalld` as the management layer over `nftables`. `firewalld` introduces a zone model that groups trust levels and allowed traffic. Zones can be attached to interfaces or to source addresses, and each zone can allow services, ports and richer rules.
+Priority orders DNS data from different profiles. It does not reorder servers within one profile, so administrators should list those servers in the required order. `ipv4.ignore-auto-dns yes` rejects automatically supplied IPv4 DNS data for that profile.
 
-The first operational checks are simple:
+DNS changes can affect active sessions even when interface addressing stays intact. `nmcli device show` reports the DNS data that NetworkManager applied, while `/etc/resolv.conf` shows what a traditional resolver can consume. Systems configured with a local caching or split-DNS plugin can route queries by domain instead of relying solely on file order.
+## Host firewalls with `firewalld`
+Host firewalls complement network perimeter controls. They limit exposure on each server, reduce lateral movement, and enforce service-specific access close to the workload. RHEL 8 uses the `nftables` kernel framework, and `firewalld` provides the usual high-level management interface.
+
+Zones classify traffic by trust. NetworkManager connections or interfaces can select a zone, and source prefixes can direct matching traffic to one. Services group the ports and protocols required by an application. Ports that a zone does not explicitly allow remain blocked unless the zone target permits them.
+
+The default zone handles traffic that has no more specific assignment. An active zone normally has at least one interface or source. A zone definition can also include rich rules, port forwards, masquerading, ICMP controls, and protocols. Administrators should keep zone assignments aligned with connection profiles so that a portable host does not retain office access rules on an untrusted network.
 
 ```bash
 sudo firewall-cmd --state
 sudo firewall-cmd --get-default-zone
+sudo firewall-cmd --get-active-zones
 sudo firewall-cmd --list-all
+sudo firewall-cmd --list-all --permanent
 ```
 
-A default installation commonly uses the `public` zone. The listing shows associated interfaces and services. Services are more readable than raw ports because each service definition can bundle ports, protocols and helper information. For example, the `http` service normally maps to TCP port 80.
-
-A major `firewalld` concept is the separation between runtime and permanent configuration. Runtime rules take effect immediately and vanish after reload or restart unless they are saved. Permanent rules are stored on disk and repopulate runtime state when `firewalld` starts. This supports safer administration. An administrator can test a live change, verify connectivity and only then save it.
-
-Allowing a service temporarily is as direct as:
+The default zone often starts as `public`, but administrators must inspect the host rather than assume a value. Vendor service and zone definitions reside under `/usr/lib/firewalld/`. Local definitions and overrides reside under `/etc/firewalld/`, which takes precedence. Package updates can replace vendor files, so local changes belong under `/etc`.
+### Runtime and permanent rules
+`firewalld` maintains separate runtime and permanent configurations. Runtime changes take effect immediately and disappear after a reload, restart, or reboot. Permanent changes become active after a reload or restart. This separation supports a test-first workflow:
 
 ```bash
+sudo dnf install httpd
+sudo systemctl enable --now httpd
 sudo firewall-cmd --add-service=http
-```
-
-That opens the service in the active zone at runtime. A remote system can then test access. If the change works, it can be copied into the permanent configuration:
-
-```bash
+sudo firewall-cmd --list-services
 sudo firewall-cmd --runtime-to-permanent
 ```
 
-The corrected idea here is "copy runtime to permanent", not "flush" in the storage sense. A restart of `firewalld` then reproduces the rule.
+The `http` service opens the ports defined by its service object, normally TCP port 80. A successful local request does not prove that a remote client can pass through the firewall because loopback traffic follows a different path. Administrators should test from an authorised remote host before copying runtime state to permanent configuration.
 
-Service and zone definitions come from XML files. Vendor supplied defaults live under `/usr/lib/firewalld`. Local changes belong under `/etc/firewalld`, which overrides the vendor copy. That split helps package updates deliver new defaults without overwriting local policy.
-## Source based access, temporary rules and custom services
-An interface based zone works when trust is tied to where traffic enters the host. That is often enough for simple servers. It becomes less useful when the same interface receives both trusted and untrusted traffic. Source based rules solve that problem.
+`--runtime-to-permanent` copies the complete runtime configuration, including unrelated changes made during the same period. Administrators should compare runtime and permanent state before invoking it. A plain `firewall-cmd --reload` performs the opposite transition by rebuilding runtime state from permanent files, which discards uncommitted experiments.
 
-A service can be added to a more trusted zone such as `internal`, then that zone can be activated for a source subnet or host:
+A timeout creates a temporary runtime rule:
+
+```bash
+sudo firewall-cmd --add-port=443/tcp --timeout=10m
+```
+
+The rule expires automatically and cannot form part of permanent configuration. Timeouts reduce the consequences of some remote tests, although they do not replace console access and a rollback plan.
+### Zones, interfaces, and sources
+Adding a service to an interface's zone can expose it to every source that reaches that interface. A source-based zone narrows access to an address or prefix:
 
 ```bash
 sudo firewall-cmd --zone=internal --add-service=http
 sudo firewall-cmd --zone=internal --add-source=192.168.33.0/24
+sudo firewall-cmd --zone=internal --list-all
+sudo firewall-cmd --runtime-to-permanent
 ```
 
-This pattern allows HTTP access only for clients from the nominated source range. The service is not simply open to every host that reaches the interface. That is a stronger design for branch offices, management subnets and lab networks.
+Traffic from `192.168.33.0/24` now enters the `internal` zone and can use its HTTP service. Source addresses do not authenticate clients, and upstream address translation or spoofing can weaken this control. Administrators should combine source restrictions with application authentication, encrypted transport, and suitable network filtering.
 
-`firewalld` can also manage raw ports directly. That is useful when no suitable service definition exists, or when a quick test is needed:
+When source ranges overlap across zones, firewalld cannot apply both zone rule sets to one packet. Administrators should avoid ambiguous ranges and verify classification with `--get-active-zones`, `--list-sources`, and remote tests. Assigning a NetworkManager profile to a zone with `nmcli connection modify <profile> connection.zone <zone>` keeps network activation and firewall classification together.
+
+A dedicated custom service keeps related ports under a clear name without changing the meaning of a vendor service:
 
 ```bash
-sudo firewall-cmd --zone=internal --add-port=443/tcp
+sudo firewall-cmd --permanent --new-service=web
+sudo firewall-cmd --permanent --service=web --add-port=80/tcp
+sudo firewall-cmd --permanent --service=web --add-port=443/tcp
+sudo firewall-cmd --reload
+sudo firewall-cmd --zone=internal --add-service=web
+sudo firewall-cmd --runtime-to-permanent
 ```
 
-A temporary opening can include a timeout:
+This approach creates a local service definition under `/etc/firewalld/services/`. It avoids redefining the built-in `http` service to include HTTPS, which could surprise other administrators and applications.
+### Fail2Ban for repeated authentication failures
+Fail2Ban reads authentication events, matches configured failure patterns, and invokes a firewall action to ban offending sources. It supplements strong SSH controls. Public servers should prefer key-based authentication, disable direct root login, restrict administrative sources where possible, and apply rate controls. An IP ban alone does not establish identity, and shared or translated addresses can produce false positives.
 
-```bash
-sudo firewall-cmd --zone=internal --add-port=443/tcp --timeout=10s
-```
-
-After the timeout expires, the port disappears from runtime configuration automatically. This is a practical safeguard when remote administrators need to test access without risking a long lived mistake.
-
-Custom service definitions provide a cleaner long term answer than scattering individual port rules. The common method is to copy the vendor XML file into `/etc/firewalld/services/`, edit it and reload `firewalld`. For example, a local copy of `http.xml` can be expanded to include both TCP 80 and TCP 443. Once reloaded, any zone that allows `http` now permits both ports according to the custom local definition.
-
-These mechanisms show the strength of `firewalld`. It offers a high level interface for common policy work while still preserving the distinction between tested runtime state and durable on disk policy.
-## Fail2Ban for repeated login abuse
-Port based filtering limits exposure, but it does not stop repeated authentication attempts against an allowed service such as SSH. Fail2Ban addresses that gap. It watches logs for repeated failures and inserts blocking rules against abusive source addresses.
-
-On RHEL based systems, Fail2Ban is commonly installed from EPEL. The exact package repository arrangement varies by environment, but the workflow stays the same. Install the repository package, install Fail2Ban, create a jail definition, enable the service and inspect jail status.
-
-The SSH jail in this material lives under `/etc/fail2ban/jail.d/sshd.conf`. The edited transcript contains an inconsistency between seven failures and three failures. The demonstrated configuration uses three failed logins within ten minutes and a 72 hour ban, so that is the corrected working example. A concise configuration pattern looks like this:
+On RHEL 8, Fail2Ban is available from Extra Packages for Enterprise Linux. Administrators must enable the appropriate EPEL repository and install the packages required for the chosen logging and firewall backends. A local jail file can enable SSH monitoring through the systemd journal:
 
 ```ini
 [DEFAULT]
-bantime = 72h
-findtime = 10m
+bantime = 259200
+findtime = 600
 maxretry = 3
-backend = systemd
 
 [sshd]
 enabled = true
+backend = systemd
 ```
 
-With the service running, status can be checked through:
+The example bans a source for 72 hours after three failures within 10 minutes. Production values should reflect user behaviour, exposure, address sharing, and support procedures. After saving the configuration under `/etc/fail2ban/jail.d/`, administrators can start the service and inspect the jail:
 
 ```bash
+sudo systemctl enable --now fail2ban
 sudo fail2ban-client status sshd
+sudo fail2ban-client set sshd unbanip <ip-address>
 ```
 
-That shows current failures, totals and banned addresses. The source example uses a public AWS host to illustrate how quickly exposed SSH services attract automated probing. Even a newly started instance can collect failed login attempts within minutes or hours. Fail2Ban is effective because it reacts to behaviour, not just to open ports. It complements the firewall rather than replacing it.
+Logs and the client status should confirm that the filter sees genuine SSH failures and that the selected firewall action creates and removes bans. A configuration that starts successfully can still watch the wrong log source.
 
-Operationally, Fail2Ban suits internet facing systems that must allow password authentication, training environments, jump hosts and public test servers. It can also be tuned more tightly or more leniently depending on the risk profile and the likelihood of genuine user error.
-## Working directly with nftables
-`firewalld` is convenient, but RHEL also allows direct control of `nftables` with the `nft` command. `nftables` is the successor to `iptables`, `ip6tables`, `arptables`, `ebtables` and `ipset`. Its most important practical advantage here is that one framework can manage IPv4 and IPv6 together through the `inet` family.
+Fail2Ban counts events that its filter recognises, not every unsuccessful interaction with a service. Administrators should test sample journal entries against the installed filter, check the configured action, and confirm that the firewall contains the resulting ban. Trusted management addresses can be allowlisted through `ignoreip`, but broad exceptions can hide hostile traffic. Ban records also require monitoring so support staff can distinguish an attack from a locked-out legitimate user.
+## Direct firewall control with `nftables`
+`nftables` provides the kernel packet-filtering framework that supersedes the legacy `iptables` command family. The `nft` utility creates, inspects, and updates rules. An `inet` table can process both IPv4 and IPv6, which removes the need to duplicate many rules across separate command families.
 
-Basic inspection commands include:
+Linux introduced nftables with kernel 3.13. RHEL 8 uses it as the default firewall backend, although compatibility commands can still translate legacy iptables rules into the `nf_tables` API. New native designs should use `nft` syntax. Available table families include `ip`, `ip6`, `inet`, `arp`, `bridge`, and `netdev`. The selected family controls which packet types and hooks the table can process.
 
-```bash
-sudo nft list ruleset
-sudo nft list tables
-sudo nft list table inet filter
-```
-
-When `firewalld` is running, many tables and chains may already exist. Stopping `firewalld` stops the daemon, but existing `nftables` rules remain in the kernel until they are removed. A clean start therefore requires an explicit flush:
+Administrators should run only one firewall manager on a RHEL host. `firewalld`, the `nftables` service, and legacy `iptables` services can interfere with one another when they control the same hooks. Direct `nftables` management therefore requires stopping and disabling `firewalld`:
 
 ```bash
 sudo systemctl disable --now firewalld
-sudo nft flush ruleset
+sudo nft list ruleset
 ```
 
-A direct `nftables` configuration begins with no default tables. Administrators define only the structures they need. That is a major difference from older expectations based on `iptables`.
+Stopping `firewalld` does not guarantee that every rule has disappeared. Administrators should inspect the ruleset before replacing it. `nft flush ruleset` removes all tables and rules, so remote execution can expose the host or interrupt access when another command fails. A console, a tested rules file, and an atomic load reduce that risk.
 
-A compact inbound only policy can use one table and one chain:
+Basic inspection commands separate structure from detail:
 
 ```bash
-sudo nft add table inet filter
-# create an input chain with type filter, hook input, priority 0 and policy accept
-sudo nft add rule inet filter input iif lo accept
-sudo nft add rule inet filter input ct state established,related accept
-sudo nft add rule inet filter input tcp dport 22 accept
-sudo nft add rule inet filter input counter drop
+sudo nft list tables
+sudo nft list ruleset
+sudo nft --handle list ruleset
 ```
 
-This ruleset does four things. It accepts loopback traffic. It allows packets that belong to established or related connections. It permits new inbound SSH traffic on TCP 22. It counts and drops everything else. Using `inet` means the same table can apply to IPv4 and IPv6.
+Handles identify rules for targeted deletion. They can change after a ruleset reload, so scripts should not assume that a previously observed handle remains stable.
+### Tables, chains, and rules
+A table groups chains, sets, maps, counters, and other objects within one address family. A regular chain organises rules. A base chain connects to a packet-processing hook such as `input`, `forward`, `output`, `prerouting`, or `postrouting`. Its type, hook, priority, and policy define how it participates in the network stack.
 
-The design also corrects a common misunderstanding. Chain names such as `input` are conventional, but the real function comes from the hook and chain type. If the host never forwards packets and does not filter outbound traffic, it does not need `forward` or `output` chains at all. Lean rulesets are easier to read and have lower overhead.
+Table and chain names carry no built-in behaviour. A chain called `input` handles inbound packets only when its base-chain hook is `input`. Hosts that do not route packets may not need a `forward` base chain, and hosts that allow all outbound traffic may not need an `output` base chain.
 
-The example chooses a default chain policy of `accept` and ends with an explicit drop rule. That keeps remote administration safer during live editing because a temporary flush does not instantly lock the operator out. A stricter policy of `drop` is also valid, but it requires more care during staged changes.
+Rules run in order. Match expressions examine packet metadata, addresses, protocols, ports, interfaces, connection state, and other fields. Statements then count, log, modify, accept, reject, or drop matching packets. `accept`, `drop`, and `reject` are terminal verdicts for the relevant processing path. A counter can share a rule with a verdict, so `counter drop` records and blocks the same packets without a second rule.
 
-This also explains why `firewalld` and direct `nftables` editing should not usually be mixed casually on the same host. `firewalld` expects to own the rule model it creates. Direct low level changes can be overwritten on reload, or they can leave a host with a policy that no longer matches the higher level zone definition. Administrators normally choose one control path for a given policy area and stay consistent.
-## Persisting nftables rules
-A direct `nftables` ruleset is still only runtime state until a service loads it from disk. On RHEL, `nftables.service` commonly reads `/etc/sysconfig/nftables.conf`. A persistent workflow therefore has three parts.
-
-First, save a clean ruleset to the configuration file. Second, ensure the file begins by clearing the active ruleset so that reloads do not append a duplicate copy. Third, enable the service.
-
-A typical start of file includes:
+The following file defines a compact host firewall. It accepts established traffic, loopback traffic, essential ICMP and ICMPv6 control traffic, and SSH from an authorised subnet. Its default policy drops unmatched input:
 
 ```nft
 flush ruleset
+
+table inet filter {
+  chain input {
+    type filter hook input priority filter
+    policy drop
+
+    ct state invalid drop
+    ct state established,related accept
+    iifname "lo" accept
+
+    ip protocol icmp accept
+    meta l4proto ipv6-icmp accept
+
+    ip saddr 192.168.33.0/24 tcp dport 22 accept
+    counter
+  }
+}
 ```
 
-After that line, the defined tables, chains and rules follow. Once the file is ready:
+Dropping every ICMP packet does not automatically improve security. IPv6 depends on ICMPv6 for core functions, including neighbour discovery and path maximum transmission unit handling. IPv4 also uses ICMP for diagnostics and network error reporting. Production rules can narrow accepted ICMP types, but they must preserve the messages required by the network design.
+
+The `counter` statement records packets that reach the end of the chain. The chain policy then drops them. `nft list ruleset` displays packet and byte counts, which helps validate rule order and diagnose blocked traffic.
+### Validation and persistence
+Administrators should store custom scripts under `/etc/nftables/`, validate them without applying them, and then load them atomically:
 
 ```bash
-sudo systemctl enable --now nftables.service
+sudo nft --check --file /etc/nftables/filter.nft
+sudo nft --file /etc/nftables/filter.nft
+sudo nft list ruleset
 ```
 
-The service then restores the rules at boot. A useful caution appears in the example. If the current ruleset is exported after traffic has already hit a `counter` rule, the saved file may include packet and byte counts. Reloading that file preserves those counts as the starting value, which can confuse later monitoring. Administrators who want fresh counters on each restart should remove those saved values from the file.
+`nft --check` verifies syntax and rule construction without installing the candidate ruleset. It cannot prove that the policy allows every required workflow or blocks every prohibited path. Administrators should review terminal verdicts, confirm the order of overlapping matches, and test from networks represented by each rule. An early broad `accept` can bypass a later restriction, while an early broad `drop` can make later permits unreachable.
 
-Direct `nftables` control makes sense when a host needs an exact low level ruleset, when `firewalld` abstractions do not fit the use case, or when the smallest possible firewall footprint matters. For common service based rules, `firewalld` is usually faster and safer. For specialised packet handling, direct `nft` work provides full control.
-## Consolidated operational model
-The material resolves into a clear administrative sequence.
+Atomic file loading protects the kernel from a partly applied ruleset when parsing fails. It does not protect an administrator from a valid but incorrect policy. Remote changes therefore need a recovery path, an explicit management-access rule, and a post-load connectivity check. Rate-limited logging can assist diagnosis, but unrestricted logging of denied traffic can exhaust storage or obscure useful events during a scan.
 
-- inspect and test live state with `ip`
-- build isolated lab topologies with namespaces and veth pairs
-- persist interface and DNS settings through NetworkManager and `nmcli`
-- apply service and source based firewall policy with `firewalld`
-- use Fail2Ban when allowed services attract repeated authentication abuse
-- drop to direct `nftables` only when a host needs precise low level control
+The rules file should begin with `flush ruleset` when it owns the complete firewall. Without that instruction, repeated loads can retain or duplicate earlier objects. A partial rules file should target only the objects it owns instead of clearing unrelated rules.
 
-That sequence keeps temporary testing, persistent configuration and security policy separate without making them disconnected. `ip` answers "what is true right now". NetworkManager answers "what should return on boot". `firewalld` answers "what traffic should the host allow". `nftables` answers "how the kernel enforces that policy". Fail2Ban answers "how the host reacts when an allowed service is abused".
+The RHEL 8 `nftables` service reads include statements from `/etc/sysconfig/nftables.conf`. The following line loads the custom file during service startup:
 
-Taken together, these tools give RHEL a layered networking model that supports both fast troubleshooting and disciplined long term configuration.
+```nft
+include "/etc/nftables/filter.nft"
+```
+
+After adding the include, administrators can enable the service:
+
+```bash
+sudo systemctl enable --now nftables
+sudo systemctl reload nftables
+sudo nft list ruleset
+```
+
+Saving the output of `nft list ruleset` can also capture live counter values. Loading that output restores those non-zero starting values. `nft --stateless list ruleset` or manual removal of counter values produces a cleaner persistent definition.
+
+A final verification should test every allowed service from an authorised client, confirm that prohibited traffic fails, inspect counters, and repeat the test after a service reload or host restart. The smallest useful ruleset is easier to audit, but it must still support IPv4, IPv6, management access, application traffic, and required control protocols.
