@@ -18,12 +18,12 @@ Through hands-on labs, real-world case studies and applied projects, this course
 - [Computer Networks and Network Security](Computer%20Networks%20and%20Network%20Security.md) ( :package: [Final Project](projects/Computer%20Networks%20and%20Network%20Security%20Final%20Project.md))
 - [Database Essentials and Vulnerabilities](Database%20Essentials%20and%20Vulnerabilities.md) ( :package: [Final Project](projects/Database%20Essentials%20and%20Vulnerabilities%20Final%20Project.md))
 - [Cybersecurity Architecture](Cybersecurity%20Architecture.md) ( :package: [Final Project](projects/Cybersecurity%20Architecture%20Final%20Project.md))
-- [Cybersecurity Compliance Framework, Standards & Regulations](Cybersecurity%20Compliance%20Framework,%20Standards%20&%20Regulations.md) ( :package: [Final Project]())
-- [Penetration Testing, Threat Hunting, and Cryptography](Penetration%20Testing,%20Threat%20Hunting,%20and%20Cryptography.md) ( :package: [Final Project]())
-- [Incident Response and Digital Forensics](Incident%20Response%20and%20Digital%20Forensics.md) ( :package: [Final Project]())
+- [Cybersecurity Compliance Framework, Standards & Regulations](Cybersecurity%20Compliance%20Framework,%20Standards%20&%20Regulations.md) ( :package: [Final Project](projects/Cybersecurity%20Compliance%20Frameworks,%20Standards,%20and%20Regulations%20Final%20Project.md))
+- [Penetration Testing, Threat Hunting, and Cryptography](Penetration%20Testing,%20Threat%20Hunting,%20and%20Cryptography.md) ( :package: [Final Project](projects/Penetration%20Testing,%20Threat%20Hunting,%20and%20Cryptography%20Final%20Project.md))
+- [Incident Response and Digital Forensics](Incident%20Response%20and%20Digital%20Forensics.md) ( :package: [Final Project](projects/Incident%20Response%20and%20Digital%20Forensics%20Final%20Project.md))
 - [Cybersecurity Case Studies](Cybersecurity%20Case%20Studies.md) and :mortar_board: [Capstone Project](projects/Capstone%20Project.md)
-- [Generative AI: Boost Your Cybersecurity Career](Generative%20AI%20Boost%20Your%20Cybersecurity%20Career.md) ( :package: [Final Project]())
-- [Cybersecurity Job Search, Resume, and Interview Prep](Cybersecurity%20Job%20Search,%20Resume,%20and%20Interview%20Prep.md) ( :package: [Final Project]())
+- [Generative AI: Boost Your Cybersecurity Career](Generative%20AI%20Boost%20Your%20Cybersecurity%20Career.md) ( :package: [Final Project](projects/Generative%20AI%20Boost%20Your%20Cybersecurity%20Career%20Final%20Project.md))
+- [Cybersecurity Job Search, Resume, and Interview Prep](Cybersecurity%20Job%20Search,%20Resume,%20and%20Interview%20Prep.md)
 ## Further Reading
 Notes are supplemented with information from third-party sources, including:
 * CompTIA Cybersecurity Analyst (CySA+) Cert Guide, 2nd edition, by Troy McMillan. ([publisher page](https://www.pearsonitcertification.com/store/comptia-cybersecurity-analyst-cysa-plus-cs0-002-cert-9780136747123))

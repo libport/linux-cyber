@@ -2,18 +2,15 @@
 
 In the final project, you will apply the core networking and security concepts learned throughout the course. Working as a Network Technician for TechSafe Ltd., you will design, analyze, and secure a real-world organizational network through a series of hands-on tasks.
 
-Throughout the project, you will:
-- Design a structured network by creating a diagram that includes subnets for different departments.
-- Calculate subnet addresses and subnet masks based on a fixed IP range provided by the company.
-- Capture and analyze network traffic using Wireshark to understand how HTTP/HTTPS communication flows across a network.
-- Configure security rules using Microsoft Windows Defender Firewall to block FTP and HTTP traffic.
-- Verify and validate your configurations through hands-on testing and screenshot documentation.
-## Scenario:
 TechSafe, Ltd. has hired you to design and secure its network. The company uses a fixed IP address from its Internet service provider (ISP) and wants a structured network with compatible IP addressing, subnetting, and security configurations.
+> [!NOTE]
+> Command-line tools replaced GUI tools in this project, as command-line tools offer more stable interfaces and often expose more detailed OS or application APIs.
+
+---
 ## Task 1: Design a network with subnets
-#### Scenario
+### Scenario
 Design a network diagram for TechSafe Ltd that includes three departments: Administration, Sales, and IT. Each department requires its own subnet.
-#### Answer
+### Answer
 ```mermaid
 flowchart TB
     R[Router] --- S[Switch]
@@ -21,21 +18,24 @@ flowchart TB
     S --- B[Sales Subnet]
     S --- I[IT Subnet]
 ```
+---
 ## Task 2: Calculate Subnet Addresses and Subnet Masks
-#### Scenario
+### Scenario
 You are working with a fixed IP address of 198.51.100.0/24. The network is divided into three subnets with the following IP address ranges for each department:    
 - Administration: 198.51.100.1 - 198.51.100.62
 - Sales: 198.51.100.65 - 198.51.100.126
 - IT: 198.51.100.129 - 198.51.100.190
 
 Your task is to calculate each department's subnet addresses and subnet masks based on their specified IP address ranges and save that information into a text-based table for later use.
-#### Answer
+### Answer
 
-| Subnet Name | Subnet Address | Subnet Mask | IP Address Range |
-| --- | --- | --- | --- |
-| Administration | 198.51.100.0/26 | 255.255.255.192 | 198.51.100.1 - 198.51.100.62 |
-| Sales | 198.51.100.64/26 | 255.255.255.192 | 198.51.100.65 - 198.51.100.126 |
-| IT | 198.51.100.128/26 | 255.255.255.192 | 198.51.100.129 - 198.51.100.190 |
+| Subnet Name    | Subnet Address    | Subnet Mask     | IP Address Range                |
+| -------------- | ----------------- | --------------- | ------------------------------- |
+| Administration | 198.51.100.0/26   | 255.255.255.192 | 198.51.100.1 - 198.51.100.62    |
+| Sales          | 198.51.100.64/26  | 255.255.255.192 | 198.51.100.65 - 198.51.100.126  |
+| IT             | 198.51.100.128/26 | 255.255.255.192 | 198.51.100.129 - 198.51.100.190 |
+
+---
 ## Task 3: Analyze HTTP/HTTPS Website Traffic Using Wireshark
 ### Scenario
 After implementing the network design in Task 1 and configuring the IP addresses and subnets during Task 2, TechSafe Ltd. needs you to monitor network usage related to website that their employees might access. Your task is to capture and analyze HTTP/HTTPS traffic from one of the following websites to identify and understand the data flow related to these two services.
@@ -48,7 +48,6 @@ Apply the following filters in Wireshark:
 - In this example, let's use the example of Wikipedia. The final filter will look like this: `tcp.port==443 and tcp contains "Wikipedia"`.
 - Analyze the filtered traffic to identify the domains, URLs, or types of content being accessed on Wikipedia.
 ### Answer
-The selected website is Wikipedia at `https://en.wikipedia.org/`.
 #### Step 1: Confirm authorization and prepare the evidence directory
 ```bash
 mkdir -p "$PWD/techsafe-task3"
@@ -170,15 +169,13 @@ tshark \
   -e frame.len \
   -e _ws.col.Protocol
 ```
-If the filter returns no rows, the result is inconclusive rather than proof that no Wikipedia traffic occurred. Check that the correct interface was captured, confirm that the curl requests succeeded, and inspect DNS answers and remote IP addresses. Encrypted ClientHello, a proxy, a VPN, or missing packets can hide the server name.
-
+If the filter returns no rows, check that the correct interface was captured, confirm that the curl requests succeeded, and inspect DNS answers and remote IP addresses. Encrypted ClientHello, a proxy, a VPN, or missing packets can hide the server name.
 ## Task 4: Configure Firewall Rules Using Microsoft Windows Defender Firewall
 
 ### Scenario
-TechSafe Ltd. wants to further secure its internal network by restricting access to specific types of web traffic. To enhance security, you must go to each workstation and configure Microsoft Windows Defender Firewall to block all FTP and HTTP traffic.
+TechSafe Ltd. wants to further secure its internal network by restricting access to specific types of web traffic. To enhance security, you must configure Microsoft Windows Defender Firewall to block all FTP and HTTP traffic.
 ### Answer
 #### Step 1: Open elevated PowerShell and create an evidence directory
-
 Open Start, search for PowerShell, select Run as administrator, and confirm the User Account Control prompt. Run:
 ```powershell
 $EvidenceDirectory = Join-Path $PWD 'techsafe-task4'
@@ -187,7 +184,6 @@ Set-Location $EvidenceDirectory
 Get-Date -AsUTC -Format 'yyyy-MM-ddTHH:mm:ssZ' | Tee-Object -FilePath '.\collection-start-utc.txt'
 ```
 #### Step 2: Record active firewall profiles and existing matching rules
-
 ```powershell
 Get-NetFirewallProfile |
   Select-Object Name, Enabled, DefaultInboundAction, DefaultOutboundAction |
@@ -237,14 +233,12 @@ Get-NetFirewallRule -DisplayName 'TechSafe Block Outbound FTP 21' |
   Out-String |
   Tee-Object -FilePath '.\ftp-port-filter.txt'
 ```
-
 The output should show an enabled outbound block rule with TCP remote port 21.
 #### Step 6: Test FTP after applying the rule
 ```powershell
 Test-NetConnection -ComputerName 'ftp.dlptest.com' -Port 21 -InformationLevel Detailed |
   Tee-Object -FilePath '.\ftp-after.txt'
 ```
-
 The FTP control is validated only if the pretest succeeded, the rule configuration is correct, and the posttest fails while the rule is enabled.
 #### Step 7: Test HTTP before applying the rule
 Use both a TCP test and an HTTP request. The TCP test isolates port reachability. The web request confirms an application-layer HTTP response.
@@ -266,7 +260,6 @@ catch {
   $_.Exception.Message | Tee-Object -FilePath '.\http-request-before.txt'
 }
 ```
-
 If both pretests fail, stop and resolve the baseline failure before creating the HTTP rule.
 #### Step 8: Create outbound HTTP block rule
 ```powershell
@@ -299,7 +292,6 @@ Get-NetFirewallRule -DisplayName 'TechSafe Block Outbound HTTP 80' |
 
 The output should show an enabled outbound block rule with TCP remote port 80.
 #### Step 10: Test HTTP after applying the rule
-
 ```powershell
 Test-NetConnection -ComputerName 'httpforever.com' -Port 80 -InformationLevel Detailed |
   Tee-Object -FilePath '.\http-tcp-after.txt'

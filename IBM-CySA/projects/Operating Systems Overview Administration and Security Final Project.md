@@ -2,6 +2,8 @@
 Cyber Secure Inc. recently hired you as a junior cybersecurity analyst. Other businesses contract Cyber Secure Inc. to handle their system administration and security.
 
 Your supervisor assigned you six tickets; the first three require you to work with Windows OS, and the other three require you to work with Linux.
+> [!NOTE]
+> Command-line tools replaced GUI tools in this project, as command-line tools offer more stable interfaces and often expose more detailed OS or application APIs.
 ## Windows tasks
 ---
 ### Ticket 1: Create a new user

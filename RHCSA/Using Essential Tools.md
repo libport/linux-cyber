@@ -1,395 +1,422 @@
-# Using Essential Tools
+# Using Essential Tools 
 > [!NOTE]
 > A practical introduction to essential RHEL command-line skills, covering lab setup, remote access, text processing, file management, permissions, ownership, links, archiving, and compression.
-## Building a lab environment
-A practical RHEL lab can start in two ways. The first uses a fresh virtual machine and a minimal RHEL installation. The second uses a prebuilt image managed by Vagrant. Both approaches work. The best choice depends on whether the goal is to practise the installer itself or to start using the shell quickly.
 
-A clean installation gives full control over language, storage, users, software selection, and networking. A minimal install keeps the footprint small and reduces unnecessary packages. For training, that approach suits a simple virtual machine on VirtualBox or another hypervisor. A lab host benefits from two network paths when possible. One interface can provide outbound connectivity for package access and registration. Another can make SSH access from the local workstation easier.
+Red Hat Enterprise Linux 8 administration centres on command-line work, text configuration, file management, access control, remote access, and archiving. RHEL combines open source software with Red Hat's tested builds, update channels, lifecycle, and support services. Access to official repositories follows Red Hat's subscription terms. A qualifying Red Hat Developer Subscription can provide no-cost access for individual development and learning, subject to the current conditions.
 
-A Vagrant-based lab removes much of the setup overhead. Vagrant can download a base image, create the machine, boot it, and manage SSH access with minimal manual work. That approach is useful when the priority is command-line practice rather than installer familiarity. Vagrant also makes rebuilds predictable because the same definition can provision the same machine again.
+A safe learning environment uses a dedicated virtual machine rather than a production host. The learner can install RHEL from current installation media or use a trusted, appropriately licensed virtual machine image. A minimal installation provides enough software for command-line practice while limiting resource use and unnecessary services.
+## Build and access a lab system
+A virtual machine normally needs a virtual disk, sufficient memory for the selected RHEL 8 release and workload, installation media, and network access. The RHEL Boot ISO retrieves packages from a configured network source, while the full installation ISO contains more local content. Current Red Hat requirements should replace old fixed examples for ISO size, memory, and disk capacity.
 
-Red Hat still provides a no-cost Developer Subscription for Individuals, which gives individual developers access to RHEL and related resources. That makes a proper RHEL lab possible without relying on an equivalent downstream clone. CentOS Stream remains a distinct platform. It sits upstream of future RHEL content and is not a drop-in substitute for learning the exact behaviour of a supported RHEL release.
+Network address translation gives the guest outbound access, but it does not automatically make the guest reachable from the host. Host-only networking, bridged networking, or explicit port forwarding can provide an SSH path. The chosen design must also account for the guest firewall and the exposure of services to other networks.
 
-Subscription registration is required to access package repositories and updates. The registration workflow uses `subscription-manager` to attach the system to an account and enable the standard software channels. On RHEL, the core repositories typically include BaseOS for the underlying operating system and AppStream for user-space components and application streams.
-
-A basic Vagrant workflow looks like this:
+The installer can configure language, time, storage, network interfaces, software selection, and user accounts. It can also register the system. Registration can instead occur after installation:
 
 ```bash
-mkdir -p ~/vagrant/rhel8
-cd ~/vagrant/rhel8
-vagrant init generic/rhel8
-vagrant up
-vagrant ssh
-```
-
-A basic registration workflow on a newly installed or newly provisioned system looks like this:
-
-```bash
-sudo subscription-manager register --username <username> --password <password> --auto-attach
+sudo subscription-manager register
+sudo subscription-manager identity
 sudo dnf repolist
 ```
 
-In RHEL, `yum` remains as a compatibility interface, but `dnf` is the underlying package manager. Either command works for many common tasks. Administrators should still recognise that current RHEL documentation uses `dnf` terminology.
-## Connecting to the system and reading host information
-A Linux host can be accessed directly at the system console or remotely over SSH. Physical or virtual console access is useful during installation and recovery. Remote shell access is the normal method for everyday administration because it works consistently across cloud instances and local labs.
+Interactive registration keeps credentials out of shell history. Simple Content Access is now the default subscription model, so a registered system usually does not need `subscription-manager attach --auto`. An organisation that still uses legacy entitlement attachment must follow its own subscription configuration.
 
-Before opening a remote session, an administrator usually checks the hostname, interface addresses, and listening network services. These commands establish the basic identity and reachability of the host:
+Vagrant can manage a repeatable lab when the host has a supported provider and Vagrant installation. The operator should select a maintained image from a trusted publisher and verify its licence, architecture, version, and registration requirements. A community box name does not establish Red Hat provenance.
+
+```bash
+mkdir -p vagrant/rhel8
+cd vagrant/rhel8
+vagrant init <trusted-rhel8-box>
+vagrant up
+vagrant ssh
+vagrant halt
+```
+
+`vagrant init` creates a `Vagrantfile`, `vagrant up` creates or starts the guest, `vagrant ssh` opens its configured shell, and `vagrant halt` requests a graceful shutdown. The project directory retains the machine configuration and allows later starts.
+
+A console login opens a physical or virtual terminal such as `/dev/tty1`. An SSH login opens a pseudo-terminal such as `/dev/pts/0`. These commands identify the host, terminal, addresses, service state, and listening TCP sockets:
 
 ```bash
 hostnamectl
-ip -4 addr show
-ss -ntl
+tty
+ip -4 address show
+systemctl is-active sshd
+ss -lnt
 ```
 
-`hostnamectl` reports the host name and operating system details. `ip -4 addr show` lists IPv4 addresses on each interface. `ss -ntl` shows listening TCP sockets without name resolution. A listening service on port 22 normally confirms that the OpenSSH server is available.
+`ip -4 address show` restricts output to IPv4. The shorter `ip address` or `ip a` also displays IPv6, so the forms do not produce identical results. A listener on TCP port 22 shows that a process accepts local connections on that socket. It does not prove that `sshd` owns the socket, that the firewall permits access, or that a remote route works. `ss -lntp` adds process details when the caller has sufficient privilege.
 
-A basic SSH login uses the form below:
+An SSH client connects with an account and a resolvable host name or address:
 
 ```bash
-ssh user@host
+ssh account@server.example.test
 ```
 
-If the host uses a private lab address, the `host` field can be the IP address. If DNS resolves the host name correctly, the host name can be used instead. The first connection records the server key in the local known-hosts file. After that, the client checks the key on future connections to detect unexpected changes.
+The client asks the user to verify an unseen server host key before storing it. That check protects against connecting to the wrong host. Current Windows, macOS, and Linux systems can provide OpenSSH clients, while other compatible clients remain available.
 
-Linux commands follow a predictable structure. The command name comes first. Options usually follow. Arguments identify targets. For example, `ls` by itself lists the current directory. `ls -a` includes hidden entries that begin with a dot. `ls -l /etc` requests a long listing of `/etc`. That pattern repeats across most command-line tools.
+Linux commands, account names, paths, and file names are case-sensitive. A command generally has this structure:
 
-Shell efficiency depends on a few habits:
-- use tab completion to reduce typing and prevent path errors
-- use clear, explicit paths when the current directory is uncertain
-- use `Ctrl-L` to clear a crowded screen
-- use `tty` to identify the current terminal device when needed
-
-The shell also provides access to built-in help and full manuals. Short option help often appears with `--help`. Longer reference material appears in the manual pages. Package-specific documentation often lives under `/usr/share/doc`.
-
-```bash
-ip --help
-man ip
-man man
-ls /usr/share/doc
+```text
+command [options] [arguments]
 ```
 
-Manual pages use a pager, usually `less`. Common navigation keys include the arrow keys, Page Up, Page Down, `/pattern` for searching, and `q` to quit.
-## Redirecting shell input and output
-Redirection is central to Linux administration because almost every tool can read from standard input and write to standard output or standard error. The shell connects those streams to the terminal by default, but it can also send them to files, pipes, or other commands.
+`ls` lists the current directory, `ls -a` includes names beginning with a dot, and `ls -l /etc` produces a long listing for `/etc`. A command can provide concise help through `--help`, a subcommand such as `ip address help`, or a manual page such as `man ip`. Installed packages often place additional material under `/usr/share/doc`. Tab completion reduces typing errors, `Ctrl-L` clears the display, and `Alt-.` or Escape followed by a full stop recalls the previous command's last argument in Bash.
 
-Standard output carries normal results. Standard error carries errors and diagnostic messages. The shell usually treats them as separate streams:
-- `>` writes standard output to a file and overwrites the file
-- `>>` appends standard output to a file
-- `2>` writes standard error to a file
-- `2>>` appends standard error to a file
-- `&>` sends both standard output and standard error to the same file in shells that support that syntax
-
-Simple file creation often starts with `touch`, which creates an empty file if it does not already exist. Content can be written with `echo` and redirection:
+Manual pages contain named sections, synopsis notation, options, files, examples, and related commands. `man man` explains the interface, `man 5 passwd` requests the file-format page rather than a command page, and `apropos keyword` searches manual-page descriptions. The shell's `type` command distinguishes an executable from an alias, function, keyword, or built-in:
 
 ```bash
-touch file1
-echo "hello" > file1
-echo "again" >> file1
+type ls
+type cd
+command -V ip
 ```
 
-That sequence creates a file, writes one line, then appends another line. Overwrite and append differ in an important way. `>` replaces the existing contents. `>>` preserves them and adds more text at the end.
+This distinction helps when two command names appear to behave differently. Aliases can add options to interactive commands, while scripts often receive the underlying command without the alias. A minimal installation can also lack a package that a fuller installation includes, so an absent command does not establish that the operating system lacks the capability.
 
-Administrators often test the difference between successful output and error output with a command such as `ls`. Listing a real file produces standard output. Listing a missing file produces standard error. Separate redirection makes that difference visible and useful.
-
-A pipeline sends the standard output of one command to the standard input of the next command. That makes simple text-processing chains possible:
+Remote access requires several independent conditions. The guest needs a usable address and route, `sshd` must run and listen on an intended interface, the firewall must admit the connection, and the client must reach the host. These checks separate the layers:
 
 ```bash
-ls /etc | less
+ip route
+systemctl status sshd
+sudo sshd -t
+sudo firewall-cmd --list-services
+ssh -v account@server.example.test
 ```
 
-The shell can also feed multi-line input directly into a command through a here-document. That is useful in scripts or one-off configuration tasks because it allows a block of literal text to be created without opening an editor.
+`sshd -t` validates server configuration syntax without starting a new daemon. The client option `-v` adds diagnostic output. A failed connection therefore calls for evidence from each layer rather than an assumption based only on port 22.
+### Redirect shell input and output
+Each process starts with standard input, standard output, and standard error, represented by file descriptors 0, 1, and 2. The shell connects them to the terminal unless redirection or a pipeline changes the connection.
+
+| Bash form | Effect |
+| --- | --- |
+| `command > file` | Replaces `file` with standard output |
+| `command >> file` | Appends standard output to `file` |
+| `command 2> file` | Replaces `file` with standard error |
+| `command 2>> file` | Appends standard error to `file` |
+| `command > file 2>&1` | Sends both output streams to `file` |
+| `command &> file` | Sends both output streams to `file` in Bash |
+| `producer | consumer` | Sends standard output from one process to standard input of another |
+
+The single greater-than operator truncates an existing destination before the command runs. The double form appends. Redirections run from left to right, so their order can change the result. Bash supports `&>` as a convenience, while `> file 2>&1` works in a wider range of Bourne-style shells.
+
+A command can produce both streams during one invocation:
 
 ```bash
-cat > story.txt <<'EOF'
+ls /etc/hosts /etc/Hosts > output.txt 2> error.txt
+ls /etc/hosts /etc/Hosts > combined.txt 2>&1
+ls /etc/hosts /etc/Hosts >> combined.txt 2>&1
+```
+
+On a normally configured host, the lowercase path enters standard output and the mixed-case path enters standard error. The first command separates them, the second replaces one combined log, and the third appends to that log. Redirection captures bytes, not their meaning, so a caller must also inspect the command's exit status when success or failure controls later work.
+
+A here-document supplies several lines to a command. The closing delimiter must appear alone, without extra characters:
+
+```bash
+cat > story.txt <<'END'
 Line 1
 Line 2
-EOF
+END
 ```
 
-The marker after `<<` defines the end of the text block. Everything up to that marker becomes the command input.
+Quoting `END` prevents parameter, command, and arithmetic expansion inside the body. An unquoted delimiter allows those expansions. Scripts commonly use here-documents to generate short configuration fragments.
 
-The `tee` command solves a common privilege problem. Redirection happens in the current shell. That means `sudo echo "entry" >> /etc/hosts` fails for a regular user because the shell, not `echo`, attempts the write to `/etc/hosts`. The correct pattern pipes the text to `tee`, which runs with elevated privileges:
+Shell redirection occurs under the shell user's identity. Elevating only `echo` therefore does not grant permission to the shell that opens a protected destination:
 
 ```bash
-echo "1.0.0.1 cf" | sudo tee -a /etc/hosts
+sudo echo "192.0.2.10 app.example.test" >> /etc/hosts
 ```
 
-`tee` writes the content to the screen and to the target file. The `-a` option appends instead of overwriting. This pattern is safer and clearer than trying to force privilege escalation into the shell redirection itself.
-## Creating, editing, and navigating text files
-Text files drive much of Linux administration. Configuration files, logs, service definitions, and shell scripts all depend on accurate text editing.
-
-`touch` creates empty files. Redirection creates or updates files while commands run. Those methods work well for short changes. For sustained editing, a text editor is faster and less error-prone.
-
-Two common editors in RHEL environments are `nano` and `vim`. `nano` is simple and menu-driven. It displays key prompts at the bottom of the screen, which makes it a practical choice for new administrators or quick edits. `vim` is more powerful and more efficient once learned, but it requires an understanding of modes.
-
-A typical package installation sequence is:
+The `tee` process can open the file with elevated privilege instead:
 
 ```bash
-sudo dnf repolist
-sudo dnf install -y nano vim bash-completion
+printf '%s\n' '192.0.2.10 app.example.test' |
+  sudo tee -a /etc/hosts > /dev/null
 ```
 
-`bash-completion` is not an editor, but it improves shell completion and makes command-line work faster.
-
-A typical `nano` session is direct:
+`tee` copies input to both standard output and one or more files. Its `-a` option appends. An administrator should inspect the destination first because an unintended duplicate or an omitted `-a` can damage a configuration file.
+### Edit text at the command line
+RHEL 8 uses YUM v4, which builds on DNF technology. The `yum` and `dnf` command names support the same package-management workflow on RHEL 8. A registered system with enabled BaseOS and AppStream repositories can install common editors and shell completion:
 
 ```bash
-nano story.txt
+sudo dnf install nano vim-enhanced bash-completion
 ```
 
-Within `nano`, the administrator types normally, uses the arrow keys to move, presses `Ctrl-X` to exit, confirms saving when prompted, and writes the file name if needed. When editing protected files, `sudo nano /etc/hosts` or a similar command opens the file with the required privileges.
+Nano provides a direct editing model. `nano story.txt` opens an existing file or starts a new buffer. `Ctrl-X` exits, and Nano then asks whether to save changed content. An editor that opens a protected file needs appropriate privilege, such as `sudo nano /etc/hosts`, although administrators should use elevated editors only for files that require them.
 
-`vim` starts in normal mode. In that mode, keystrokes act as commands rather than text input. Common entry points into insert mode include:
-- `i` to insert before the cursor
-- `a` to append after the cursor
-- `I` to insert at the start of the line
-- `A` to append at the end of the line
-
-After editing, `Esc` returns to normal mode. `:wq` writes and quits. `:q!` quits without saving. `vimtutor` provides an interactive introduction and is worth using before any serious editing session.
-
-```bash
-vimtutor
-vim story.txt
-```
-
-Short files suit `cat`. Large files suit `less`. The beginning and end of files can be inspected quickly with `head` and `tail`.
-
-```bash
-cat /etc/hosts
-head /etc/passwd
-tail -n 20 /var/log/messages
-less /etc/services
-wc -l /etc/services
-```
-
-`wc -l` counts lines, which helps when judging file size or verifying that a generated file has the expected number of records.
-
-Directory navigation underpins all file work. The shell always has a current working directory. `pwd` prints it. `cd` changes it. `cd` with no argument returns to the user’s home directory. `cd -` returns to the previous working directory, which is one of the fastest ways to switch between two locations.
+Vim separates actions into modes. It starts in Normal mode. `i` inserts before the cursor, `a` appends after it, `I` inserts at the start of the line, and `A` appends at the end. Escape returns to Normal mode. A colon opens the command-line mode, where `:x` writes changes when necessary and exits, while `:q!` abandons changes. `vimtutor` provides an interactive introduction.
+### Manage directories and files
+An absolute path begins at `/`, the root of the file system. A relative path begins at the current directory. `~` denotes the current user's home directory, `.` denotes the current directory, and `..` denotes its parent. These commands navigate and create a small hierarchy:
 
 ```bash
 pwd
 cd /usr/share/doc
-cd
 cd -
+cd
+mkdir -p project/input project/output
 ```
 
-`mkdir` creates directories. `mkdir -p` creates parent directories as needed. `rmdir` removes empty directories only. `rm -r` removes a directory tree recursively, and `rm -rf` suppresses prompts and errors for many cases.
+`pwd` prints the current directory. `cd -` returns to the previous directory, and `cd` without an argument returns to the home directory. `mkdir -p` creates missing parent directories and does not fail when an existing parent already satisfies the request.
+
+`touch name` creates an empty regular file when `name` does not exist. When the file already exists, `touch` updates timestamps and preserves its content. The `file` command examines content and selected metadata to classify an object:
 
 ```bash
-mkdir -p ~/work/dir1/dir2
-rmdir emptydir
-rm -r olddir
+touch file1
+file file1
+printf '%s\n' 'hello' > file1
+file file1
 ```
 
-File operations rely on `cp`, `mv`, and `rm`. Globbing expands patterns before the command runs. `*` matches any string of characters. `?` matches a single character. Braces such as `{1..12}` perform shell expansion rather than filename matching.
+The first classification reports an empty file. After redirection, `file` normally identifies text. This inspection gives stronger evidence than a filename extension, which Linux does not require for file typing. Names beginning with a dot remain ordinary directory entries. Shell tools hide them from default listings by convention, not through a separate hidden-file attribute.
+
+`rmdir` removes an empty directory. `rm -r` recursively removes a directory tree, and `rm -f` suppresses selected prompts and errors. Combining them as `rm -rf` can erase extensive data without confirmation. An administrator should resolve and inspect the exact target before using recursive deletion and should not use a broad wildcard in a home, system, or configuration directory.
+
+The principal file operations are `cp`, `mv`, and `rm`:
 
 ```bash
-cp /etc/hosts ~/hosts.copy
-mv hosts.copy hosts.test
-rm hosts.test
-touch files{1..12}
-ls files*
-ls files?
-ls files??
+cp /etc/hosts .
+mv hosts hosts.old
+rm -i hosts.old
 ```
 
-Permission requirements matter during file operations. To copy a file, the process needs read access to the source file and write plus execute access to the destination directory. To move or rename a file within a directory tree, the operation depends mainly on permissions on the directories involved, not on write access to the file itself. To delete a file, the process needs write and execute access to the parent directory. That distinction explains why a user can sometimes delete a read-only file if the directory permissions allow it.
-## Searching text with grep and regular expressions
-Text search becomes powerful when it combines plain strings with simple regular expressions. `grep` scans lines for matches and prints the matching lines. That makes it ideal for checking configuration files, looking for users or services, and isolating effective settings from commented defaults.
+Copying a regular file requires search permission on path components, read access to the source, and suitable access to the destination. Creating a new destination entry normally requires write and search permissions on its directory. Moving or renaming within one file system normally requires write and search permissions on both affected directories. A move across file systems behaves more like a copy followed by deletion and can need additional access. Removing a file depends mainly on write and search permissions for its directory, not write permission on the file itself. Sticky-bit rules, ACLs, SELinux, immutable attributes, and read-only mounts can impose further limits.
 
-A plain search finds any line that contains the target text:
+Bash expands patterns before it starts a command. `*` matches any string within one path component, `?` matches one character, and bracket expressions match selected characters. Brace expansion generates literal alternatives or sequences and differs from pathname matching:
 
 ```bash
-grep root /etc/passwd
+touch file{1..12}
+printf '%s\n' file*
+printf '%s\n' file?
+printf '%s\n' file??
 ```
 
-That result can include unintended matches. For example, a search for `root` also matches a line that ends in `/root`. Anchors solve that problem. `^` anchors the pattern to the start of the line. `$` anchors it to the end.
+The first command generates twelve names. `file?` matches `file1` through `file9`, while `file??` matches names with two characters after `file`, including `file10`, `file11`, and `file12`. Quoting a pattern prevents pathname expansion. Before passing a pattern to `rm`, an operator can print the expansion with `printf` or `ls` and confirm the targets.
+
+Short text files suit `cat`. `head` and `tail` read the beginning or end, while `less` provides paging and interactive search. `wc -l` counts newline-terminated lines:
 
 ```bash
-grep '^root' /etc/passwd
-grep 'bash$' /etc/passwd
+cat /etc/hosts
+head /etc/passwd
+tail -n 2 /etc/passwd
+less /etc/services
+wc -l /etc/services
 ```
 
-Configuration files often contain comments. A plain search can therefore match both comments and real settings. Anchoring the pattern helps identify active directives. For example, a search for lines that start with `PasswordAuthentication` in the SSH daemon configuration shows the effective directive more clearly than a broader search for `password`.
+Within `less`, `/text` searches forward, `n` finds the next match, and `q` quits. The `man` command commonly uses a pager such as `less`.
+
+`grep` selects lines that match text or a regular expression. Matching remains case-sensitive unless an option changes it. A caret anchors a match at the beginning of a line, and a dollar sign anchors it at the end:
 
 ```bash
-sudo grep '^PasswordAuthentication' /etc/ssh/sshd_config
+grep '^root:' /etc/passwd
+grep '/bin/bash$' /etc/passwd
+sudo grep -E '^PasswordAuthentication[[:space:]]+' /etc/ssh/sshd_config
+sudo grep -vE '^[[:space:]]*(#|$)' /etc/ssh/sshd_config
 ```
 
-The search is case-sensitive unless options such as `-i` request case-insensitive matching. That matters because many configuration directives use precise capitalisation. Administrators should search for the exact setting name when possible.
+The last command filters blank lines and lines whose first non-space character is `#`. It does not modify the file. Configuration includes, defaults, command-line options, and service policy can affect the final SSH behaviour, so a textual match alone does not always establish the effective setting.
 
-`grep` also works well with pipelines. One command can generate a list and another can narrow it. That workflow is often faster than opening a large file in an editor when the goal is only to confirm one value.
-## Understanding file metadata and permissions
-Linux stores metadata with each file and directory. Long listings reveal the key fields:
+Quoting protects a regular expression from shell expansion before `grep` receives it. Basic `grep` recognises anchors and character classes, while `grep -E` enables extended operators such as grouping, alternation, and repetition without many backslashes. `grep -F` treats the search as a fixed string, which suits punctuation that should have no regular-expression meaning.
 
 ```bash
-ls -l file1
-stat file1
+grep -F 'root:' /etc/passwd
+grep -i 'worldwide http' /etc/services
+grep -n '^root:' /etc/passwd
+grep -c '/bin/bash$' /etc/passwd
+grep -rF 'setting=value' project
 ```
 
-The first character in the permissions string identifies the file type. A dash represents a regular file. `d` represents a directory. `l` represents a symbolic link. The remaining nine permission bits are arranged in three groups of three:
-- user permissions for the file owner
-- group permissions for the file’s group owner
-- other permissions for everyone else
+The `-i` option ignores case, `-n` prints line numbers, `-c` reports a count of matching lines, and `-r` searches below a directory. Recursive searches should use a narrow starting path because pseudo-file systems, large trees, unreadable files, and binary content can produce slow or noisy results.
 
-Each triplet uses the same symbols:
-- `r` for read
-- `w` for write
-- `x` for execute
+A pipeline can combine selection and measurement:
 
-Those permissions apply differently to files and directories. On regular files, read allows viewing contents, write allows modifying contents, and execute allows running a program or script when other requirements are met. On directories, read allows listing entries, write allows creating, deleting, or renaming entries, and execute allows entering the directory and accessing entries by name. Directory write without execute is rarely useful. Directory execute without read can be useful when a path should be traversable but not listable.
+```bash
+sudo grep -vE '^[[:space:]]*(#|$)' /etc/ssh/sshd_config |
+  wc -l
+```
 
-Numeric permissions translate the same bits into octal values. `r` equals 4, `w` equals 2, and `x` equals 1. The values add within each triplet. Common examples include:
-- `7` for `rwx`
-- `6` for `rw-`
-- `5` for `r-x`
-- `4` for `r--`
+`wc -l` counts the filtered lines that reach it. It does not validate the configuration and, without additional shell settings, the pipeline's final status normally comes from `wc`. `grep -c` avoids that pipeline when only a match count is needed. When a privileged file requires reading, `sudo` belongs on the process that opens the file. Giving privilege to a later `wc` process cannot repair a read failure in `grep`.
+## Interpret metadata and file types
+`ls -l` displays the file type and mode, hard-link count, owner, group, size, modification time, and name. `ls -ld directory` reports the directory entry itself rather than its contents. `stat` provides fuller metadata and supports selected output:
 
-A mode such as `644` therefore means read and write for the owner, and read-only for group and others. A mode such as `755` means full access for the owner and read plus execute for group and others.
+```bash
+ls -ld /etc
+stat /etc/hosts
+stat -c '%A %a %U %G %n' /etc/hosts
+```
 
-New files and directories start from default creation modes and then lose permissions through the shell’s `umask`. In practice, it is safer to inspect the current `umask` than to assume a universal default, because distributions, login profiles, and site policies can change it. A common collaborative setting removes write permission from others. More restrictive settings remove group write as well.
+`stat` prints modes such as `644` in octal, not decimal. The first character in an `ls -l` mode identifies the file type.
+
+| Character | File type |
+| --- | --- |
+| `-` | Regular file |
+| `d` | Directory |
+| `l` | Symbolic link |
+| `p` | Named pipe |
+| `b` | Block device |
+| `c` | Character device |
+| `s` | Unix domain socket |
+
+A Unix domain socket supports local interprocess communication. It does not represent every network connection. Commands such as `ss` inspect active sockets more directly.
+
+The next nine mode characters form three classes: owner, group, and other. Each class receives read, write, and execute bits. Access checks select the owner class when the process's effective user ID matches the owner. Otherwise, they select the group class when an effective group matches. If neither matches, they select the other class. The kernel does not combine a matching owner's bits with group or other bits.
+
+| Bit | Octal value | Regular file | Directory |
+| --- | ---: | --- | --- |
+| `r` | 4 | Reads file content | Lists entry names |
+| `w` | 2 | Changes file content | Creates, removes, or renames entries when search access also exists |
+| `x` | 1 | Executes a suitable program or script | Searches or traverses the directory |
+
+The values combine within each class. Read and write form 6, read and execute form 5, and all three form 7. A mode such as `0640` gives the owner read and write, the group read, and other users no access.
+
+New regular files usually begin from a base mode no broader than `0666`, and new directories begin from `0777`. The process applies its `umask` as a bit mask:
+
+```text
+effective mode = base mode & ~umask
+```
+
+The operation removes masked bits rather than performing ordinary subtraction. On a standard RHEL 8 configuration, a regular user's `umask` commonly starts at `0002`, producing `0664` for a new regular file and `0775` for a new directory. Root commonly starts at `0022`, producing `0644` and `0755`. Shell startup files, PAM configuration, services, containers, and applications can set different values.
 
 ```bash
 umask
-touch file2
-mkdir dir2
-ls -ld file2 dir2
+umask 0077
+touch private.txt
+mkdir private-dir
+stat -c '%A %a %n' private.txt private-dir
 ```
 
-The key rule is that `umask` removes permissions from the creation defaults. It does not add permissions beyond those defaults. Regular files normally start without execute bits. Directories normally include execute because directory traversal requires it.
+`umask 0077` removes all group and other bits from newly created objects in that shell. It does not retroactively change existing objects, and an application can request a narrower base mode.
 
-`chmod` changes permissions. It accepts numeric modes and symbolic expressions. Numeric modes replace the full permission set explicitly. Symbolic modes add, remove, or assign bits more selectively.
+`chmod` changes mode bits. Numeric notation sets a complete mode, while symbolic notation changes selected classes:
 
 ```bash
-chmod 644 file1
-chmod u=rw,go=r file1
-chmod o+w file1
-chmod g-w file1
+chmod 0640 report.txt
+chmod u=rw,g=r,o= report.txt
+chmod g+w shared.txt
+chmod -R a+X project
 ```
 
-The symbolic forms use `u`, `g`, `o`, and `a` for user, group, other, and all. They combine with `+`, `-`, or `=` and the permission letters. An uppercase `X` has a specialised meaning. It adds execute only to directories and to files that already have at least one execute bit set. That is useful when fixing directory trees without accidentally marking ordinary text files as executable.
+Uppercase `X` adds execute permission to directories and to regular files that already have at least one execute bit. This makes `a+X` safer than `a+x` for many recursive directory operations. When symbolic notation omits the class, as in `chmod +w`, the current `umask` limits the affected classes. An explicit class such as `a+w` does not rely on that omission rule.
+
+`chown` changes ownership, and `chgrp` changes group ownership:
 
 ```bash
-chmod -R a+X projectdir
+sudo chown root:root report.txt
+sudo chown account: report.txt
+chgrp project report.txt
 ```
-## Ownership, links, and identity changes
-Permissions depend on ownership as well as mode bits. Every file has a user owner and a group owner. Long listings display both. The `id` command shows the current user ID, primary group ID, and supplementary groups.
+
+Only root can normally change a file's user owner. The file owner can normally change its group to a group of which that owner is a member. In `chown account:`, the empty group field requests the named account's login group.
+
+Traditional mode bits implement discretionary access control. Root processes often hold capabilities that bypass these checks, but root does not override every protection. SELinux policy, read-only mounts, immutable attributes, encrypted storage, and other kernel controls can still deny an operation. RHEL enables SELinux by default, so administrators should diagnose both mode bits and security context rather than treating root as universally unrestricted.
+
+Access control lists extend the owner-group-other model. `getfacl` shows entries, and `setfacl` can grant named users or groups specific rights. The ACL mask limits effective permissions for named users, named groups, and the owning group. A plus sign after the mode in `ls -l` can indicate an ACL, while a full stop can indicate an SELinux context.
+
+An access failure requires inspection of the process identity and every relevant path component. A reliable diagnosis gathers current state before changing permissions:
 
 ```bash
 id
-ls -l file1
+namei -l /srv/project/report.txt
+ls -ld /srv /srv/project /srv/project/report.txt
+getfacl /srv/project/report.txt
+ls -lZ /srv/project/report.txt
 ```
 
-RHEL commonly creates a private primary group for each user, where the user name and the default group name match. New files usually inherit the current effective primary group of the process that created them.
+`id` reports the credentials that the current process actually holds. `namei -l` walks the path and shows ownership and modes for each component. `ls -ld` avoids accidentally listing a directory's contents when the directory's own metadata is required. `getfacl` exposes ACL entries and the effective mask, while `ls -lZ` adds the SELinux context.
 
-`chown` changes ownership. `chgrp` changes group ownership. Root privileges are normally required to change the user owner. Group changes may be possible when the user belongs to the target group and local policy permits it.
+The investigation first identifies whether the operation needs content access, directory traversal, directory modification, or execution. It then determines which owner, group, or other class the kernel selects. Next, it checks ACLs, the mount state, file attributes, and SELinux denials. Changing a mode to `0777` before this analysis can expose data without resolving the real cause. The smallest permission change that supports the intended actor and operation provides the safer correction.
+## Manage links, users, and groups
+A hard link adds another directory entry for the same inode. Each name reaches the same file content and metadata. Removing one name leaves the inode available while another hard link or open reference remains. Hard links cannot cross file systems, and ordinary users generally cannot create hard links to directories.
 
 ```bash
-sudo chown alice file1
-sudo chown alice:wheel file1
-sudo chgrp wheel file1
+ln source.txt second-name.txt
+ls -li source.txt second-name.txt
 ```
 
-Links provide alternate names for files. Hard links point directly to the same inode as the original file. Symbolic links store a path to another file or directory. Hard links generally stay on the same filesystem and are normally restricted to regular files. Symbolic links can cross filesystems and can point to directories, which makes them the normal choice for shortcuts and compatibility paths.
+Both names display the same inode number. A user does not need administrator status to create a permitted hard link, although directory access, ownership protections, and kernel settings still apply.
+
+A symbolic link stores a path to another name. It has its own inode, can cross file systems, can target a directory, and can remain after its target disappears:
 
 ```bash
-ln original.txt hardlink.txt
-ln -s /etc/services services
+ln -s /etc/services ports
+ls -l ports
 ```
 
-A symbolic link shows `l` as the file type in `ls -l`, along with an arrow to the target path. Removing a symbolic link does not remove the target. Removing one hard link only removes one name. The underlying file content remains until all hard links are removed and no process still holds the file open.
+Relative symbolic targets resolve from the link's containing directory. Absolute targets always begin at `/`, which can make a copied directory tree less portable.
 
-Administrators also need to understand user and group identity changes inside a shell session. `newgrp` starts a new shell with a different primary group. That affects the group ownership of newly created files. `su` switches user identity. `su -` starts a full login shell for the target account and loads the target user’s environment. That form is usually safer for administrative work than plain `su`.
+The `id` command reports the current process's user and group identities. RHEL commonly creates a private primary group for each local user. The primary group usually supplies the group owner for a new file, although a parent directory's set-group-ID bit can instead make the file inherit that directory's group.
 
 ```bash
-newgrp wheel
-su -
+id
+sudo usermod -aG wheel account
+id account
 ```
 
-One correction matters here. Adding a user to a supplementary group does not automatically update existing processes in every current session. New logins pick up the new group set. Existing shells usually need a fresh login or a new shell with the required group context before they reflect the change.
+`usermod -aG` appends supplementary membership in the account database. Existing login processes do not acquire the new group automatically. The user must start a new login session or deliberately create a process with the new credentials. `newgrp group` starts a new shell with a changed effective group, while `sg group command` runs a command with that group context. Each new shell should end with `exit` when its work finishes.
 
-For single administrative tasks, `sudo` is usually clearer than switching fully to root because it limits privilege elevation to one command and preserves an audit trail.
-## Special permission patterns for controlled access
-Standard read, write, and execute bits can support some useful access patterns without introducing more advanced controls. Two examples stand out.
-
-A write-only file can accept appended data from a user while blocking that same user from reading the existing contents. That pattern suits simple logging or drop-box style input where many users must add records but should not read each other’s entries. The owner or root can still inspect the file as needed.
-
-An execute-only directory allows traversal without directory listing. If a user knows the full file name and the file itself grants appropriate access, that user can open the file through the directory path. Without read permission on the directory, the user cannot list the directory contents. If the directory grants write and execute, the user can create and remove entries even without directory read permission. That pattern is useful when a directory must accept known-path access but should not expose its full contents casually.
-
-These patterns rely on exact directory semantics. For directories:
-- read controls listing
-- write controls entry creation, removal, and renaming
-- execute controls traversal and named access
-
-That behaviour often surprises administrators who learned file permissions first and then assumed directories follow the same rules.
-## Creating archives with tar and star
-Archiving groups files into a single file. Compression reduces size. The two jobs often appear together, but they are not the same thing. A tar archive can exist without compression. That distinction matters because an archive is often useful even when storage space is not the main concern.
-
-`tar` remains the standard archiving tool on Linux. It creates a single archive from one or more files or directories, preserves paths relative to the invocation point, and can later list or extract the stored content.
-
-Common `tar` operations include:
-- `-c` to create an archive
-- `-t` to list archive contents
-- `-x` to extract an archive
-- `-f` to specify the archive file name
-- `-v` for verbose output when needed
-
-Typical examples are:
+`sudo` runs an authorised command under another identity, usually root, according to policy. It supports more focused privilege than sharing the root password. `su - account` starts a login-style shell for another account and loads that account's login environment. `su account` changes identity without a complete login environment and normally retains the current directory. Administrators should use the form that matches the required environment and should avoid unnecessary long-lived root shells.
+## Apply unusual permissions safely
+A write-only mode can let a process change a regular file without reading it:
 
 ```bash
-tar -cf myetc.tar etc
-tar -tf myetc.tar
-tar -xf myetc.tar
+chmod u=w log
+printf '%s\n' 'event' >> log
 ```
 
-Because `tar` stores many files inside one larger file, it can sometimes appear slightly smaller than the original directory tree even before compression. That effect comes from block allocation and metadata overhead in the filesystem rather than from true data compression.
+This arrangement does not create a secure logging service by itself. A writer may still truncate, overwrite, corrupt, or flood the file according to the open mode and other controls. System logging through `systemd-journald`, `rsyslog`, or a dedicated service provides stronger separation, concurrency handling, rotation, and policy.
 
-Extraction deserves care. By default, `tar` can overwrite files depending on path, timestamps, options, and local conditions. Administrators should extract into a controlled destination or inspect the archive first when working with valuable data.
+Directory access has different semantics from file access. Execute without read lets a user traverse the directory and access a known name when that name's own permissions allow it. Write plus execute can allow creation, deletion, and renaming of known entries even when the user cannot list the directory. Hidden names therefore provide weak protection. A shared writable directory often needs the sticky bit, as in mode `1777`, so users cannot remove or rename entries owned by others. ACLs and service-mediated access usually express multi-user requirements more safely.
+## Archive and compress files
+`tar` groups files and their metadata into one archive. Archiving does not inherently compress data. A tar archive includes headers and block padding, so it can be larger or smaller than a casual `du` comparison suggests. `du` commonly reports allocated disk blocks, while an archive listing reports file length. Neither result proves compression.
 
-The course material also mentions `star`, another archiver. `star` offers similar create, list, and extract operations and may provide different defaults or performance characteristics. It is not always installed by default, so `tar` remains the practical baseline command for most RHEL systems.
-## Compressing archives with gzip and bzip2
-Compression utilities reduce file size by encoding repeated or predictable data more efficiently. Two classic tools are `gzip` and `bzip2`. Their matching decompression tools are `gunzip` and `bunzip2`.
+| Operation | Command pattern |
+| --- | --- |
+| Create | `tar -cf archive.tar paths` |
+| List | `tar -tf archive.tar` |
+| Extract all | `tar -xf archive.tar` |
+| Extract selected members | `tar -xf archive.tar member` |
 
-Used directly, they compress an existing file:
+Using `-C` controls the directory from which tar reads or into which it writes. This approach records relative member names and avoids embedding an absolute leading slash:
 
 ```bash
-gzip etc.tar
-gunzip etc.tar.gz
-
-bzip2 etc.tar
-bunzip2 etc.tar.bz2
+sudo tar -cf etc-backup.tar -C / etc
+tar -tf etc-backup.tar
+mkdir -p restore-test
+tar -xf etc-backup.tar -C restore-test
 ```
 
-The choice involves a trade-off. `gzip` usually runs faster. `bzip2` often produces a smaller file, but it tends to use more CPU time. The best option depends on whether speed or storage reduction matters more for the task at hand.
+The test extraction creates `restore-test/etc` and leaves the live `/etc` tree untouched. A recovery operation can extract a selected member to `/` only after the operator validates the archive, target path, permissions, ownership, and effect on the running service. Deleting a live configuration file to demonstrate restoration creates needless risk.
 
-`tar` can call these tools during archive creation. That combines packaging and compression into one step:
+GNU tar normally preserves basic mode, time, ownership, and link information in the archive, although extraction behaviour depends on privilege and options. Backups that require ACLs, extended attributes, or SELinux labels need suitable options and a tested restoration procedure. An archive should never substitute for restore testing.
+
+A dependable archive workflow separates creation, integrity checking, content inspection, test restoration, and production recovery. The operator records the command and its exit status, stores the archive away from the source failure domain, and protects it according to the sensitivity of its contents. A checksum can detect later byte changes:
 
 ```bash
-tar -czf etc.tar.gz etc
-tar -xzf etc.tar.gz
-
-tar -cjf etc.tar.bz2 etc
-tar -xjf etc.tar.bz2
+sha256sum etc-backup.tar > etc-backup.tar.sha256
+sha256sum -c etc-backup.tar.sha256
+tar -tvf etc-backup.tar
 ```
 
-With modern `tar`, extraction often detects the compression format automatically, so the explicit `z` or `j` is sometimes unnecessary on extraction. Even so, explicit options improve clarity in training and scripts.
+`tar -tvf` displays member types, modes, ownership, sizes, times, and names. A successful checksum confirms that the archive matches the recorded bytes, but it does not show that the selected files were complete or usable. Test extraction and application-level validation provide that evidence. A recovery plan also accounts for free space, existing destinations, service shutdown requirements, ownership mapping, SELinux relabelling, and confidential data.
 
-Compression is especially effective on text-heavy content such as configuration files, logs, source code, and many plain-text datasets. It is less effective on data that is already compressed, such as many images, videos, or archives created with strong compression beforehand.
-## Practical habits for reliable command-line work
-Reliable shell work depends less on memorising every option and more on disciplined habits:
-- check the current directory before destructive commands
-- use tab completion to reduce typing errors
-- inspect permissions and ownership before assuming a fault in the application
-- distinguish clearly between file permissions and directory permissions
-- prefer `sudo` for single privileged actions
-- inspect an archive before extracting it when the destination matters
-- treat overwrite operations such as `>` and recursive removal operations such as `rm -rf` with extra care
-- verify effective configuration values with focused `grep` searches instead of scanning files manually
+GNU tar strips leading slashes from ordinary archived names by default, but an operator should not rely on that behaviour as the only safeguard. Before extracting an untrusted archive, the operator should inspect its member names for absolute paths, parent traversal, unexpected links, devices, and overwrites, then extract it inside an isolated directory.
 
-Those habits reduce mistakes and make troubleshooting faster. They also scale well from small labs to production systems.
-## Summary
-RHEL administration rests on a small set of repeatable shell skills. A good lab starts with a proper RHEL system, ideally registered so that standard repositories and updates are available. Remote access over SSH, accurate inspection of host identity, and efficient use of manual pages establish a solid working environment.
+Compression utilities trade processor time for storage and transfer savings. Results depend on the data, utility, level, and hardware, so one example cannot establish a general ratio or speed:
 
-From there, shell redirection, `tee`, and here-documents make text flow manageable. `nano` and `vim` provide practical editing paths. Directory navigation, file operations, and globbing support daily filesystem work. `grep` and related text tools turn large configuration files into searchable data.
+```bash
+gzip archive.tar
+gunzip archive.tar.gz
+bzip2 archive.tar
+bunzip2 archive.tar.bz2
+```
 
-Permissions, ownership, and links explain who can access what and why. `chmod`, `chown`, `chgrp`, `newgrp`, `su`, and `sudo` control identity and access with precision when they are used with a clear understanding of file and directory semantics. Finally, `tar`, `gzip`, and `bzip2` package and compress files for transfer, backup, and recovery.
+These utilities normally replace the input with the transformed output. `gzip` often runs faster, while `bzip2` can produce a smaller result for some inputs. Actual workloads require measurement.
+
+Tar can invoke a compressor while creating an archive:
+
+```bash
+sudo tar -czf etc-backup.tar.gz -C / etc
+sudo tar -cjf etc-backup.tar.bz2 -C / etc
+tar -tf etc-backup.tar.gz
+tar -xf etc-backup.tar.gz -C restore-test
+```
+
+The `z` option selects gzip, and `j` selects bzip2. GNU tar can normally detect these formats during listing and extraction, so `-tf` and `-xf` can work without repeating the compression option. The archive name is an argument to `-f`, so placing `f` immediately before the archive name keeps the relationship clear.
+
+The `star` utility provides another tar-compatible archiver with a different option set and overwrite behaviour. Package availability depends on enabled RHEL repositories. An administrator should consult the installed `star` manual rather than assume that every GNU tar option or extraction rule carries across.

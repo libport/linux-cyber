@@ -1,318 +1,459 @@
 # Creating Shell Scripts
 > [!NOTE]
 > How to build reliable, secure, and maintainable Bash scripts on RHEL using command-line testing, validation, exit statuses, arguments, loops, functions, and safe input handling. 
-## Core Bash principles
-Shell scripting builds on command-line behaviour rather than replacing it. If a command or control structure works in the shell, the same logic can usually move into a script with only minor formatting changes. This makes the command line the fastest place to test ideas before they become part of a reusable tool.
-### Using loop syntax at the command line
-A `for` loop processes each item in a list. At the prompt it can print greetings, create several directories or add several users with similar settings. In a script the same structure becomes easier to read because each keyword can sit on its own line.
+## Shell scripts and automation
+Bash serves as both a command interpreter and a programming language. A shell script stores commands, expansions, tests, loops, and functions in a text file so that Bash can execute them as a repeatable process. Scripts reduce manual work, apply the same procedure consistently, and make administrative operations easier to review.
+
+An administrator can test most shell syntax interactively before placing it in a script. Multi-line input works at the command line because Bash displays a continuation prompt until it receives a complete construct. This loop processes three greetings:
 
 ```bash
-for msg in hi salut ciao
+for message in hi salut ciao
 do
-  echo "$msg"
+  printf '%s\n' "$message"
 done
 ```
 
-A `while` loop repeats while a test remains true. It suits counters, retries and validation.
+A `for` loop processes a list. A `while` loop repeats commands while its test or command returns success. Every loop must make progress towards termination. Otherwise, it can continue indefinitely.
+
+Scripts can call shell builtins, functions, external programs, and other scripts. They can also redirect input and output, accept arguments, and make decisions from command results. Before an administrator automates a privileged operation, the administrator should test it with harmless data, check its failure paths, and confirm that repeated execution will not damage an existing configuration.
+## A practical working environment
+A disposable, non-production RHEL 8 virtual machine allows an administrator to snapshot the system, test privileged operations, and restore the earlier state. The host needs Bash, standard command-line utilities, an editor, and authorised `sudo` or root access. User-creation tests should use invented names that cannot collide with real identities.
+
+The command line provides immediate feedback. `type` distinguishes keywords, builtins, functions, and external commands, while local manual pages describe the installed versions:
 
 ```bash
-i=3
-while [ "$i" -gt 0 ]
+type for
+type read
+type useradd
+man bash
+man useradd
+man passwd
+```
+
+An administrator should develop a privileged script in stages. A dry run can print planned actions without changing the system. Later stages can add one operation at a time, inspect its status, and verify its result. This sequence exposes errors before a loop amplifies them across many accounts.
+
+A `while` loop often updates a counter:
+
+```bash
+count=3
+
+while (( count > 0 ))
 do
-  echo "$i"
-  i=$((i - 1))
+  printf '%s\n' "$count"
+  (( count-- ))
 done
 ```
 
-These patterns matter because shell scripts rarely do anything magical. They organise familiar commands into clear, repeatable flows. A loop that works interactively will usually work unchanged inside a script once it is placed in a file and given the right interpreter.
-### Exit status and simple logic
-Bash relies on exit status to decide whether a command succeeded. An exit status of `0` means success. Any non-zero status indicates failure. In practice Bash exposes statuses in the range `0` to `255`, so negative values do not appear as shell exit codes.
+Arithmetic syntax avoids the string-oriented `[` command for integer work. The decrement makes the condition false after three iterations. A resource-creation loop also needs a policy for existing resources and failed iterations.
+## Exit status and command logic
+Every command returns an exit status. Bash stores the status of the most recent foreground pipeline in `$?`. Status `0` denotes success. A status from `1` to `255` denotes a failure or another non-success result whose meaning depends on the command. Shells do not expose negative exit statuses. Values outside the supported range undergo conversion, so scripts should use documented values within the range.
 
-The shell stores the most recent exit status in `$?`. Scripts can inspect that value directly, but Bash also provides compact control operators that make simple logic easier to read.
+```bash
+ls /etc/hosts
+printf 'Status: %s\n' "$?"
 
-- `cmd1 && cmd2` runs `cmd2` only if `cmd1` succeeds
-- `cmd1 || cmd2` runs `cmd2` only if `cmd1` fails
+ls /etc/hostz
+printf 'Status: %s\n' "$?"
+```
 
-This pattern is useful for directory creation and navigation:
+The first `printf` reports the status from `ls`. Any intervening command would replace that value. A script should therefore test a command directly when possible:
+
+```bash
+if getent passwd bob >/dev/null
+then
+  printf 'The bob account exists.\n'
+else
+  printf 'The bob account does not exist.\n'
+fi
+```
+
+The `&&` operator runs its right-hand command only when the left-hand command succeeds. The `||` operator runs its right-hand command only when the left-hand command fails. These operators suit short decisions:
 
 ```bash
 mkdir sales && cd sales
 ```
 
-It also helps when a directory might already exist.
-
 ```bash
-cd mkt 2>/dev/null || {
-  mkdir mkt &&
-  cd mkt
+cd marketing 2>/dev/null || {
+  mkdir -p marketing &&
+  cd marketing
 }
 ```
 
-The grouped command on the right keeps directory creation and the follow-up `cd` together so Bash evaluates them as one fallback path. Redirecting the failed `cd` message to `/dev/null` keeps the output tidy when the script already expects that failure.
-### Command-line testing as part of script design
-Interactive testing remains part of the design process. Administrators can confirm that shell keywords are real language elements with tools such as `type for`, inspect exit codes immediately after a command runs and refine logic before any script file exists. This habit matters in exams and in production because it shortens the path between an idea and a working result.
+The brace group runs in the current shell, so a successful `cd` changes the current working directory. The grouped commands also prevent a later `cd` from running when `mkdir` fails. Longer logic normally reads more clearly as an `if` statement.
 
-A practical example is bulk user creation. Instead of typing several `useradd` commands by hand, a short loop can create multiple accounts and then remove them again during testing. The same logic can later move into a script file with clearer spacing, error handling and prompts.
-## Creating executable shell scripts
-A reusable script needs the right interpreter, sensible permissions and a location that Bash can find.
-### The shebang
-The first line of a shell script should declare the interpreter.
+Pipelines require care because Bash normally returns the status of the last command in the pipeline. A script that must detect failure anywhere in a pipeline can enable `pipefail`:
+
+```bash
+set -o pipefail
+```
+
+An unconditional newline runs the next command after the preceding command finishes, regardless of success. Short-circuit operators instead make the second command depend on the first result. Their left-to-right association can produce surprising behaviour when a line combines several operators. Grouping or a full conditional makes the intended relationship explicit.
+
+Redirection can suppress expected output without hiding unrelated failures. `>/dev/null` discards standard output, while `2>/dev/null` discards standard error. A script should suppress a diagnostic only when it handles the corresponding failure. Otherwise, the diagnostic helps identify a fault.
+
+Commands define their own non-zero statuses. A script should not assume that every failure returns `1`. It can preserve a command's status before printing another message:
+
+```bash
+some_command
+status=$?
+
+if (( status != 0 ))
+then
+  printf 'some_command failed with status %s\n' "$status" >&2
+fi
+```
+## The interpreter directive
+An executable Bash script normally begins with an interpreter directive:
 
 ```bash
 #!/bin/bash
 ```
 
-That line is the shebang. It tells the system to run the script with Bash even if the current shell is different. Without it, a script may execute in the caller's current shell, which can break Bash-specific syntax.
+The kernel reads the `#!` characters at the start of an executable file and uses the remaining path as the interpreter. Bash treats that line as a comment after the kernel starts the interpreter. The directive must occupy the first line, and the interpreter path must exist on the target system. RHEL 8 provides Bash at `/bin/bash`.
 
-The point becomes obvious when a user launches a script from `sh` or another shell. Without a shebang, the script inherits that environment. With a shebang, the system starts Bash explicitly and the script behaves as designed. The same pattern selects Python, Perl or another interpreter when required.
-### Execute permissions and PATH
-A script can run without execute permission when Bash opens it explicitly.
+The directive controls execution only when a process invokes the script as a program. The command `bash script.sh` starts Bash explicitly, so the named interpreter reads the file regardless of its execute permission or its first line. Direct execution requires execute permission:
 
 ```bash
-bash my.sh
+chmod u+x script.sh
+./script.sh
 ```
 
-Direct execution requires the execute bit.
+`chmod u+x` grants execution to the owner. `chmod a+x` grants it to the owner, group, and others. When the mode omits `u`, `g`, `o`, or `a`, the current `umask` can restrict which classes receive newly added permissions. An explicit class avoids that ambiguity.
+
+On RHEL 8, `/bin/sh` commonly resolves to Bash operating with `sh`-compatible behaviour. It is not the historical Bourne shell. A Bash-specific script should name Bash in its interpreter directive rather than depend on whichever program provides `sh`.
+## Script location and PATH
+Bash searches the colon-separated directories in `PATH` when a command contains no slash. The current directory normally does not appear in `PATH`, so an executable in that directory requires a relative or absolute path such as `./script.sh`.
+
+A personal directory such as `$HOME/bin` provides a suitable location for a user's scripts when the login configuration adds it to `PATH`. The home directory itself should not enter `PATH`. An administrator should inspect the active value rather than assume a distribution or account configuration:
 
 ```bash
-chmod a+x my.sh
-./my.sh
+printf '%s\n' "$PATH"
+command -v script.sh
 ```
 
-Using `a+x` clearly applies execute permission to all classes. A plain `+x` depends on the current `umask`, so it may not grant execute permission to every class as intended.
+`command -v` reports how Bash would resolve a command. After an administrator creates `$HOME/bin` during a session, the administrator may need to update `PATH` or start a new login session before Bash can find scripts there.
 
-Bash only finds commands in directories listed in `PATH`. On many RHEL systems `~/bin` is included when that directory exists, which makes it a sensible place for personal scripts.
-
-```bash
-mkdir -p ~/bin
-mv my.sh ~/bin/
-my.sh
-```
-
-`which my.sh` confirms which file Bash will run. When the full path is supplied, `PATH` is ignored and Bash runs exactly the named file. That distinction explains why `./my.sh` works in the current directory even when `my.sh` alone does not.
-### Faster editing with Vim abbreviations
-Vim can insert common boilerplate through abbreviations stored in `.vimrc`. An abbreviation for the shebang reduces repeated typing and keeps new scripts consistent.
+An editor can reduce repeated typing. For example, a Vim insert-mode abbreviation in `$HOME/.vimrc` can expand a short token into the Bash interpreter directive:
 
 ```vim
-abbr _sh #!/bin/bash
+iabbrev _sh #!/bin/bash
 ```
 
-Typing `_sh` in insert mode expands to the full shebang. The feature is optional, but it speeds up routine editing. The same approach can store other frequent snippets, including interpreter lines for Python or Perl.
+Vim reads `$HOME/.vimrc` when it starts, and the `vim-enhanced` package supplies the full Vim implementation on RHEL 8. The administrator still needs to confirm that the abbreviation expanded on line 1. `bash -n script.sh` checks syntax without executing commands, but tests must still cover success, failure, missing input, existing resources, and interrupted execution.
+## Positional and special parameters
+A script receives command-line arguments as positional parameters. Quoting preserves spaces, wildcard characters, and empty values.
 
-The editing workflow also highlights a broader point. Useful editor habits save time, but the script still needs clean structure, deliberate spacing and clear naming. Automation starts in the file itself, not only in the commands the file later runs.
-## Special variables and argument handling
-Bash provides built-in variables that describe the running script and the arguments passed to it.
+| Parameter | Meaning |
+| --- | --- |
+| `$0` | The name used to invoke the shell or script |
+| `$1`, `$2`, and so on | Individual positional parameters |
+| `$#` | The number of positional parameters |
+| `"$@"` | Every positional parameter as a separate quoted word |
+| `"$*"` | All positional parameters joined into one quoted word |
+| `$?` | The most recent foreground pipeline's exit status |
+| `$$` | The process ID of the main shell |
+| `$!` | The process ID of the most recent background job |
 
-- `$$` is the process ID of the current shell or script
-- `$?` is the exit status of the previous command
-- `$0` is the script name or path used to invoke it
-- `$1`, `$2` and later values are positional parameters
-- `$#` is the number of positional parameters
-- `"$*"` expands all positional parameters as one word
-- `"$@"` expands all positional parameters as separate words
-
-These values make a script flexible. A process-inspection script, for example, can use a supplied process ID instead of relying on a hard-coded value. If no argument is provided, parameter expansion can supply a default.
+`$0` does not always contain an absolute path. It contains the invocation name supplied to Bash. Parameter expansion removes any leading path components without starting another program:
 
 ```bash
-PID="${*:-1}"
-ps -f -p "$PID"
+program_name=${0##*/}
 ```
 
-That example defaults to process `1` when no argument is supplied. It is more resilient than assuming the user always provides input.
-
-`$0` is especially useful in usage messages because the script can name itself accurately.
+`"$@"` is not a Bash array. It is a special expansion that produces one word for each positional parameter, which makes it the correct form for forwarding or iterating over arguments:
 
 ```bash
-echo "Usage: $0 username"
-```
-
-Running `basename "$0"` strips the path and prints only the file name. This is helpful when a script lives inside a long path but the message only needs the visible command name.
-
-The last argument from the previous command can also be recalled interactively with `!$`. That shortcut belongs to shell history rather than to a script file, but it reinforces the same lesson. Bash stores useful context, and efficient scripting often begins with understanding what the shell already provides.
-## Conditional structure and validation
-Reliable scripts validate inputs before they make changes. Bash offers several direct ways to express that logic.
-### Testing values
-Square brackets and the `test` command both evaluate conditions. They are commonly used for argument counts, numeric comparisons and string checks.
-
-```bash
-if [ "$#" -lt 1 ]
-then
-  echo "Usage: $0 username"
-  exit 1
-fi
-```
-
-This pattern rejects an empty argument list and returns a deliberate exit status.
-### Testing commands directly
-When the decision depends on a command succeeding or failing, Bash does not need square brackets. It can use the command's exit status directly.
-
-```bash
-if getent passwd "$1" >/dev/null
-then
-  echo "User $1 already exists"
-  exit 2
-fi
-```
-
-This form is cleaner than running a command, reading `$?` separately and then writing another comparison. Bash already knows whether the command worked.
-### Using `elif` to reduce clutter
-Related checks can sit inside one `if` block instead of several disconnected tests.
-
-```bash
-if [ "$#" -lt 1 ]
-then
-  echo "Usage: $0 username"
-  exit 1
-elif getent passwd "$1" >/dev/null
-then
-  echo "User $1 already exists"
-  exit 2
-fi
-```
-
-`if` begins the conditional and `fi` closes it. Using `elif` keeps the decision tree compact and easier to follow.
-## Building a user creation script
-The central example is a script that creates local user accounts and sets passwords. The final version evolves in stages, which reflects good practice. Small increments make debugging easier and keep each change testable.
-### Validate required input
-A user creation script needs at least one user name. The first check should reject an empty argument list.
-
-```bash
-if [ "$#" -lt 1 ]
-then
-  echo "Usage: $0 username"
-  exit 1
-fi
-```
-
-This approach gives a clear error message and a deliberate exit code. Using different exit codes for different failure cases makes the script easier to troubleshoot.
-### Check whether the account already exists
-The next step is to prevent duplicate account creation. `getent passwd` is a reliable way to test for an existing local or directory-backed account because it respects the system's configured name service sources.
-
-```bash
-if getent passwd "$1" >/dev/null
-then
-  echo "User $1 already exists"
-  exit 2
-fi
-```
-
-When an `if` statement tests a command, Bash uses the command's exit status automatically. There is no need to wrap the command in square brackets.
-### Read a password securely during execution
-Passwords should not appear on the command line because shell history may record them. `read` collects the password during execution instead.
-
-```bash
-read -rs -p "Enter a password for $1: " USER_PASSWORD
-echo
-```
-
-`-r` preserves backslashes, `-s` suppresses screen echo and `-p` prints a prompt. If no variable name is supplied, Bash stores the input in `REPLY`, but an explicit variable name is clearer.
-
-On RHEL, `passwd --stdin` reads a password from standard input. That option is convenient but platform-specific. For broader portability, `chpasswd` is usually safer across distributions.
-
-```bash
-echo "$USER_PASSWORD" | passwd --stdin "$1"
-```
-
-Reading the password during execution keeps it out of command history and off the process list. That is a direct improvement over supplying it as a second positional parameter.
-### Create the account and confirm the result
-With input validated and the password collected, the script can create the user and display the resulting entry.
-
-```bash
-useradd -m "$1"
-echo "$USER_PASSWORD" | passwd --stdin "$1"
-getent passwd "$1"
-```
-
-`-m` creates the home directory. `getent passwd "$1"` confirms the account details after creation.
-
-The example assumes the script runs with suitable privileges, either through `sudo` inside the command sequence or by running the whole script with administrative rights. User management commands will fail without that access.
-## Improving the script with loops and functions
-A single-user tool works, but a practical administration script often needs to handle many accounts in one run. Bash loops and functions provide the structure to do that cleanly.
-### Process all user names
-A `for` loop can iterate over every supplied user name. The choice between `"$*"` and `"$@"` is critical.
-
-When quoted, `"$*"` turns all positional parameters into one string. If the input is `u1 u2 u3`, Bash may treat it as a single combined value. `"$@"`, by contrast, preserves each positional parameter as a separate item. For looping over user names, `"$@"` is the correct choice.
-
-```bash
-for u in "$@"
+for user in "$@"
 do
-  echo "User $u"
+  printf '%s\n' "$user"
 done
 ```
 
-This distinction is small but important. It determines whether the script creates three accounts or tries to process one malformed name. It also preserves quoted multi-word values correctly when the input deliberately contains spaces.
-### Require a non-empty password
-A password prompt should not accept an empty value. A `while` loop can keep asking until the variable contains text.
+By contrast, `"$*"` joins all positional parameters into one word using the first character of `IFS`. Unquoted `$@` and `$*` allow word splitting and pathname expansion, so robust scripts rarely use those forms.
+
+The interactive history designator `!$` recalls the last word of the preceding history entry. It does not represent a script parameter, and non-interactive shells normally disable history expansion. Bash uses `$!`, with the characters reversed, for the latest background process ID. Bash also updates `$_` to the final argument of the previous simple command, but scripts should store important values in named variables instead of relying on that changing value.
+
+`$$` identifies the main Bash process. Inside some subshell contexts, `$$` retains the parent shell's value. Bash supplies `$BASHPID` when a script requires the process ID of the current Bash process.
+
+Default-value expansion can supply a fallback for one parameter:
 
 ```bash
-USER_PASSWORD=""
-while [ -z "$USER_PASSWORD" ]
+pid=${1:-1}
+ps -f -p "$pid"
+```
+
+When a command must accept several process IDs, an array preserves each argument:
+
+```bash
+pids=("$@")
+
+if (( ${#pids[@]} == 0 ))
+then
+  pids=(1)
+fi
+
+printf -v pid_list '%s,' "${pids[@]}"
+pid_list=${pid_list%,}
+ps -f -p "$pid_list"
+```
+
+Shell quoting controls when Bash treats text as one word. Unquoted variable expansion can split one value into several arguments and expand wildcard characters against filenames. Double quotes preserve parameter and command substitutions while preventing those two transformations. Single quotes preserve every enclosed character literally. A script should therefore quote expansions unless it deliberately requires splitting or pattern expansion.
+
+Assignment syntax allows no spaces around `=`:
+
+```bash
+name=alice
+```
+
+`name = alice` asks Bash to run a command named `name`. Braces separate a variable name from adjacent text:
+
+```bash
+home_label="${name}_home"
+```
+
+Command substitution captures standard output:
+
+```bash
+program_name=$(basename -- "$0")
+```
+
+The shell removes trailing newlines from the captured output. Parameter expansion often avoids an external command, as `${0##*/}` does for a simple basename operation.
+
+Arrays provide the safest representation for a list whose elements may contain spaces:
+
+```bash
+accounts=("alice smith" bob carol)
+
+for account in "${accounts[@]}"
 do
-  read -rs -p "Enter a password for $u: " USER_PASSWORD
-  echo
+  printf '<%s>\n' "$account"
 done
 ```
 
-`-z` is the direct test for an empty string. The loop above is clearer and more accurate than trying to infer emptiness from a negated non-empty test. It ensures the script only continues once the password variable holds real input.
-
-This pattern also shows why validation belongs close to the input step. Bash does not need to set a password, call `passwd` and then discover that the value was empty. It can reject the empty input immediately and ask again.
-### Use functions to organise the script
-Functions separate tasks into readable blocks. The script becomes easier to maintain because account creation, password collection and reporting each sit in one place.
+Linux login names normally cannot contain spaces, but the same quoting rule applies to paths, descriptions, and general script data. The distinction between a list and one joined string remains central to reliable Bash code.
+## Tests and conditional statements
+An `if` statement uses a command's exit status as its condition. It does not require `$?` or square brackets around a command:
 
 ```bash
-create_user() {
-  useradd -m "$1"
-  getent passwd "$1"
+if getent passwd "$user" >/dev/null
+then
+  printf 'Account already exists: %s\n' "$user"
+fi
+```
+
+The `test` builtin and its `[` form evaluate file attributes, strings, and integers. Bash also provides `[[ ... ]]`, which avoids pathname expansion and supplies Bash-specific pattern and regular-expression matching. Arithmetic contexts use `(( ... ))`.
+
+```bash
+if (( $# < 1 ))
+then
+  printf 'Usage: %s USER [USER ...]\n' "${0##*/}" >&2
+  exit 64
+fi
+```
+
+`fi` closes an `if` construct. `elif` adds another condition without creating a separate nested statement. Diagnostic messages should go to standard error with `>&2`, and distinct exit statuses can help calling programs identify different failures.
+## Reading input
+The Bash `read` builtin collects input during execution. Its option names use lower case. `-p` displays a prompt, `-s` suppresses terminal echo, and `-r` prevents backslashes from acting as escape characters. If no variable name follows `read`, Bash stores the result in `REPLY`.
+
+```bash
+IFS= read -r -s -p 'Password: ' password
+printf '\n'
+```
+
+Silent input prevents nearby observers from reading characters on the screen, but it does not validate, encrypt, or otherwise protect the stored value. A password should never appear as a command-line argument because process listings, shell history, logs, or audit systems can expose it.
+
+A loop can reject an empty or whitespace-only value. The string test `-n` checks only whether a string has non-zero length, so spaces satisfy it. A regular expression can reject both cases:
+
+```bash
+while true
+do
+  if ! IFS= read -r -s -p 'Password: ' password
+  then
+    printf '\nPassword input ended.\n' >&2
+    exit 1
+  fi
+
+  printf '\n'
+
+  if [[ $password =~ [^[:space:]] ]]
+  then
+    break
+  fi
+
+  printf 'A password cannot be blank.\n' >&2
+done
+```
+
+Password confirmation catches typing errors. System password policy still determines whether the password meets length, complexity, history, and dictionary requirements.
+
+`read` returns a non-zero status when it reaches end of file or a timeout. A script that can receive redirected input should handle that result instead of looping forever. Interactive password prompts also require a terminal. Automation that runs without a terminal should obtain secrets through an approved secret-delivery mechanism, not through command-line arguments or source-code literals.
+
+The `for` and `while` constructs solve different iteration problems. `for` suits a known argument list. `while` suits a condition that changes during execution. Both constructs return the status of the last command they execute, or `0` when they execute no commands. A script that needs an overall result from many iterations should track that result explicitly.
+
+The `break` builtin leaves the nearest loop. `continue` skips the rest of the current iteration. These controls can simplify validation:
+
+```bash
+for user in "$@"
+do
+  if getent passwd "$user" >/dev/null
+  then
+    printf 'Skipped existing account: %s\n' "$user" >&2
+    continue
+  fi
+
+  printf 'New account: %s\n' "$user"
+done
+```
+
+This dry run performs no privileged change. It shows which arguments the script would process and which existing accounts it would skip.
+## Functions
+Functions give related commands a name and reduce duplication. Bash must read a function definition before the script calls it:
+
+```bash
+show_user()
+{
+  id "$1"
 }
 
-set_password() {
-  USER_PASSWORD=""
-  while [ -z "$USER_PASSWORD" ]
+show_user alice
+```
+
+The empty parentheses form part of the function-definition syntax. They do not declare or receive parameters. A function call supplies arguments automatically through the function's own `$1`, `$2`, `$#`, and `"$@"`. A function can return an exit status from `0` to `255`, but it cannot return arbitrary text. It sends data through standard output or assigns an appropriately scoped variable.
+
+Variables default to global scope in Bash functions. The `local` builtin prevents an internal variable from overwriting a variable elsewhere in the script:
+
+```bash
+account_exists()
+{
+  local user=$1
+  getent passwd "$user" >/dev/null
+}
+```
+
+A function should perform one coherent job, report diagnostics to standard error, and return a status that its caller can test. The calling code then controls whether a failure stops the script, skips one item, or records an overall failure and continues.
+
+Function definitions improve readability only when their names describe actions accurately. Names such as `account_exists`, `read_password`, and `create_user` expose the main control flow. Excessively small functions can obscure simple operations, while large functions can conceal several unrelated responsibilities.
+
+Functions execute in the current shell unless a surrounding construct creates a subshell. They can therefore change global variables, the working directory, shell options, and positional parameters. `local` variables and careful status handling limit unintended effects.
+## User-account automation
+Local account administration requires root privileges. `useradd --create-home NAME` creates an account and home directory. `getent passwd NAME` checks the configured name-service sources, not only `/etc/passwd`. On RHEL 8, `passwd --stdin NAME` can read a password from standard input. Other distributions may omit that option.
+
+A multi-user script should process `"$@"`, quote every expansion, prompt separately for each account, and preserve a non-zero final status when any account fails. Reusing one password for several users weakens security and should not form part of an administrative workflow.
+
+```bash
+#!/bin/bash
+usage()
+{
+  printf 'Usage: %s USER [USER ...]\n' "${0##*/}" >&2
+}
+
+read_password()
+{
+  local user=$1
+  local first
+  local second
+
+  unset USER_PASSWORD
+
+  while true
   do
-    read -rs -p "Enter a password for $1: " USER_PASSWORD
-    echo
+    if ! IFS= read -r -s -p "Password for $user: " first
+    then
+      printf '\nPassword input ended.\n' >&2
+      return 1
+    fi
+
+    printf '\n'
+
+    if ! IFS= read -r -s -p 'Retype password: ' second
+    then
+      printf '\nPassword input ended.\n' >&2
+      return 1
+    fi
+
+    printf '\n'
+
+    if [[ -z $first || $first =~ ^[[:space:]]*$ ]]
+    then
+      printf 'A password cannot be blank.\n' >&2
+    elif [[ $first != "$second" ]]
+    then
+      printf 'The passwords do not match.\n' >&2
+    else
+      USER_PASSWORD=$first
+      return 0
+    fi
   done
-  echo "$USER_PASSWORD" | passwd --stdin "$1"
 }
-```
 
-The main body of the script then becomes much shorter.
+create_user()
+{
+  local user=$1
 
-```bash
-for u in "$@"
+  if getent passwd "$user" >/dev/null
+  then
+    printf 'Account already exists: %s\n' "$user" >&2
+    return 2
+  fi
+
+  if ! useradd --create-home "$user"
+  then
+    printf 'Account creation failed: %s\n' "$user" >&2
+    return 3
+  fi
+
+  if ! read_password "$user"
+  then
+    printf 'Password input failed: %s\n' "$user" >&2
+    return 4
+  fi
+
+  if ! printf '%s\n' "$USER_PASSWORD" |
+    passwd --stdin "$user" >/dev/null
+  then
+    printf 'Password assignment failed: %s\n' "$user" >&2
+    unset USER_PASSWORD
+    return 5
+  fi
+
+  unset USER_PASSWORD
+  id "$user"
+}
+
+if (( EUID != 0 ))
+then
+  printf 'The script requires root privileges.\n' >&2
+  exit 77
+fi
+
+if (( $# == 0 ))
+then
+  usage
+  exit 64
+fi
+
+overall_status=0
+
+for user in "$@"
 do
-  create_user "$u"
-  set_password "$u"
+  if ! create_user "$user"
+  then
+    overall_status=1
+  fi
 done
+
+exit "$overall_status"
 ```
 
-This structure improves readability because the loop describes the workflow in plain terms. It also improves debugging because each function has one clear responsibility.
+The root check runs before any account operation. The argument check prevents an empty invocation from succeeding silently. The outer `for` loop preserves each argument through `"$@"`, calls `create_user` once per name, and records whether any call fails.
 
-A further refinement allows one password prompt to populate a variable once, then reuse that value for every user created in the same run. That saves time when several accounts need the same initial password. It also demonstrates Bash variable scope in a practical way. A variable set in the script remains available to later function calls unless a separate scope is introduced.
-### Confirm the script works
-Testing should continue after the script prints success messages. A sensible check is to switch to one of the newly created accounts with `su - username` and verify that the password works. That confirms both account creation and password assignment rather than trusting the display output alone.
-## Practical scripting habits
-Several habits make Bash scripts more reliable and easier to support.
-### Build in stages
-The user creation example improves step by step: first argument validation, then existence checks, then password input, then account creation, then loops and functions. This staged approach isolates faults quickly. It also makes it easier to test each feature before adding the next.
-### Prefer readable code over clever code
-Indentation is not syntactically required in shell scripts, but it makes loops, conditionals and functions much easier to follow. Clear names such as `USER_PASSWORD` or `create_user` communicate intent better than cryptic abbreviations. Small functions make large scripts feel manageable.
-### Test commands interactively first
-Because scripts mirror the shell, the command line is the best place to verify syntax, exit status and command behaviour. Once the command works interactively, it can move into a script with less risk. The shell's history and shortcuts can accelerate this cycle, but the important habit is disciplined testing.
-### Handle portability deliberately
-Some commands and options behave differently across distributions. `passwd --stdin` works on Red Hat systems but not everywhere. When portability matters, the script should prefer cross-platform tools or document the platform-specific dependency.
-### Separate validation from action
-Checks such as argument counting and account existence should happen before `useradd` or `passwd` runs. This keeps failure cases predictable and avoids partial changes.
-### Treat scripts as maintainable tools
-Even a short script benefits from comments, a consistent style and a clear purpose. The most useful scripts are not merely functional. They are also easy to read a week later, easy to debug under pressure and easy to extend when requirements change.
-## Key takeaways
-Bash scripting on RHEL is an exercise in disciplined command-line automation. The essential ideas are straightforward:
-- shell scripts use the same syntax as interactive shell commands
-- exit status drives conditional behaviour
-- the shebang selects the correct interpreter
-- execute permission and `PATH` determine how a script runs
-- special variables make scripts adaptable
-- `read` gathers sensitive input more safely than command-line arguments
-- `"$@"` is the correct way to loop over positional parameters
-- `while` loops handle validation and retry logic
-- functions keep repetitive tasks concise and readable
+`create_user` queries the name-service database before it changes the system. This check can detect local and centrally managed identities. `useradd` still performs its own validation and remains the authority on whether it can create the requested local account. A race between the check and creation can still cause `useradd` to fail, so the script tests both operations.
+
+`read_password` uses local variables for the two entries and assigns the confirmed value to a global variable only long enough for the caller to use it. `printf` sends the value through a pipe without placing it in the process command line. RHEL's `passwd --stdin` applies the configured password policy and stores the resulting password hash. The script immediately unsets the clear-text shell variable after the command returns.
+
+Each function emits its own diagnostic and non-zero status. The main loop continues so one existing or invalid account does not prevent later arguments from receiving attention. The final status remains non-zero when any iteration fails, which allows a calling program to detect an incomplete batch.
+
+The script leaves a newly created account locked if password assignment fails, which prevents password login but still requires an administrator to investigate and either complete or remove the account. Production automation should also define an approved username policy, log outcomes without secrets, handle interruption, and establish a deliberate rollback policy.
+
+Account removal can delete valuable data. `userdel --remove NAME` removes the account, home directory, and mail spool, but it does not remove every file that the user owns elsewhere. An administrator should terminate active sessions, preserve required data, and confirm the exact account before removal.

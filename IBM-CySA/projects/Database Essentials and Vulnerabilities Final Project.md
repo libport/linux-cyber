@@ -1,5 +1,7 @@
 # *Database Essentials and Vulnerabilities* Final Project
 You have been hired as a database security consultant for SecureShop, an online retail company. SecureShop is looking to upgrade its database to enhance security and data management practices. The company's database needs to handle sensitive information, including customer personal data, order details, and payment information, while ensuring compliance with data protection regulations.
+> [!NOTE]
+> Command-line tools replaced GUI tools in this project, as command-line tools offer more stable interfaces and often expose more detailed OS or application APIs.
 
 ---
 ## Task 1: Database design and implementation
@@ -489,6 +491,7 @@ Dataset-derived expected output for normal input:
 | order_id | customer_id | first_name | last_name | email                | phone        |
 | -------: | ----------: | ---------- | --------- | -------------------- | ------------ |
 |        1 |           1 | John       | Doe       | john.doe@example.com | 123-456-7890 |
+
 The query is vulnerable because the application inserts the input into executable SQL text. Preparing the already concatenated string does not restore the separation between code and data.
 #### 4.2: Exploiting the vulnerable SQL query using SQL Injection
 SQL injection: Write and execute an SQL injection attack using vulnerable query created in Task 4.1 to retrieve unauthorized data. Show the output.

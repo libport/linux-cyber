@@ -5,15 +5,15 @@ This programme is designed for mastery in real-time intelligence informed, threa
 ## Linux and Platform Engineering
 Linux provides the operating-system foundation for much of platform engineering, including cloud servers, containers, Kubernetes nodes, CI/CD runners, networking, and observability systems. Platform engineers automate and standardize these Linux-based capabilities into secure, reliable self-service platforms so application developers can deploy and operate software without managing low-level infrastructure directly.
 ### Course Notes and Project Files
-- :notebook: [Red Hat Certified System Administrator](RHCSA/README.md) ([course link](https://www.pluralsight.com/paths/rhcsa-red-hat-certified-system-administrator-ex200))
-- :notebook: [Red Hat Certified Engineer](RHCE/README.md) ([course link](https://www.pluralsight.com/paths/rhce-red-hat-certified-engineer-ex294))
-- :notebook: [Configuration Management Using Ansible](ansible/README.md) ([course link](https://www.pluralsight.com/paths/configuration-management-using-ansible))
-- :notebook: [Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting](RHCSLDT/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342))
-- :notebook: [Red Hat Certified Specialist in Performance Tuning](RHCSPT/README.md) ([course link](https://www.pluralsight.com/courses/red-hat-certified-specialist-in-performance-tuning-ex442))
-- :notebook: [Red Hat Certified Specialist in Containers](RHCSC/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-containers-ex188))
-- :notebook: [Docker](docker/README.md) ([course link](https://www.pluralsight.com/paths/managing-docker-in-production))
-- :notebook: [Certified Kubernetes Administrator](CKA/README.md) ([course link](https://www.pluralsight.com/paths/certified-kubernetes-administrator))
-- :construction: :notebook: [Terraform](terraform/README.md) ([course link](https://www.pluralsight.com/paths/terraform))
+- :notebook: [Red Hat Certified System Administrator](RHCSA/README.md) ([course link](https://www.pluralsight.com/paths/rhcsa-red-hat-certified-system-administrator-ex200)) 
+- :notebook: [Red Hat Certified Engineer](RHCE/README.md) ([course link](https://www.pluralsight.com/paths/rhce-red-hat-certified-engineer-ex294)) 
+- :notebook: [Configuration Management Using Ansible](ansible/README.md) ([course link](https://www.pluralsight.com/paths/configuration-management-using-ansible)) 
+- :notebook: [Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting](RHCSLDT/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342)) 
+- :notebook: [Red Hat Certified Specialist in Performance Tuning](RHCSPT/README.md) ([course link](https://www.pluralsight.com/courses/red-hat-certified-specialist-in-performance-tuning-ex442)) 
+- :notebook: [Red Hat Certified Specialist in Containers](RHCSC/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-containers-ex188)) 
+- :notebook: [Docker](docker/README.md) ([course link](https://www.pluralsight.com/paths/managing-docker-in-production)) 
+- :notebook: [Certified Kubernetes Administrator](CKA/README.md) ([course link](https://www.pluralsight.com/paths/certified-kubernetes-administrator)) 
+- :construction: :notebook: [Terraform](terraform/README.md) ([course link](https://www.pluralsight.com/paths/terraform)) 
 - Splunk Search Expert Specialization ([course link](https://www.coursera.org/specializations/splunk-search-expert))
 - :construction: :notebook: [IBM DevOps and Software Engineering Professional Certificate](IBM-DSE/README.md) ([course link](https://www.coursera.org/professional-certificates/devops-and-software-engineering))
 ### Book Notes
@@ -41,7 +41,7 @@ Cybersecurity is the practice of protecting systems, networks, and data from una
 - Trust in Computer Systems and the Cloud, by Mike Bursell. ([publisher page](https://www.wiley.com/en-us/trust-in-computer-systems-and-the-cloud-p-9781119695158))
 - Intelligent Continuous Security, by Marc Hornbeek. ([publisher page](https://www.oreilly.com/library/view/intelligent-continuous-security/9798341615908/))
 ## Custom Portfolio Projects
-- Ansible CIS Benchmarking System
+- [Ansible CIS Benchmarking System](../../../ansible-linux-audit)
 
 > [!WARNING]
 > Solutions to labs and projects are my own and validated as correct with tests, but are not the solutions provided by the courses and may not be optimal solutions. Solutions provided by the courses have not been provided in the notes.

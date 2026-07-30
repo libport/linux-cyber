@@ -3,6 +3,8 @@
 During this final project, you will use a Windows Server based lab environment to resolve three service tickets.
 
 This project is divided into three different assignment scenarios. Each scenario has one or more tasks in it. You will have to complete all 6 tasks across the three scenarios and take screenshots as per instructions.
+> [!NOTE]
+> Command-line tools replaced GUI tools in this project, as command-line tools offer more stable interfaces and often expose more detailed OS or application APIs.
 ## Scenario - Ticket 1
 You are a service desk employee for XYZ Corporation. You have received a ticket indicating that a recent update caused a conflict with an existing application. You are working on a fix for this problem, but in the meantime, you must undo the most recent update and temporarily pause automatic updates.
 ### Task 1
