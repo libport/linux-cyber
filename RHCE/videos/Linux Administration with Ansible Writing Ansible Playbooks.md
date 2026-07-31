@@ -1,826 +1,858 @@
 # Linux Administration with Ansible: Writing Ansible Playbooks
 > [!NOTE]
 > Explains how to build reliable, portable Ansible playbooks using clear YAML, inventories, variables, modules, handlers, validation, idempotent execution, and reusable automation components.
-## Ansible's operating model
-Ansible applies configuration from a control node to managed nodes. A playbook describes the required state in YAML. Each play selects hosts, applies play-level settings, and runs an ordered list of tasks. Each task calls a module or another Ansible action.
 
-The control node reads inventory, variables, configuration, playbooks, roles, and collections. It templates task data before sending the required operation to each managed node. Most POSIX modules need a suitable Python interpreter on the managed node. The `ansible.builtin.raw` and `ansible.builtin.script` modules provide important exceptions.
+Ansible playbooks describe the state or sequence of operations that managed hosts must reach. They combine YAML data, Ansible keywords, modules, roles, variables, conditions, and handlers. A well-designed playbook states its intent clearly, uses a supported module or role for each operation, protects credentials, and produces the same desired state when an operator runs it again.
 
-Ansible encourages declarative administration. A task states that a package must be present, a file must contain approved content, or a service must be running. A well-designed module checks the current state and changes the host only when required. This behaviour supports idempotence, which means that repeated runs converge on the same required state without repeating unnecessary changes.
+Red Hat Enterprise Linux 10 includes `ansible-core` 2.16. A RHEL 10 control node can manage RHEL 9 and RHEL 10 hosts, while Red Hat Ansible Automation Platform can provide a controlled execution environment for larger operations. Managed RHEL hosts do not need Ansible installed. Most standard modules require Python on the managed host, while connection-specific modules and a small set of bootstrap actions do not.
 
-Idempotence belongs to the complete operation, not to Ansible as a universal property. Modules such as `ansible.builtin.package`, `ansible.builtin.copy`, and `ansible.builtin.user` usually implement state checks. Arbitrary commands and scripts usually do not. Administrators must add guards, change detection, and failure conditions when a module cannot determine the state.
+RHEL system roles provide supported interfaces for complex operating system services. The `redhat.rhel_system_roles` collection covers areas such as firewalls, SELinux, OpenSSH, storage, sudo, systemd, and time synchronisation. These roles reduce direct edits to implementation-specific configuration files and help an organisation apply consistent settings across supported RHEL releases.
+## Establishing the automation baseline
+An automation project should define its control-node version, collections, roles, inventory sources, and execution dependencies. Version control should contain the playbooks, templates, variable files, and a dependency manifest. An execution environment or another isolated Python environment should hold the matching Ansible packages and collections.
 
-Ad hoc commands suit investigation and isolated operations. Playbooks suit reviewed, repeatable administration because they preserve intent, task order, variables, conditions, handlers, and error handling in version-controlled files. Shell scripts remain useful for local algorithms or vendor tools, but they require explicit logic for distribution differences, privilege, error handling, remote execution, and state detection.
-### Selecting the automation interface
-The `ansible` command runs one ad hoc task against an inventory pattern. It uses the same module system as a playbook:
+| Component | RHEL 10 baseline |
+| --- | --- |
+| Control node | RHEL 10 with `ansible-core` 2.16, or a supported Ansible Automation Platform execution environment |
+| Managed hosts | RHEL 9 or RHEL 10 hosts reachable through an approved connection |
+| System roles | `redhat.rhel_system_roles` from the supported RHEL package or execution environment |
+| Core modules | Fully qualified names under `ansible.builtin` |
+| Additional modules | Explicitly installed, pinned, and recorded collections |
+| Package manager | DNF through `ansible.builtin.dnf` for RHEL-specific playbooks |
+| Service manager | systemd through `ansible.builtin.systemd_service` or the RHEL systemd role |
+| Secrets | Ansible Vault, an Automation Platform credential, or an approved external secret store |
 
-```shell
-ansible webservers -i inventories/staging/hosts.yml \
-  -m ansible.builtin.package \
-  -a 'name=tree state=present' \
-  --become
-```
+The control node should use a dedicated, non-root automation account. SSH keys should carry a passphrase and remain under the operator's or platform's credential controls. An SSH agent or Automation Platform credential can unlock a key during a run. Inventory should use DNS names or stable addresses, and SSH host-key checking should remain enabled. Disabling host-key verification weakens the connection by allowing an unverified host to impersonate a managed system.
 
-This form can confirm connectivity, inspect facts, perform a rare operation, or test a module invocation before incorporating it into maintained automation. It does not record a sequence, explain dependencies, or provide a reusable deployment unit. Repeated ad hoc commands should move into a playbook.
+Privilege escalation should grant only the commands required by the automation. A broad `NOPASSWD: ALL` rule gives a compromised automation account unrestricted root access. Where interactive runs use a sudo password, Ansible can prompt with `--ask-become-pass`. Automation Platform can inject the credential without placing it in source files or command history.
 
-Calling ad hoc commands from a shell script can combine Ansible's host selection and modules with an existing workflow, but that structure splits intent across two languages. A playbook usually expresses the same sequence more clearly. If a shell wrapper remains necessary, it should select an explicit inventory, fail on a non-zero Ansible exit status, avoid passing secrets in arguments, and remain under version control.
+Disposable RHEL 10 virtual machines make suitable development targets. KVM with libvirt, approved cloud instances, or an existing lab can replace old VirtualBox and Vagrant examples. Lab creation should not enable SSH password authentication, reuse a published password, disable host-key checking, or place an unprotected private key in a repository.
 
-Module documentation should come from the installed runtime:
-
-```shell
-ansible-doc ansible.builtin.package
-ansible-doc -s ansible.builtin.user
-ansible-doc -t lookup ansible.builtin.file
-```
-
-The installed documentation identifies parameters, requirements, return values, check-mode support, collection ownership, and examples for the exact available version. Searching Python files under `/usr/lib` does not provide a reliable module catalogue. Collections, execution environments, installation methods, action plugins, and configured search paths can place content elsewhere.
-
-The configuration in effect also needs verification:
-
-```shell
-ansible --version
-ansible-config view
-ansible-config dump --only-changed
-```
-
-Ansible uses the first eligible configuration file in its search order. A project-local `ansible.cfg` can define inventory, roles paths, collection paths, callbacks, forks, and privilege behaviour for that project. Operators should not assume that a home-directory configuration applies when a project file or `ANSIBLE_CONFIG` selects another source.
-## YAML for playbooks
-YAML represents data through mappings, sequences, and scalar values. Ansible uses that data model for playbooks, inventories, variable files, and role content.
-
-```yaml
----
-account:
-  name: julie
-  shell: /bin/bash
-  skills:
-    - Python
-    - Linux
-```
-
-`account` maps to another mapping. `skills` maps to a sequence. Indentation defines structure, so YAML forbids tab characters for indentation. Ansible projects commonly use two spaces at each level, although YAML does not impose that width. Consistent spacing prevents structural ambiguity.
-
-Quoted and unquoted scalars can behave differently. Quoting helps when a value contains a colon followed by a space, begins with a special character, resembles a number, or could be interpreted as another data type. Boolean values should use `true` or `false`. File modes should normally use quoted strings such as `'0644'` so Ansible receives the intended octal representation.
-
-Jinja expressions use double braces when a value needs templating:
-
-```yaml
-dest: "/etc/{{ application_name }}/application.conf"
-```
-
-Conditions such as `when`, `changed_when`, and `failed_when` already accept Jinja expressions. They should not enclose variables in double braces:
-
-```yaml
-when: ansible_facts['os_family'] == 'RedHat'
-```
-
-A literal block scalar preserves line breaks:
-
-```yaml
-content: |
-  first line
-  second line
-```
-
-A folded block scalar replaces most line breaks with spaces:
-
-```yaml
-content: >
-  one logical line
-  written across several source lines
-```
-
-The distinction is important for configuration files, scripts, certificates, and other content whose line structure carries meaning.
-
-Local validation protects confidential inventory values, credentials, and templates. Public web parsers should not receive operational playbooks or secrets. Editor integrations can provide YAML parsing, Ansible schema validation, completion, and lint feedback without disclosing project data. Vim, Nano, Visual Studio Code, and other editors can all enforce spaces and display indentation. Editor choice is less important than a shared project configuration.
-
-An editor should display invisible whitespace, remove trailing spaces, preserve UTF-8, insert a final newline, and expand indentation tabs to spaces. A project-level EditorConfig file can apply common settings across editors:
-
-```ini
-root = true
-
-[*.{yml,yaml}]
-charset = utf-8
-end_of_line = lf
-insert_final_newline = true
-indent_style = space
-indent_size = 2
-trim_trailing_whitespace = true
-```
-
-The file does not replace parsing or linting, but it reduces accidental formatting differences. YAML syntax highlighting alone cannot determine whether a task uses a valid Ansible keyword, whether a collection is installed, or whether a variable exists at runtime.
-
-YAML files can use `.yml` or `.yaml`. A project should choose one convention and apply it consistently. The leading `---` document marker remains common and improves recognition, although Ansible can parse many files without it. File names should describe function, such as `webservers.yml` or `accounts.yml`, rather than execution order alone.
-## Project structure and dependencies
-A small project can keep a playbook, inventory, variables, templates, and static files together:
-
-```text
-ansible-project/
-|-- ansible.cfg
-|-- requirements.yml
-|-- site.yml
-|-- inventories/
-|   |-- production/
-|   |   |-- hosts.yml
-|   |   |-- group_vars/
-|   |   |   |-- all.yml
-|   |   |   `-- webservers.yml
-|   |   `-- host_vars/
-|   `-- staging/
-|       |-- hosts.yml
-|       `-- group_vars/
-|-- files/
-|-- templates/
-`-- roles/
-```
-
-Larger projects should use roles to group tasks, handlers, defaults, variables, files, templates, and dependencies by function. Separate inventories reduce the risk of applying test settings to production. Version control records intent, enables review, and provides a basis for automated validation.
-
-Ansible content now spans `ansible-core` and separately distributed collections. A short module name can become ambiguous, and some modules from older examples no longer belong to core. Fully qualified collection names identify the exact implementation:
-
-```yaml
-ansible.builtin.package:
-community.general.archive:
-community.general.filesystem:
-ansible.posix.authorized_key:
-ansible.posix.mount:
-```
-
-Projects should declare non-core collections in `requirements.yml` and install them before validation or execution:
+Collections form part of the project interface. `ansible.builtin` ships with `ansible-core`, but modules such as `ansible.posix.authorized_key` and `community.general.archive` do not. A `collections/requirements.yml` file should pin required collection versions that work with the chosen execution environment:
 
 ```yaml
 ---
 collections:
   - name: ansible.posix
+    version: "<approved-version>"
   - name: community.general
+    version: "<approved-version>"
 ```
 
-```shell
-ansible-galaxy collection install -r requirements.yml
-```
+An organisation should select versions from its tested and supported repository and replace each placeholder with an exact pin. The project should record role dependencies in the same way. `ansible-galaxy collection list`, `ansible-doc`, and the execution-environment build definition reveal what the runtime actually provides. The filesystem location of a module is an internal implementation detail and should not become a project dependency.
+## Defining inventory and host scope
+Inventory names the managed hosts and organises them into groups. It can come from a static file, an inventory directory, or a dynamic inventory plugin that queries an infrastructure source. The project should treat inventory as operational data, validate its source, and prevent an unreviewed host from entering a privileged group.
 
-Production projects should constrain dependency versions according to their support and testing policy. Execution environments can package `ansible-core`, collections, Python libraries, and system dependencies into a controlled runtime.
-
-An `ansible.cfg` file should include only deliberate differences from defaults. Generating a large sample and leaving every setting in place obscures the effective policy. `ansible-config dump --only-changed` helps reviewers confirm the result.
-
-Inventory, roles, and collections loaded from writable or untrusted paths can execute code on the control node. Project directories, collection sources, callback plugins, filter plugins, and configuration files therefore require code-review and filesystem controls. Running Ansible with elevated local privilege expands the impact of a malicious plugin and should remain unnecessary for ordinary remote administration.
-
-Tests should install dependencies from `requirements.yml` into a clean environment. This step detects undeclared collections that happen to exist on one administrator's workstation. The same test environment should run linting, syntax checks, and representative Molecule or integration scenarios where the project supports them.
-## Playbook anatomy
-A playbook contains a sequence of plays. A play targets an inventory pattern and applies tasks to the selected hosts. A compact package play looks like this:
-
-```yaml
----
-- name: Install diagnostic utility
-  hosts: linux
-  become: true
-  gather_facts: false
-
-  tasks:
-    - name: Ensure tree is installed
-      ansible.builtin.package:
-        name: tree
-        state: present
-```
-
-The play name and task name should describe the intended outcome. `hosts` selects an inventory group or pattern. `become: true` requests privilege escalation for the play. `gather_facts: false` skips automatic fact collection because this play does not use host facts.
-
-Fact gathering normally runs before ordinary tasks. It returns operating system, network, storage, hardware, and environment data under `ansible_facts`. A play should gather facts when its logic needs them:
-
-```yaml
-- name: Report the platform family
-  ansible.builtin.debug:
-    msg: "Platform family: {{ ansible_facts['os_family'] }}"
-```
-
-Legacy top-level variables such as `ansible_os_family` often remain available, but the `ansible_facts` dictionary makes the source explicit and avoids dependence on fact injection settings.
-
-Playbook keywords and module parameters occupy different levels. In the next task, `when`, `notify`, and `become` control task execution. `src`, `dest`, `owner`, `group`, and `mode` belong to the module:
-
-```yaml
-- name: Install application configuration
-  ansible.builtin.template:
-    src: application.conf.j2
-    dest: /etc/application/application.conf
-    owner: root
-    group: root
-    mode: '0644'
-  become: true
-  when: application_enabled
-  notify: Restart application
-```
-
-Correct indentation preserves that distinction.
-## Validation and controlled execution
-Playbook development requires several complementary checks. No single command proves that a change is safe.
-
-```shell
-yamllint .
-ansible-lint
-ansible-playbook -i inventories/staging/hosts.yml site.yml --syntax-check
-ansible-playbook -i inventories/staging/hosts.yml site.yml --list-hosts
-ansible-playbook -i inventories/staging/hosts.yml site.yml --list-tasks
-ansible-playbook -i inventories/staging/hosts.yml site.yml --check --diff
-```
-
-`yamllint` checks YAML style and syntax. `ansible-lint` checks Ansible syntax and maintainability rules, including module naming and change reporting. `--syntax-check` loads and parses the playbook but does not test every runtime path. `--list-hosts` confirms the target set. `--list-tasks` exposes the expanded task order where static imports permit it.
-
-Check mode simulates changes only for modules that support it. A module with no check-mode support may skip its operation and return little information. Later tasks that depend on a registered result from a skipped task may behave differently from a real run. Diff mode can display file content, so operators must avoid exposing secrets in terminals, logs, and continuous integration output.
-
-A safe rollout begins in an equivalent test environment. Production execution should narrow both scope and concurrency:
-
-```shell
-ansible-playbook -i inventories/production/hosts.yml site.yml \
-  --limit web-canary-01
-```
-
-After canary verification, `serial` can process hosts in batches:
-
-```yaml
-- name: Update web servers in batches
-  hosts: webservers
-  serial: 2
-```
-
-Verbose output supports diagnosis, but higher verbosity can expose arguments and connection details. Sensitive tasks should use `no_log: true`, and log access should follow the same controls as other administrative records.
-
-Validation should follow the same route as execution. The selected inventory, variable files, vault identities, collections, and configuration all affect parsing and runtime behaviour. A syntax check against an empty placeholder inventory can pass while the production inventory exposes an undefined variable or an unsupported platform.
-
-Task results separate several states:
-- `ok` means the task completed without reporting a change.
-- `changed` means the module reports that it altered the host or would alter it in check mode.
-- `failed` means the task returned a failure under its current failure conditions.
-- `unreachable` means Ansible could not establish the required connection.
-- `skipped` means a condition, tag, check-mode rule, or host selection prevented execution.
-- `rescued` means a failure entered a block's rescue path.
-- `ignored` means execution continued after a failure that policy explicitly ignored.
-
-Green output does not by itself prove semantic correctness. A task can report `ok` while checking the wrong file, or `changed` on every run because its change logic is incomplete. A second real run in a safe environment provides a practical idempotence test. The second recap should report zero changes unless the playbook intentionally performs a non-idempotent action.
-
-Runtime verification should test the service outcome as well as task status. An HTTP deployment can use `ansible.builtin.uri` to request a health endpoint. An account deployment can query the account database and inspect authorised keys without displaying secret material. A storage deployment can verify the mounted source, filesystem type, capacity, and persistence. Assertions can convert those observations into explicit failures.
-
-Tags and `--start-at-task` help development and recovery, but partial execution can bypass prerequisites. A tagged configuration task may run without the package task that installs its validation command. Playbooks should remain correct when run normally, and documentation should identify any supported partial paths.
-## Inventory, variables, and facts
-Inventory describes managed hosts and groups. Groups should express function, location, lifecycle, or platform characteristics that genuinely affect policy. A YAML inventory can place hosts in child groups:
+A compact YAML inventory can separate web and database tiers:
 
 ```yaml
 ---
 all:
   children:
-    linux:
-      children:
-        webservers:
-        time_servers:
     webservers:
       hosts:
-        web01.example.net:
-        web02.example.net:
-    time_servers:
+        web-01.example.com:
+        web-02.example.com:
+    databases:
       hosts:
-        time01.example.net:
+        db-01.example.com:
 ```
 
-`ansible-inventory --graph` and `ansible-inventory --host HOSTNAME` provide clearer inventory inspection than printing the internal `groups` variable from every host.
+The inventory name becomes `inventory_hostname`. Connection details such as `ansible_host`, `ansible_user`, and `ansible_port` can differ from that name, but secrets should not appear in an ordinary inventory file. A host should have one stable inventory identity so cached facts, output, and host-specific variables do not split across aliases.
 
-Variables separate policy data from task logic. A cross-distribution Apache play can use platform-specific values:
+Groups describe an operational characteristic rather than a temporary selection. Names such as `webservers`, `rhel10`, and `sydney_datacentre` communicate useful properties. A broad group should not imply privilege by itself. Variables that grant credentials or enable destructive behaviour need their own controls.
 
-```yaml
-# inventories/production/group_vars/redhat.yml
-apache_package: httpd
-apache_service: httpd
-apache_document_root: /var/www/html
-```
-
-```yaml
-# inventories/production/group_vars/debian.yml
-apache_package: apache2
-apache_service: apache2
-apache_document_root: /var/www/html
-```
-
-Inventory group names do not automatically follow `ansible_facts['os_family']`. Administrators must create and maintain the corresponding groups, or select a platform variable file from gathered facts. Explicit functional inventory often produces clearer control than inferring all policy from platform facts.
-
-Variables have scopes and precedence. Role defaults provide easy-to-override values. Inventory variables describe host and group policy. Play variables apply within a play. Extra variables supplied with `--extra-vars` have very high precedence and can override safeguards. Projects should validate externally supplied values before using them:
-
-```yaml
-- name: Validate requested account state
-  ansible.builtin.assert:
-    that:
-      - account_state in ['present', 'absent']
-    fail_msg: "account_state must be present or absent"
-```
-
-A typed state value is clearer than paired string flags such as `user_create=yes` and `user_create=no`. One task can then apply the selected state without creating contradictory create and delete paths.
-
-Facts describe observed host properties. Variables describe intended policy. Mixing the two can grant a compromised managed node too much influence over sensitive decisions. Privilege, credentials, repository sources, and trust anchors should come from controlled inventory, role variables, or a secret manager rather than untrusted host facts.
-
-Registered variables capture a task result for later tasks on the same host:
-
-```yaml
-- name: Read application version
-  ansible.builtin.command:
-    argv:
-      - /usr/local/bin/application
-      - --version
-  register: application_version
-  changed_when: false
-
-- name: Require an approved major version
-  ansible.builtin.assert:
-    that:
-      - application_version.stdout is match('^4\\.')
-```
-
-The registered result can contain `stdout`, `stderr`, `rc`, `changed`, `failed`, and module-specific fields. Code should inspect documented fields rather than parse coloured terminal output. Debug tasks should print only the value needed for diagnosis, especially when results can carry commands, tokens, or file content.
-
-Fact gathering has a cost across large inventories. A play that uses no facts can disable it. A play that needs a narrow subset can call `ansible.builtin.setup` with a filter or `gather_subset`. Fact caching can reduce repeated discovery, but stale cached facts can drive incorrect decisions. Policy should define cache lifetime and invalidate cached data after material platform changes.
-## Idempotence and native commands
-Modules should replace native commands whenever a supported module expresses the required state. A package task can detect whether installation is required. A copy task can compare content. A user task can inspect account attributes. A command generally reports a change whenever it runs because Ansible cannot infer the command's effect.
-
-Four modules cover common native execution cases:
-
-| Module | Execution model | Appropriate use |
-|---|---|---|
-| `ansible.builtin.command` | Runs a command without a remote shell | Commands that do not need shell syntax |
-| `ansible.builtin.shell` | Runs a command through `/bin/sh` by default | Pipelines, redirection, shell expansion, or compound shell logic |
-| `ansible.builtin.raw` | Bypasses the normal module subsystem | Bootstrapping Python or managing a device without a usable Python interpreter |
-| `ansible.builtin.script` | Transfers a local script and runs it remotely | Existing scripts that must execute on managed nodes |
-
-The script module does not execute a local script line by line over the connection. It transfers the script to a temporary remote location, invokes it, and removes the temporary copy according to Ansible's execution process.
-
-The command module should take an argument list when values can contain spaces or untrusted data:
-
-```yaml
-- name: Query an account
-  ansible.builtin.command:
-    argv:
-      - /usr/bin/getent
-      - passwd
-      - "{{ account_name }}"
-  register: account_query
-  changed_when: false
-```
-
-`argv` prevents shell parsing and avoids fragile quoting. The task also reports no change because it only reads state.
-
-The shell module enables metacharacters such as `|`, `>`, `<`, `&&`, and variable expansion. That power expands the injection surface. Untrusted values must not be concatenated into shell text. The command module remains the safer choice when shell behaviour is unnecessary.
-
-`creates` and `removes` can guard command, shell, and script operations:
-
-```yaml
-- name: Initialise application data
-  ansible.builtin.command:
-    cmd: /usr/local/sbin/app-init --root /srv/application
-    creates: /srv/application/.initialised
-```
-
-`creates` skips the command when the named path exists. `removes` skips it when the named path does not exist. These guards only test path existence. They do not prove that every effect of a complex script remains correct. A stronger task may register output and define `changed_when` and `failed_when` from documented exit codes.
-
-The raw module can install a Python interpreter during bootstrap, but normal modules should take over after that point. Raw commands lack the richer argument handling, state checks, and return structure of standard modules. Network platforms may also provide purpose-built connection and network modules that are safer than generic raw commands.
-
-A bootstrap play can gather no facts, test interpreter availability, and install Python only when required. Distribution-specific bootstrap commands may still be necessary because ordinary package facts are unavailable before Python starts. Inventory should group hosts by their known bootstrap image rather than guess the package manager with an `else` branch. After installation, `ansible.builtin.setup` can gather facts and normal roles can proceed.
-
-Scripts require the same security and state controls as direct commands:
-
-```yaml
-- name: Run vendor initialisation script once
-  ansible.builtin.script:
-    cmd: files/vendor-init.sh --root /opt/vendor
-    creates: /opt/vendor/.initialised
-  become: true
-```
-
-The local script should use a valid shebang, strict error handling, quoted variables, absolute paths, and validated arguments. Ansible transfers it, but the remote host still needs the interpreter named by the shebang. The `executable` parameter can select another interpreter when required.
-
-A timezone should not be managed by forcing `/etc/localtime` to a hand-built symbolic link unless platform policy explicitly requires that implementation. A supported timezone module or operating system role can handle the platform's state and associated files. Similar reasoning applies to package repositories, firewalls, SELinux, and storage. Direct file manipulation can bypass validation and auxiliary state that a dedicated module manages.
-
-Native commands should use absolute paths where the remote environment could vary. They should quote internal shell values, set an explicit working directory, constrain input, and avoid depending on interactive profiles. A dedicated module or role becomes worthwhile when the same imperative logic appears repeatedly.
-## Provisioning disposable lab systems
-Vagrant can invoke Ansible as a provisioner for local virtual machines. The remote `ansible` provisioner runs `ansible-playbook` on the Vagrant host and uses generated connection details. The `ansible_local` provisioner runs Ansible inside the guest. The former keeps the control runtime on the workstation, while the latter needs Ansible and project content inside the guest.
-
-```ruby
-Vagrant.configure("2") do |config|
-  config.vm.provision "ansible" do |ansible|
-    ansible.playbook = "site.yml"
-  end
-end
-```
-
-Provisioning should call the same roles and declared dependencies used by other test environments where practical. A separate lab inventory can supply host-specific values. Vagrant-generated inventory may override connection variables, so operators should inspect the invoked command and inventory when behaviour differs from a direct playbook run.
-
-Lab convenience must not weaken the production baseline. Enabling SSH password authentication, installing a known password, or granting a broad password-free sudo rule can suit an isolated disposable exercise only when the network and credentials remain contained. Reusable roles should default to secure settings, and lab overrides should live in the lab inventory rather than in the main task logic.
-## Packages, files, and services
-Packages, configuration files, and services form a common configuration sequence:
-1. Install the required packages.
-2. Deploy approved configuration and content.
-3. Enable and start the service.
-4. Restart or reload the service only when configuration changes.
-
-The generic `ansible.builtin.package` module acts as a proxy for the detected package manager. It does not translate package names between distributions. The generic `ansible.builtin.service` module similarly acts as a proxy for the detected service manager, but service names can still differ.
+Group variables can hold shared data:
 
 ```yaml
 ---
-- name: Deploy Apache
+web_package: httpd
+web_service: httpd
+web_document_root: /var/www/html
+```
+
+The usual project layout places these values in `group_vars/webservers.yml`. Host-specific exceptions belong in `host_vars/<inventory_hostname>.yml`, although many exceptions can indicate that the group model or role interface needs redesign. Secrets belong in an encrypted Vault file or an external credential system, not beside ordinary variables in cleartext.
+
+Host patterns determine the play's initial scope. `hosts: webservers` targets that group, while intersections and exclusions can narrow it. An operator should inspect the resolved list before applying a high-impact change:
+
+```text
+ansible-playbook site.yml --list-hosts --limit 'webservers:&rhel10'
+```
+
+`--limit` can reduce the command-line scope but cannot add a host that the play's `hosts` pattern excluded. Quoting protects pattern punctuation from the local shell.
+
+An inventory plugin should use a read-only infrastructure credential where possible. Its grouping rules, filters, and cache settings should live in version control. Dynamic discovery does not remove the need to review the resulting host set. A stale cache, broad cloud tag, or incorrect filter can enlarge the target unexpectedly.
+
+Connection variables should choose the supported transport. Standard RHEL hosts normally use the SSH connection. Network devices, containers, and local actions can require different connection plugins. The playbook should not call `raw` as a substitute for selecting the correct platform connection.
+
+The automation account needs permission on each selected host before the main playbook starts. A bootstrap workflow can create that account and install its public key, but the organisation should separate bootstrap authority from routine configuration authority. A permanent production play should not keep account-provisioning credentials that it no longer needs.
+
+Unreachable hosts differ from failed tasks. A block's `rescue` section cannot repair a host that Ansible never reached. Inventory validation, DNS checks, SSH host-key management, credential tests, and `ansible.builtin.ping` can identify connection failures before a change window.
+## Writing reliable YAML
+YAML represents mappings, sequences, and scalar values. Ansible reads these structures and interprets particular keys as playbook keywords or module arguments. Spaces control YAML indentation. Tabs must not indent YAML, and a consistent two-space increment keeps the hierarchy visible.
+
+A mapping associates keys with values:
+
+```yaml
+web_package: httpd
+web_service: httpd
+web_root: /var/www/html
+```
+
+A sequence stores ordered items:
+
+```yaml
+web_packages:
+  - httpd
+  - mod_ssl
+```
+
+A sequence of mappings can describe structured records:
+
+```yaml
+managed_accounts:
+  - name: deploy
+    groups:
+      - wheel
+    state: present
+  - name: retired
+    groups: []
+    state: absent
+```
+
+The dash begins each sequence item. A colon followed by a space separates a mapping key from its value. Indentation places `groups` and `state` inside each account record.
+
+Lowercase `true` and `false` provide clear boolean values. Quotation marks should protect strings that resemble other YAML types, begin with a reserved character, contain a colon followed by a space, or need to retain a leading zero. File modes should be quoted so YAML passes them as strings:
+
+```yaml
+enabled: true
+release_label: "10.0"
+service_banner: "Status: ready"
+config_mode: "0644"
+```
+
+Jinja expressions that begin a value also require quotation marks:
+
+```yaml
+dest: "{{ web_root }}/index.html"
+```
+
+Single quotes treat most characters literally. A single quote inside a single-quoted scalar appears twice. Double quotes allow escape sequences such as `\n`, so they require more care around backslashes. Plain scalars remain useful for simple words and paths, but selective quotation prevents YAML from converting an intended string.
+
+Block scalars preserve readable multi-line content. The literal indicator `|` retains line breaks, while the folded indicator `>` converts most line breaks to spaces. The chomping indicators `|-` and `>-` remove the final newline:
+
+```yaml
+literal_message: |-
+  First line
+  Second line
+
+folded_message: >-
+  This text occupies several source lines
+  but becomes one logical line.
+```
+
+Comments begin with `#` outside quoted strings. Comments should explain constraints, unusual decisions, or operational risks. Task names should carry the ordinary description of intent, which avoids comments that repeat the code.
+
+YAML anchors can reduce duplication, but they can also hide the effective value and complicate reviews. Ansible variables, defaults, roles, and task reuse usually express shared configuration more clearly. Flow-style YAML such as `{name: httpd, state: present}` saves space but makes later changes harder to review. Block style suits most playbooks.
+
+Local tools should validate YAML that may contain credentials. Sending unpublished inventory, tokens, passwords, or configuration to an online parser can disclose sensitive data. Visual Studio Code with the Red Hat Ansible extension, or another local editor with YAML and Ansible support, can flag indentation, schema, and module errors without uploading the file.
+
+`ansible-lint` examines more than YAML syntax. It detects many Ansible-specific defects, risky shell use, weak task names, non-idempotent patterns, and inconsistent module naming. On RHEL, the DNF package belongs to a Red Hat Ansible Automation Platform subscription. Other environments should install it in an isolated tool environment, such as `pipx` or a virtual environment, and pin a version compatible with the project's `ansible-core`. Installing Python packages into the RHEL system interpreter can conflict with RPM-managed software.
+## Structuring plays and tasks
+A play maps a host pattern to an ordered list of tasks. A playbook contains one or more plays and runs them from top to bottom. Tasks also run in source order for each host, subject to strategy, serialisation, conditions, failures, and delegation.
+
+```yaml
+---
+- name: Configure the RHEL 10 web tier
   hosts: webservers
   become: true
   gather_facts: true
 
   vars:
-    apache_platforms:
-      RedHat:
-        package: httpd
-        service: httpd
-      Debian:
-        package: apache2
-        service: apache2
-
-  pre_tasks:
-    - name: Validate supported operating system family
-      ansible.builtin.assert:
-        that:
-          - ansible_facts['os_family'] in apache_platforms
-        fail_msg: "The Apache role does not support this operating system family"
-
-    - name: Select Apache platform values
-      ansible.builtin.set_fact:
-        apache_package: "{{ apache_platforms[ansible_facts['os_family']]['package'] }}"
-        apache_service: "{{ apache_platforms[ansible_facts['os_family']]['service'] }}"
+    web_package: httpd
+    web_service: httpd
 
   tasks:
-    - name: Ensure Apache is installed
-      ansible.builtin.package:
-        name: "{{ apache_package }}"
+    - name: Install the web server
+      ansible.builtin.dnf:
+        name: "{{ web_package }}"
         state: present
 
-    - name: Install the home page
+    - name: Enable and start the web server
+      ansible.builtin.systemd_service:
+        name: "{{ web_service }}"
+        enabled: true
+        state: started
+```
+
+The play name and every task name should state a concrete action and object. Useful names improve terminal output, failure reports, and targeted starts with `--start-at-task`. A name such as `Install the web server` communicates more than `DNF task`.
+
+`hosts` selects an inventory pattern. Operators should inspect the selection with `--list-hosts` before running a high-impact playbook. `become: true` belongs at the narrowest practical scope. A play may need root privileges throughout, while a mixed play should apply escalation only to privileged tasks or blocks.
+
+`gather_facts: true` runs the setup module before ordinary tasks. Facts describe each host, including its distribution, interfaces, memory, and Python environment. Fact gathering has a cost, so a play that uses no facts can disable it. A play should not disable gathering and then rely on facts that happen to remain in a cache.
+
+Fully qualified collection names make module ownership explicit:
+
+```yaml
+ansible.builtin.copy:
+ansible.posix.authorized_key:
+community.general.archive:
+```
+
+Short names may resolve, but two collections can publish modules with the same short name. FQCNs also connect source code to the correct documentation. A project should use `ansible-doc ansible.builtin.copy` or the corresponding collection documentation instead of inferring parameters from an old example.
+
+Module arguments form a mapping below the module name. Task keywords such as `when`, `register`, `notify`, `become`, `loop`, and `tags` align with the module name. Misplacing a task keyword under the module's arguments produces an unsupported-parameter error or an unintended value.
+
+Tags allow selective execution, but they do not create independent workflows automatically. A tagged subset can fail if it skips prerequisite tasks. Roles and separate playbooks provide stronger boundaries for operations that must run independently.
+## Facts, variables, conditions, and results
+Variables separate environment data from task logic. Inventory variables, group variables, host variables, role defaults, role variables, play variables, registered results, and extra variables have different precedence. High-precedence input can override a carefully chosen default, so a playbook should validate external values before using them.
+
+Descriptive names such as `account_state` or `web_service_name` reduce ambiguity. Variable names should use letters, numbers, and underscores, and should not begin with a number. A project should avoid names that collide with Ansible keywords, Python methods, or magic variables.
+
+Host facts should use the `ansible_facts` mapping:
+
+```yaml
+- name: Display the operating system family
+  ansible.builtin.debug:
+    msg: "{{ ansible_facts['os_family'] }}"
+```
+
+Legacy top-level aliases such as `ansible_os_family` may exist when fact injection remains enabled, but the namespaced form makes the source clear and avoids dependence on that setting.
+
+`debug` can display a variable with `var` or a rendered message with `msg`:
+
+```yaml
+- name: Display the selected web service
+  ansible.builtin.debug:
+    var: web_service
+
+- name: Display the managed host
+  ansible.builtin.debug:
+    msg: "Configuring {{ inventory_hostname }}"
+```
+
+Debug output can expose credentials and personal data. Sensitive tasks should use `no_log: true`, and the playbook should avoid printing secret variables. `no_log` limits Ansible's task output, but it does not protect data that a called program writes elsewhere.
+
+A `when` clause contains a raw Jinja expression and must not use `{{ }}`:
+
+```yaml
+- name: Install the RHEL web package
+  ansible.builtin.dnf:
+    name: httpd
+    state: present
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - ansible_facts['distribution_major_version'] | int == 10
+```
+
+A list under `when` applies logical AND. A single expression can use `or`, and parentheses can clarify combinations. Filters should normalise a value before comparison when inventory or command-line input may provide a string.
+
+Extra variables have very high precedence. A destructive operation should not treat any non-empty string as consent. An assertion can restrict the accepted states:
+
+```yaml
+- name: Validate account input
+  ansible.builtin.assert:
+    that:
+      - account_name is match('^[a-z_][a-z0-9_-]{0,31}$')
+      - account_state in ['present', 'absent']
+      - account_remove_home is boolean
+    fail_msg: "Account input is invalid"
+```
+
+The condition can then use the validated boolean directly:
+
+```yaml
+remove: "{{ account_remove_home }}"
+```
+
+A task can register its result for later decisions:
+
+```yaml
+- name: Read the HTTP service state
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - httpd
+  register: httpd_state
+  changed_when: false
+  failed_when: httpd_state.rc not in [0, 3]
+```
+
+Registered results commonly expose `rc`, `stdout`, `stderr`, `changed`, `failed`, and `skipped`. The exact fields depend on the module. `changed_when` should describe an observed change accurately, not suppress a genuine change to produce cleaner output. `failed_when` should accept documented non-zero return codes only when the command uses them for an expected state.
+## Driving tasks from structured data
+Loops apply one task definition to a sequence of values. The loop input should carry enough structure to keep the task readable:
+
+```yaml
+required_packages:
+  - name: httpd
+    state: present
+  - name: mod_ssl
+    state: present
+```
+
+```yaml
+- name: Manage required packages
+  ansible.builtin.dnf:
+    name: "{{ item.name }}"
+    state: "{{ item.state }}"
+  loop: "{{ required_packages }}"
+  loop_control:
+    label: "{{ item.name }}"
+```
+
+Many modules accept a list directly and can process it more efficiently. DNF can install the entire package list in one transaction:
+
+```yaml
+- name: Install required web packages
+  ansible.builtin.dnf:
+    name:
+      - httpd
+      - mod_ssl
+    state: present
+```
+
+A loop remains useful when each item has different parameters, conditions, notifications, or result handling. `loop_control.label` limits noisy output to a meaningful field. It does not hide secrets, so a sensitive loop still needs protected inputs and `no_log: true`.
+
+Nested data should use a distinct loop variable when an included task or role may also use `item`:
+
+```yaml
+- name: Configure application instances
+  ansible.builtin.include_tasks: tasks/instance.yml
+  loop: "{{ application_instances }}"
+  loop_control:
+    loop_var: application_instance
+    label: "{{ application_instance.name }}"
+```
+
+This naming prevents an inner loop from overwriting the outer `item`. The included file can reference `application_instance.name` and other fields directly.
+
+Templates should consume structured variables rather than assemble configuration through repeated line edits. A template can render a complete, reviewable file:
+
+```jinja2
+{% for backend in application_backends %}
+server {{ backend.name }} {{ backend.address }}:{{ backend.port }}
+{% endfor %}
+```
+
+The task should validate the rendered temporary file before installing it whenever the application provides a validator. Whole-file ownership also establishes a clear boundary. If another tool edits the same file, the organisation should assign one owner or use a documented drop-in directory.
+
+Distribution-specific values can sit in variable files selected by facts:
+
+```yaml
+- name: Load operating system variables
+  ansible.builtin.include_vars:
+    file: "vars/{{ ansible_facts['os_family'] }}.yml"
+```
+
+The file name comes from a trusted fact rather than unchecked user input. A RHEL-focused role can simplify the interface further by supporting only RHEL 9 and RHEL 10 and asserting that range. RHEL system roles already encapsulate many release differences, which reduces local branching.
+
+Lists and mappings should describe desired state, not an ordered imitation of terminal commands. A data model such as `managed_accounts`, `firewall`, or `storage_pools` lets the task logic remain stable while environment data changes. Assertions at the role boundary can reject missing keys, invalid choices, unsafe sizes, and unsupported combinations before a module acts.
+## Idempotence and native commands
+An idempotent task converges a host on the declared state. Running it again against that state should report `ok` and should not repeat a change. Package, file, user, and service modules usually support this model because they inspect current state before acting. Idempotence still depends on module behaviour, input stability, external services, and the resources being managed.
+
+Ansible should use a purpose-built module or RHEL system role whenever one represents the desired resource. A command that installs a package cannot give Ansible the structured state, check-mode support, and error handling available through `ansible.builtin.dnf`. Direct commands remain valid for software or operations that have no suitable module.
+
+The four native execution modules serve different purposes:
+
+| Module | Appropriate use |
+| --- | --- |
+| `ansible.builtin.command` | Runs a program without shell parsing |
+| `ansible.builtin.shell` | Runs syntax that requires a shell, such as a pipeline or redirection |
+| `ansible.builtin.script` | Transfers a local script to the managed host and executes it |
+| `ansible.builtin.raw` | Sends a command through the remote shell without the normal module subsystem |
+
+`command` should be the default for an external executable. Its `argv` parameter passes each argument separately and avoids quoting ambiguity:
+
+```yaml
+- name: Initialise the application database once
+  ansible.builtin.command:
+    argv:
+      - /usr/local/libexec/app-init
+      - --database
+      - /var/lib/example/app.db
+      - --owner
+      - example
+    creates: /var/lib/example/app.db
+```
+
+`creates` skips the command when the named path already exists. `removes` skips it when the named path does not exist. These are module parameters, not universal task controls. They provide partial convergence for a command whose effect has a reliable filesystem marker. A marker should represent successful completion, and a failed program should not create it early.
+
+`command` does not expand shell variables, pipes, redirections, wildcards, or command substitutions. That restriction prevents a large class of injection defects. Ansible performs Jinja rendering before the module runs, so untrusted input still requires validation even without a shell.
+
+`shell` is appropriate when the operation genuinely requires shell grammar:
+
+```yaml
+- name: Check whether the application log contains an error
+  ansible.builtin.shell:
+    cmd: "set -o pipefail && journalctl -u example | grep -q 'fatal error'"
+    executable: /bin/bash
+  register: log_check
+  changed_when: false
+  failed_when: log_check.rc not in [0, 1]
+```
+
+Shell commands should not concatenate untrusted values. The `quote` filter can protect a value used as one shell argument, but strict validation and `command: argv` provide stronger controls. A task should never place a password, token, or private key in a command string because process listings, callback output, and logs can reveal it.
+
+Inline shell scripts should use a literal YAML scalar and begin with defensive shell options where appropriate. Shell behaviour differs across interpreters, so a task that depends on Bash should set `executable: /bin/bash`. A pipeline needs `pipefail` if failure in an earlier command must fail the task.
+
+`script` copies a file from the control node to the managed host and then executes it. It does not stream and execute each source line separately. It can operate before Python is available on the managed host, but the script still needs its own interpreter and dependencies. `creates` and `removes` can give the action partial check-mode support:
+
+```yaml
+- name: Run the vendor bootstrap script once
+  ansible.builtin.script:
+    cmd: files/vendor-bootstrap.sh --non-interactive
+    creates: /var/lib/vendor/bootstrap.complete
+```
+
+A maintained module, role, or package should replace a script when the automation becomes long-lived. Scripts often hide state detection, error handling, and sensitive output from Ansible.
+
+`raw` bypasses the module subsystem and passes a command through the configured remote shell. It is suitable for a narrow bootstrap operation, such as installing Python on a host that lacks it. It does not provide normal change reporting or check-mode support. Network automation should use the platform's connection plugin and network modules rather than treating every device as a Python-free Linux shell.
+
+Ad hoc commands can appear in a controlled shell script for a short operational task, but a playbook provides better structure, review, and error reporting. If a script invokes Ansible, it should use an inventory, a restricted host pattern, explicit module names, checked exit status, and quoted arguments. Repeated administration should move into a playbook or role.
+## Packages, files, services, and handlers
+Package installation, configuration deployment, and service management form a common sequence. On RHEL 10, `ansible.builtin.dnf` expresses package state directly:
+
+```yaml
+- name: Install the Apache HTTP Server
+  ansible.builtin.dnf:
+    name:
+      - httpd
+      - mod_ssl
+    state: present
+```
+
+`state: present` accepts the repository's selected version, while `state: latest` requests an upgrade whenever a newer candidate exists. Production playbooks should use an explicit update policy. An unreviewed `latest` operation can introduce unrelated changes during a configuration run.
+
+`ansible.builtin.package` selects a package backend for the managed host, but it does not translate package names. Cross-distribution automation still needs variables or role logic for names such as `httpd` and `apache2`. A RHEL-only playbook should use `dnf` when DNF-specific behaviour or clarity is useful.
+
+`copy` transfers a static source or writes static content. `template` renders a Jinja template. Both can manage ownership, group, mode, SELinux-related attributes, backups, and validation where supported. Configuration files should declare permissions explicitly:
+
+```yaml
+- name: Deploy the web home page
+  ansible.builtin.copy:
+    src: files/index.html
+    dest: /var/www/html/index.html
+    owner: root
+    group: root
+    mode: "0644"
+```
+
+`content` suits a short, non-templated value. A template file suits larger content and variable interpolation. Sensitive templates should use `no_log: true` and `diff: false`, but the destination permissions and application logs still require review.
+
+A handler performs a deferred action after a notifying task reports a change:
+
+```yaml
+- name: Deploy the Apache configuration
+  ansible.builtin.template:
+    src: templates/example.conf.j2
+    dest: /etc/httpd/conf.d/example.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart Apache
+
+handlers:
+  - name: Restart Apache
+    ansible.builtin.systemd_service:
+      name: httpd
+      state: restarted
+```
+
+When a module uses `validate`, the command must accept a temporary file path in the position represented by `%s`. An application-specific validator can prevent deployment of syntactically invalid configuration. A validator for an Apache fragment must also load the surrounding configuration tree, so the project should test the complete candidate configuration in its deployment workflow.
+
+Notified handlers normally run after the relevant play section. Multiple notifications execute the same handler once for each host at that point. This coalescing prevents repeated restarts when several tasks update related files. If a later task requires the changed service immediately, `ansible.builtin.meta: flush_handlers` can run pending handlers earlier. Early flushing should remain exceptional because it adds another service transition.
+
+A handler runs only when its notifying task reports `changed`. A forced `changed_when: true` restarts a service on every run and defeats convergence. A configuration task should rely on the module's comparison or define an accurate change condition.
+
+A RHEL 10 web-service play can combine package, content, service, and firewall state:
+
+```yaml
+---
+- name: Configure the RHEL 10 web service
+  hosts: webservers
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Confirm the RHEL major version
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == 'RedHat'
+          - ansible_facts['distribution_major_version'] | int == 10
+        fail_msg: "This play requires RHEL 10"
+
+  tasks:
+    - name: Install Apache
+      ansible.builtin.dnf:
+        name: httpd
+        state: present
+
+    - name: Deploy the home page
       ansible.builtin.copy:
         src: files/index.html
         dest: /var/www/html/index.html
         owner: root
         group: root
-        mode: '0644'
+        mode: "0644"
 
-    - name: Ensure Apache is enabled and running
-      ansible.builtin.service:
-        name: "{{ apache_service }}"
-        enabled: true
-        state: started
-```
-
-Group variables can replace the platform mapping when inventory already carries reliable platform policy. A role can place these values in `vars/RedHat.yml` and `vars/Debian.yml`, then select the correct file after gathering facts.
-
-The copy module handles static files and short literal content. Its `content` parameter writes a complete file and should specify a file path as `dest`. The `src` parameter reads from the control node unless `remote_src: true` changes that behaviour. A trailing slash on a source directory copies its contents, while a source directory without the slash copies the directory itself. Ownership and mode should be explicit.
-
-Directory deployment through `copy` suits small static trees. Large trees can make the module perform expensive recursive checks. Packages, synchronisation tools, artefact repositories, or application deployment modules may scale better. Deleting a source file does not automatically remove an old remote file from a copied directory, so exact mirroring needs an explicit design.
-
-Inline `content` replaces the destination file with the supplied string. It should not manage one setting inside a complex vendor file. `lineinfile` can enforce a well-defined line, `blockinfile` can own a marked block, and `template` can own the whole configuration. Whichever method applies, one authority should control each region of the file. Overlapping tasks can undo one another and report changes on every run.
-
-Templates suit files whose content depends on variables. A Jinja template provides cleaner structure than embedding a long configuration under `content`. It also supports validation before replacement:
-
-```yaml
-- name: Install sudo policy
-  ansible.builtin.template:
-    src: ansible-operator.j2
-    dest: /etc/sudoers.d/ansible-operator
-    owner: root
-    group: root
-    mode: '0440'
-    validate: /usr/sbin/visudo -cf %s
-```
-
-Validation prevents an invalid candidate file from replacing the active file. Similar validation should protect web server, SSH, and time-service configuration.
-### Handlers and change-driven service control
-A handler runs after a notifying task reports `changed`. Ansible normally runs notified handlers at defined synchronization points, including the end of a play's main task section. Repeated notifications of the same handler lead to one run at that point.
-
-```yaml
-- name: Manage Chrony
-  hosts: time_servers
-  become: true
-  gather_facts: true
-
-  vars:
-    chrony_platforms:
-      RedHat:
-        package: chrony
-        service: chronyd
-        config: /etc/chrony.conf
-      Debian:
-        package: chrony
-        service: chrony
-        config: /etc/chrony/chrony.conf
-
-  tasks:
-    - name: Select Chrony platform values
-      ansible.builtin.set_fact:
-        chrony_data: "{{ chrony_platforms[ansible_facts['os_family']] }}"
-
-    - name: Ensure Chrony is installed
-      ansible.builtin.package:
-        name: "{{ chrony_data['package'] }}"
-        state: present
-
-    - name: Install Chrony configuration
+    - name: Deploy the virtual host
       ansible.builtin.template:
-        src: chrony.conf.j2
-        dest: "{{ chrony_data['config'] }}"
+        src: templates/example.conf.j2
+        dest: /etc/httpd/conf.d/example.conf
         owner: root
         group: root
-        mode: '0644'
-      notify: Restart Chrony
+        mode: "0644"
+      notify: Restart Apache
 
-    - name: Ensure Chrony is enabled and running
-      ansible.builtin.service:
-        name: "{{ chrony_data['service'] }}"
+    - name: Enable and start Apache
+      ansible.builtin.systemd_service:
+        name: httpd
         enabled: true
         state: started
 
+    - name: Permit HTTP through firewalld
+      ansible.builtin.include_role:
+        name: redhat.rhel_system_roles.firewall
+      vars:
+        firewall:
+          - service: http
+            state: enabled
+            runtime: true
+            permanent: true
+
   handlers:
-    - name: Restart Chrony
-      ansible.builtin.service:
-        name: "{{ chrony_data['service'] }}"
+    - name: Restart Apache
+      ansible.builtin.systemd_service:
+        name: httpd
         state: restarted
 ```
 
-The play should validate the operating system family before indexing the mapping. Configuration syntax should also be validated when the service provides a suitable check command. A forced restart is not idempotent by itself, but the handler restricts it to configuration changes.
+The firewall role manages the runtime and permanent firewalld state. A public service may also require TLS, a reviewed SELinux policy, application-specific file contexts, and monitoring. SELinux should remain enforcing. Disabling it to make a service start hides a configuration defect and removes a security control.
 
-`ansible.builtin.meta: flush_handlers` can run notified handlers before the normal synchronization point when later tasks require the new service state. Early flushing should remain deliberate because it changes task order.
-## Account management and access
-The `ansible.builtin.user` module creates, modifies, and removes local accounts. A single state variable can control the lifecycle:
+Time synchronisation should use the RHEL timesync role instead of deleting comments from `/etc/chrony.conf` or replacing fragments without understanding the complete configuration:
 
 ```yaml
----
-- name: Manage local automation account
-  hosts: linux
-  become: true
-  gather_facts: false
-
+- name: Configure RHEL time synchronisation
+  ansible.builtin.include_role:
+    name: redhat.rhel_system_roles.timesync
   vars:
-    account_name: ansible-operator
-    account_state: present
-
-  pre_tasks:
-    - name: Validate account state
-      ansible.builtin.assert:
-        that:
-          - account_state in ['present', 'absent']
-
-  tasks:
-    - name: Apply account state
-      ansible.builtin.user:
-        name: "{{ account_name }}"
-        state: "{{ account_state }}"
-        shell: /bin/bash
-        create_home: true
-        remove: "{{ account_state == 'absent' }}"
+    timesync_ntp_servers:
+      - hostname: time.example.com
+        trusted: true
+        prefer: true
+        iburst: true
+      - hostname: 0.rhel.pool.ntp.org
+        pool: true
+        iburst: true
 ```
 
-`remove: true` asks the platform's account tool to remove associated directories when the account becomes absent. It requires careful review because account removal can destroy a home directory and mail spool. Production workflows should separate approval for creation, modification, suspension, and deletion.
-
-Supplementary group management also needs care. Supplying `groups` without `append: true` removes memberships not listed in the task. That behaviour can enforce an exact policy, but an accidental incomplete list can remove required access.
-### Passwords and secrets
-Linux expects the user module's `password` value to contain a password hash, not clear text. A literal clear-text password inside a playbook remains exposed even when a Jinja filter hashes it during execution. Source control, process arguments, logs, editor recovery files, and job output can all disclose it.
-
-A safer account task receives an approved hash from a protected variable:
+The timesync role replaces the configuration of the selected provider. The variable set must therefore describe every required source and option. On RHEL 10, the role normally configures `chronyd`. Network Time Security can authenticate time sources, but a deployment should follow the role's rules for NTS-only source sets.
+## Managing users and secure access
+Account automation should separate the desired account state from credentials and authorisation. A structured variable can define ordinary attributes:
 
 ```yaml
-- name: Create account with managed password hash
-  ansible.builtin.user:
-    name: "{{ account_name }}"
-    password: "{{ account_password_hash }}"
-    update_password: on_create
-  no_log: true
-```
-
-The variable can come from Ansible Vault or an external secret manager. Vault protects encrypted data at rest. Once Ansible decrypts the value for use, task authors must still prevent disclosure with access controls, careful logging, and `no_log`.
-
-`update_password: on_create` sets the supplied password only for a newly created account. `always` updates it when the supplied hash differs. The correct choice follows the organisation's ownership model for password rotation. A fixed hash should not stand in for a centrally managed identity system.
-
-Extra variables placed directly on a command line can appear in shell history and process inspection. A vaulted variable file, a protected secret integration, or a private prompt provides a safer path. Diff mode and debugging must not reveal secret-backed files.
-### SSH public-key authentication
-SSH authentication proves possession of a private key against a public key installed for the remote account. The private key should remain under the control of its owner or an approved credential service. Ansible normally distributes only public keys.
-
-`ansible.posix.authorized_key` belongs to the `ansible.posix` collection:
-
-```yaml
-- name: Authorise the automation public key
-  ansible.posix.authorized_key:
-    user: "{{ account_name }}"
-    key: "{{ lookup('ansible.builtin.file', 'files/ansible-operator.pub') }}"
+managed_accounts:
+  - name: deploy
+    comment: Deployment service account
+    groups:
+      - webops
+    shell: /bin/bash
     state: present
+```
+
+A loop can apply the records:
+
+```yaml
+- name: Manage local accounts
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    comment: "{{ item.comment | default(omit) }}"
+    groups: "{{ item.groups | default(omit) }}"
+    append: true
+    shell: "{{ item.shell | default('/bin/bash') }}"
+    state: "{{ item.state }}"
+    password_lock: true
+    create_home: true
+  loop: "{{ managed_accounts }}"
+  loop_control:
+    label: "{{ item.name }}"
+```
+
+`append: true` preserves supplementary groups that the task does not list. Without it, the module can replace the account's supplementary group membership. `password_lock: true` supports a key-only service account, but the administrator should confirm that no local password workflow requires the account.
+
+Deleting an account can remove data. `state: absent` with `remove: true` may delete the home directory and mail spool. A production playbook should validate the account name, require an explicit deletion state, back up required data to a separate system, and apply an approval process. It should never construct the target name from unchecked external input.
+
+On Linux, the `user` module expects an encrypted password hash, not a cleartext password. It writes the supplied value to the account database without validating the hash. Playbooks should not generate password hashes from cleartext literals, commit hashes to an unprotected variable file, or prescribe an obsolete algorithm. An approved identity process should generate the hash according to current RHEL policy. Vault or a credential system should protect it, and the task should set `no_log: true`.
+
+SSH keys should be generated on the control side or by an approved credential system, not repeatedly on managed hosts as part of ordinary account configuration. RHEL 10 generates Ed25519 keys by default outside FIPS mode and RSA keys in FIPS mode. The private key should have a passphrase, remain outside the playbook repository, and enter an automation run through an SSH agent or platform credential.
+
+The public key belongs in the user's `authorized_keys` file. The `ansible.posix.authorized_key` module resides in the `ansible.posix` collection, not in `ansible-core`:
+
+```yaml
+- name: Install the deployment public key
+  ansible.posix.authorized_key:
+    user: deploy
+    state: present
+    key: "{{ lookup('ansible.builtin.file', 'public_keys/deploy.pub') }}"
     manage_dir: true
 ```
 
-The lookup reads the public key on the control node. The module manages the target account's `authorized_keys` file and can create the `.ssh` directory with appropriate ownership and permissions.
+The default file name is `authorized_keys`, with a final `s`. A repository may contain public keys, although an organisation should still track their owner, purpose, rotation date, and revocation. The module's `exclusive: true` option removes unspecified keys. It is not loop-aware, so an exclusive policy must pass the complete approved key set in one operation.
 
-`generate_ssh_key: true` under `ansible.builtin.user` generates a key pair for the managed user on the host where that task runs. It does not inherently generate a controller key or copy a public key to other hosts. A task that must create controller-side credentials should target or delegate to the controller explicitly, protect the private key, avoid overwriting an existing key, and follow organisational key-generation policy.
+Key restrictions can limit port forwarding, agent forwarding, source addresses, or the permitted command. Those restrictions should match the automation's actual needs. A compromised unrestricted key can provide capabilities beyond the intended deployment task.
 
-No key algorithm is universally best for every compatibility and compliance requirement. Modern OpenSSH environments often support Ed25519, while some regulated or legacy environments require an approved RSA configuration. Policy, client support, cryptographic libraries, and lifecycle management should determine the selection.
-
-Public-key access does not by itself grant privilege escalation. An automation account may need `become`, but a broad `NOPASSWD: ALL` rule grants extensive power. The account should have tightly controlled credentials, host access, network reachability, audit logging, and job permissions. Where command-specific sudo rules conflict with Ansible's temporary module execution, an automation platform can mediate access instead of distributing unrestricted interactive credentials.
-
-Account provisioning should follow a complete lifecycle:
-- Create a named account or bind a centrally managed identity.
-- Apply the intended primary group, supplementary groups, shell, home, and expiry.
-- Install approved public keys and remove retired keys.
-- Grant only the required escalation path.
-- Verify login and escalation through the automation channel.
-- Suspend access before destructive deletion when investigation or handover may be required.
-- Remove credentials, sudo policy, scheduled jobs, and owned service access during offboarding.
-- Retain or archive data according to policy before requesting home-directory removal.
-
-The `exclusive: true` option of `ansible.posix.authorized_key` can remove keys that the task does not supply. That option supports exact key ownership, but loops can remove keys installed by earlier loop iterations unless the complete key set is supplied together. Shared access files need one declared owner and a reviewed source of truth.
-
-Changing `sshd_config` to enable password authentication weakens a key-only environment and should not serve as a routine provisioning step. Any SSH change should use a template or specialised role, validate the candidate configuration with `sshd -t`, notify a reload or restart handler, and preserve an established recovery path.
-## Conditions, blocks, and errors
-Conditions control tasks from typed data:
+OpenSSH server settings should use the RHEL sshd role. On RHEL 10, a non-exclusive configuration can use a drop-in under `/etc/ssh/sshd_config.d`:
 
 ```yaml
-- name: Install a Red Hat family package
+- name: Apply the automation SSH policy
+  ansible.builtin.include_role:
+    name: redhat.rhel_system_roles.sshd
+  vars:
+    sshd_config_file: /etc/ssh/sshd_config.d/42-automation.conf
+    sshd_config:
+      PermitRootLogin: false
+      PasswordAuthentication: false
+      PubkeyAuthentication: true
+```
+
+The operator must install and test a working key before disabling password authentication. A staged change should keep an existing administrative session open, validate the generated configuration, test a second connection, and define a console recovery path. The role manages configuration and service handling more safely than an unvalidated line edit.
+
+Sudo rules should grant named commands rather than `ALL` wherever practical. The RHEL sudo role provides a structured interface:
+
+```yaml
+- name: Grant the deployment command
+  ansible.builtin.include_role:
+    name: redhat.rhel_system_roles.sudo
+  vars:
+    sudo_sudoers_files:
+      - path: /etc/sudoers.d/deploy
+        user_specifications:
+          - users:
+              - deploy
+            hosts:
+              - ALL
+            commands:
+              - /usr/bin/systemctl restart httpd
+```
+
+The exact command form, arguments, executable path, and service implications need security review. Some permitted programs can launch a shell or write arbitrary files and therefore provide effective root access even when the sudo rule names a single binary.
+
+A project that writes a sudoers fragment directly must set mode `"0440"` and validate it before replacement:
+
+```yaml
+- name: Install the reviewed sudoers fragment
+  ansible.builtin.copy:
+    src: files/deploy-sudoers
+    dest: /etc/sudoers.d/deploy
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+```
+
+Blocks apply shared directives and can provide error handling:
+
+```yaml
+- name: Configure the deployment account
+  become: true
+  block:
+    - name: Create the account
+      ansible.builtin.user:
+        name: deploy
+        state: present
+        password_lock: true
+
+    - name: Install the public key
+      ansible.posix.authorized_key:
+        user: deploy
+        state: present
+        key: "{{ lookup('ansible.builtin.file', 'public_keys/deploy.pub') }}"
+
+  rescue:
+    - name: Report the failed account task
+      ansible.builtin.debug:
+        msg: "Account configuration failed at {{ ansible_failed_task.name }}"
+
+  always:
+    - name: Record completion in the controller log
+      ansible.builtin.debug:
+        msg: "Account configuration attempt completed"
+```
+
+Tasks in a block inherit directives such as `become`, `when`, and `tags`. A `rescue` section runs after a task returns a failed state, but it does not catch invalid task definitions or unreachable hosts. For hosts that enter block error handling and remain active, an `always` section runs after the block and any rescue tasks. Error handling should not conceal a failed security control. Recovery tasks should restore a safe state or add useful evidence, and the run should fail when the desired security state remains absent.
+## Reusing tasks, roles, and playbooks
+Small playbooks can keep related tasks together. As an automation project grows, roles provide standard directories for tasks, handlers, defaults, variables, templates, files, and metadata. A role exposes a coherent interface and reduces long collections of one-task files.
+
+Ansible supports dynamic includes and static imports:
+
+| Mechanism | Processing model | Common use |
+| --- | --- | --- |
+| `ansible.builtin.include_tasks` | Dynamic at run time | File name or execution depends on earlier results, conditions, or a loop |
+| `ansible.builtin.import_tasks` | Static during playbook parsing | Task structure is known before execution |
+| `ansible.builtin.include_role` | Dynamic at run time | Role invocation depends on run-time state or a loop |
+| `ansible.builtin.import_role` | Static during parsing | Role structure should appear in the parsed task graph |
+| `ansible.builtin.import_playbook` | Static and top-level | Combines complete playbooks |
+
+`include_tasks` is plural. The old generic `include` keyword is obsolete. Dynamic content may not appear in `--list-tasks` exactly as imported content does because Ansible has not evaluated its run-time decision. Static imports cannot use a file name derived from a result that exists only after an earlier task runs.
+
+A task file contains a list of tasks without a play header:
+
+```yaml
+---
+- name: Install Apache
   ansible.builtin.dnf:
     name: httpd
     state: present
-  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: Enable and start Apache
+  ansible.builtin.systemd_service:
+    name: httpd
+    enabled: true
+    state: started
 ```
 
-String comparisons such as `user_create == 'yes'` work, but booleans or state values reduce ambiguity. Conditions should also handle undefined data explicitly when a variable is optional.
-
-Blocks group tasks and apply common directives such as `when`, `become`, `tags`, or environment settings:
+The calling play can import it:
 
 ```yaml
-- name: Configure privileged application files
+- name: Configure the web service
+  hosts: webservers
   become: true
-  when: application_enabled
-  block:
-    - name: Create configuration directory
-      ansible.builtin.file:
-        path: /etc/application
-        state: directory
-        owner: root
-        group: root
-        mode: '0755'
 
-    - name: Install configuration
-      ansible.builtin.template:
-        src: application.conf.j2
-        dest: /etc/application/application.conf
-        owner: root
-        group: root
-        mode: '0644'
+  tasks:
+    - name: Apply the Apache tasks
+      ansible.builtin.import_tasks: tasks/apache.yml
 ```
 
-`rescue` runs after an ordinary task in the associated block returns a failed state. `always` runs after the block and any rescue tasks. Invalid task definitions and unreachable hosts do not enter `rescue` in the same way as an ordinary failed task.
+A dynamic include can pass variables and use a loop:
 
 ```yaml
-- name: Apply configuration with recovery
-  block:
-    - name: Install candidate configuration
-      ansible.builtin.template:
-        src: service.conf.j2
-        dest: /etc/service/service.conf
-        backup: true
-      register: service_config
-
-    - name: Validate live service
-      ansible.builtin.command:
-        argv:
-          - /usr/sbin/service-check
-          - /etc/service/service.conf
-      changed_when: false
-
-  rescue:
-    - name: Stop rollout after validation failure
-      ansible.builtin.fail:
-        msg: "Service configuration validation failed"
-
-  always:
-    - name: Record completion
-      ansible.builtin.debug:
-        msg: "Configuration attempt completed on {{ inventory_hostname }}"
+- name: Configure selected application instances
+  ansible.builtin.include_tasks: tasks/instance.yml
+  loop: "{{ application_instances }}"
+  loop_control:
+    loop_var: application_instance
 ```
 
-Recovery tasks must perform a real recovery when rollback is required. A backup file alone does not restore the previous configuration. Transactional services, snapshots, load balancer delegation, and serial batches may provide safer deployment patterns.
-## Reusing tasks, roles, and playbooks
-Task files contain a sequence of tasks without play-level keys such as `hosts`. They can be reused through static imports or dynamic includes.
-
-| Mechanism | Processing | Main consequence |
-|---|---|---|
-| `ansible.builtin.import_tasks` | Static, during playbook preprocessing | Ansible expands tasks before execution |
-| `ansible.builtin.include_tasks` | Dynamic, when execution reaches the include | Runtime conditions, loops, and earlier results can select content |
-| `ansible.builtin.import_playbook` | Static, at the top level | A control playbook combines complete playbooks |
-
-An imported task file can use variables available during preprocessing and at task execution, but the import statement itself cannot use every runtime feature that an include supports. A dynamic include can use a loop, runtime condition, or host-specific result to choose tasks.
-
-```yaml
-tasks:
-  - name: Load platform tasks
-    ansible.builtin.include_tasks: "tasks/{{ ansible_facts['os_family'] }}.yml"
-```
+Static and dynamic reuse have different inheritance and evaluation rules. A project should choose deliberately and test conditions, tags, handlers, and variable scope. Mixing both styles throughout one workflow can make the effective task graph hard to inspect.
 
 `import_playbook` can appear only at the top level:
 
 ```yaml
 ---
-- ansible.builtin.import_playbook: webservers.yml
-- ansible.builtin.import_playbook: time-servers.yml
-- ansible.builtin.import_playbook: storage.yml
+- name: Import the web-tier playbook
+  ansible.builtin.import_playbook: web.yml
+
+- name: Import the database-tier playbook
+  ansible.builtin.import_playbook: database.yml
 ```
 
-Roles provide stronger structure than a growing collection of loose task files. They package defaults, variables, tasks, handlers, templates, files, metadata, and tests behind a named interface. Repeated cross-project functions such as web server deployment, time synchronisation, account policy, and storage configuration usually belong in roles or supported collections.
-## Archives and scheduled work
-`community.general.archive` creates an archive on the managed node. It does not transfer that archive to the control node or to durable backup storage:
+An imported playbook contains complete plays with their own `hosts` and task sections. It does not belong inside a play's `tasks` list.
+
+Role defaults should provide low-precedence, user-overridable values. Role variables should remain rare because their high precedence makes overrides difficult. Role arguments can use an argument specification to validate types, required fields, and choices before tasks make changes.
+## Scheduled work and backups
+`ansible.builtin.cron` can manage traditional cron entries:
 
 ```yaml
-- name: Create configuration archive
-  community.general.archive:
-    path: /etc
-    dest: "/var/backups/etc-{{ inventory_hostname }}.tar.gz"
-    format: gz
-    owner: root
-    group: root
-    mode: '0600'
-```
-
-An archive stored on the same host and disk is not a complete backup. A backup design also requires remote storage, retention, integrity checks, encryption, access control, monitoring, and tested restoration. Archiving `/etc` can capture secrets, so the destination requires strict protection.
-
-`ansible.builtin.cron` manages named crontab entries and files under `/etc/cron.d`:
-
-```yaml
-- name: Schedule configuration backup
+- name: Schedule the application health check
   ansible.builtin.cron:
-    name: Configuration backup
-    weekday: '5'
-    hour: '2'
-    minute: '0'
+    name: application health check
     user: root
-    job: /usr/local/sbin/configuration-backup
-    cron_file: ansible_configuration_backup
+    minute: "*/15"
+    job: /usr/local/sbin/example-health-check
 ```
 
-A `cron_file` name should contain portable filename characters, and the task must specify `user`. The managed command should reside in a reviewed script rather than a dense shell expression. The script should use absolute paths, lock against overlapping runs, report failures, and send archives to protected remote storage.
+The command should use an absolute path, produce controlled output, and avoid secrets on its command line. A systemd timer may suit RHEL 10 services that need dependency ordering, resource controls, persistent catch-up, structured logs, or stronger unit-level security. The RHEL systemd role can manage systemd units and drop-ins.
 
-Systemd timers can provide stronger dependency, logging, and missed-run behaviour on systemd hosts. The scheduler should match the operational platform rather than defaulting automatically to cron.
-## Storage automation
-Storage tasks can destroy data, so they require explicit device selection, preflight assertions, serial execution, backups, and a tested recovery procedure. Fixed device names such as `/dev/sdb` can identify different disks after hardware or topology changes. Stable identifiers, inventory policy, and discovery checks reduce that risk.
+An archive is not automatically a backup. `community.general.archive` creates an archive on the managed host and does not copy it to the control node. An archive under `/tmp` or on the same disk shares the host's failure domain and may disappear during cleanup. A valid backup design sends protected data to separate storage, defines retention, verifies restoration, and monitors failures.
 
-The modules used by common storage examples do not all belong to `ansible-core`:
-- `community.general.filesystem` creates or manages filesystem signatures.
-- `ansible.posix.mount` manages active mounts and `/etc/fstab`.
-- Red Hat system roles can manage supported RHEL storage configurations at a higher level.
+When a local archive forms one stage of a backup process, the module name and collection dependency should remain explicit:
 
 ```yaml
-- name: Mount an existing XFS filesystem
-  ansible.posix.mount:
-    path: /srv/data
-    src: UUID=11111111-2222-3333-4444-555555555555
-    fstype: xfs
-    opts: defaults
-    state: mounted
+- name: Create the staged application archive
+  community.general.archive:
+    path: /srv/example/data
+    dest: /var/tmp/example-data.tar.gz
+    format: gz
+    mode: "0600"
 ```
 
-`state: mounted` both mounts the filesystem and maintains the persistent entry. It can create the mount-point directory. A separate file task remains useful when policy requires explicit ownership and mode.
+A later task or backup system must transfer the archive to durable storage and remove the staging file under an approved retention policy. Removing the source during archival is not a backup operation and can cause data loss.
+## Managing LVM-VDO storage on RHEL 10
+RHEL 10 integrates Virtual Data Optimizer with LVM. Old playbooks that create a standalone VDO service or call a legacy VDO module do not represent the RHEL 10 storage model. The `redhat.rhel_system_roles.storage` role can create an LVM-VDO volume with compression and deduplication.
 
-A command-driven loop-device example based on a guessed `/dev/loop100` does not safely reserve that device. Another process could already own it, and a `creates` check on the device node does not prove the association. Storage automation should use supported storage abstractions or inspect and register the actual allocation.
+Storage automation can destroy data. A playbook should target stable device identifiers, confirm that each device is disposable or approved, restrict the host set, record capacity assumptions, and test recovery before production use. A path such as `/dev/sdb` may identify a different device after hardware or discovery changes. `/dev/disk/by-id` names provide a safer basis where the environment supports them.
 
-VDO provides block-level deduplication, compression, and thin provisioning. Older RHEL examples manage a standalone VDO service and device. Current RHEL uses VDO as an LVM logical-volume type. The supported RHEL storage system role can create an LVM-VDO pool, filesystem, and mount from declared storage data. Capacity planning must distinguish physical size, logical size, index memory, workload deduplication, and failure behaviour. Thin provisioning does not remove the need to monitor physical space.
+The RHEL 10 storage role can create a VDO-backed logical volume:
 
-Storage playbooks should fail before mutation unless the target device, expected size, current signatures, host identity, and intended state all pass validation. Destructive options such as filesystem force flags must never compensate for uncertain discovery.
+```yaml
+---
+- name: Configure LVM-VDO application storage
+  hosts: storage_nodes
+  become: true
 
-Storage changes should also distinguish creation from adoption. Creating a new filesystem on an empty device and mounting an existing filesystem require different evidence. An adoption task should verify the expected UUID, filesystem type, label, mount path, and existing data before changing persistent configuration. A creation task should require an explicit empty-device assertion and approval for irreversible formatting.
+  tasks:
+    - name: Create the LVM-VDO volume
+      ansible.builtin.include_role:
+        name: redhat.rhel_system_roles.storage
+      vars:
+        storage_pools:
+          - name: app_vg
+            disks:
+              - /dev/disk/by-id/example-approved-device
+            volumes:
+              - name: app_lv
+                compression: true
+                deduplication: true
+                vdo_pool_size: 100 GiB
+                size: 500 GiB
+                mount_point: /srv/example
+```
 
-Check mode cannot guarantee storage safety. Module support varies, discovery can change between review and execution, and a command-based task may not simulate its effect. Maintenance windows should freeze competing storage operations, process one host or failure domain at a time, and verify application access after each change.
-## Testing playbook behaviour
-A useful test sequence separates defects that require different evidence:
-1. Static tests parse YAML, run `ansible-lint`, and confirm declared dependencies.
-2. Inventory tests list selected hosts, resolved groups, and representative variables.
-3. Planning tests run syntax, check, and diff modes against a disposable environment.
-4. Integration tests apply the playbook to clean hosts and verify service outcomes.
-5. Convergence tests apply it again and expect no unintended changes.
-6. Change tests alter relevant input, apply the playbook, and confirm the required transition.
-7. Failure tests supply unsupported values, break a dependency, or trigger validation, then confirm a safe stop or recovery.
-8. Rollout tests use a canary and production-sized batches before wider execution.
+`vdo_pool_size` defines the physical space consumed by the VDO pool. `size` defines the virtual size presented by the VDO volume. The virtual size may exceed physical capacity because compression and deduplication can reduce stored data, but the saving depends on the workload. Capacity monitoring must track physical data usage and VDO health. Exhausting the physical pool can disrupt writes and damage service availability.
 
-Clean-host tests detect missing prerequisites that an administrator's long-lived lab may already contain. Convergence tests detect commands, templates, permissions, generated hashes, and handlers that report changes on every run. Change tests detect the opposite defect, where a task reaches `ok` despite a required update.
+The storage role permits one volume per LVM-VDO pool. Administrators should consult the installed role README for every supported variable because the packaged role defines the interface available on the control node. A syntax check confirms YAML and task structure, but it cannot confirm that a selected disk is safe to erase.
+## Validating and operating playbooks
+Validation should progress from inexpensive static checks to controlled execution:
+1. The editor checks YAML structure and Ansible schemas.
+2. `ansible-playbook --syntax-check` parses the playbook in its execution environment.
+3. `ansible-lint` examines Ansible-specific quality and safety rules.
+4. `--list-hosts`, `--list-tasks`, and `--list-tags` expose the planned scope and task graph.
+5. Check mode and diff mode exercise supported simulations on a limited host.
+6. A disposable RHEL 10 host receives a normal run.
+7. A second normal run checks convergence.
+8. Service, security, and application tests verify the resulting state.
+9. A canary subset receives the production change before the wider fleet.
 
-Assertions should examine externally visible state. Package installation alone does not prove that a service can accept requests. A running service does not prove that it loaded the new configuration. A mounted filesystem does not prove that the application can read and write the intended path with the intended identity.
+Representative commands include:
 
-Test data should include every supported operating system family and significant version. A generic package task can hide differences in package names, repository availability, default configuration, service units, security policy, and filesystem paths. Unsupported platforms should fail with a clear assertion rather than reach a later module error.
+```text
+ansible-playbook --syntax-check site.yml
+ansible-lint
+ansible-playbook site.yml --list-hosts
+ansible-playbook site.yml --check --diff --limit web-canary-01
+ansible-playbook site.yml --limit web-canary-01
+ansible-playbook site.yml --limit web-canary-01
+```
 
-Continuous integration should use the same `requirements.yml`, lint configuration, and execution environment as release automation. It should avoid production inventory and live credentials. Where a test needs secrets, the job should receive short-lived credentials through a protected secret facility, restrict output, and destroy the test environment afterwards.
+Check mode is a simulation, not proof of a safe run. Modules that do not support it may skip their actions. A later task can also depend on a change that check mode did not make, which changes the simulated path. Command, shell, script, and raw actions have limited or no simulation unless parameters such as `creates` or `removes` provide enough state information.
 
-Production verification completes the test cycle. Monitoring, service health, audit events, and user-facing checks can expose failures that task results cannot. A successful recap records Ansible's execution result, while operational acceptance confirms the required system state.
-## Durable automation practices
-Reliable playbooks share several properties:
-- Each play, task, handler, and block has an outcome-focused name.
-- Fully qualified collection names identify every module and plugin.
-- Supported modules replace shell commands where possible.
-- Variables separate policy from reusable task logic.
-- Assertions reject unsupported platforms and invalid external input.
-- Secrets remain outside ordinary source files and logs.
-- File ownership, permissions, and validation commands are explicit.
-- Handlers connect configuration changes to reloads or restarts.
-- Check mode supports review but never substitutes for staging and canary execution.
-- Serial batches constrain production impact.
-- Roles and declared dependencies make reuse testable.
-- Idempotence tests run each playbook twice and expect no changes on the second run.
-- Version control, peer review, linting, and continuous integration gate deployment.
+Diff mode can reveal file content, including credentials. Sensitive tasks should set `diff: false` and `no_log: true`, and the automation platform should restrict job-output access and retention. These controls do not replace secure variable storage.
 
-Ansible automates the state that a playbook actually declares. Clear state, constrained inputs, supported modules, and verified rollouts turn that mechanism into dependable Linux administration.
+A second normal run should report no changes for stable configuration. Unexpected repeat changes often reveal a timestamp embedded in a template, an unstable command, a generated file with changing order, a module parameter that resets state, or external software that rewrites managed content. The team should investigate the cause instead of masking the result.
+
+Verification should test outcomes rather than task completion. A web-service play should confirm that systemd reports the unit active, the expected socket listens, firewalld permits only the intended service, SELinux remains enforcing, and an HTTP request returns the required response. A storage play should verify mounts, capacity, ownership, and restoration procedures. A user play should test key authentication, rejected password authentication where required, sudo scope, and revocation.
+
+Production runs should use a reviewed commit, an immutable execution environment, a recorded inventory source, and an auditable credential. `serial` can limit the number of hosts changed at once:
+
+```yaml
+- name: Update the web tier in batches
+  hosts: webservers
+  serial: 2
+  max_fail_percentage: 0
+```
+
+Batching reduces the failure radius but does not replace load-balancer coordination, health checks, rollback, or application-aware deployment logic. A handler that restarts two hosts at the end of a batch can still affect capacity.
+
+Source-control checks should reject private keys, Vault passwords, cleartext credentials, generated archives, and execution output. Reviews should examine both task logic and variable changes because a one-line inventory or group-variable edit can enlarge scope or enable a destructive state. Protected branches, signed release artefacts, and separate deployment approval can connect the tested commit to the production run. The job record should retain the commit identifier, inventory revision, execution-environment image, limit, initiator, and final result.
+
+Every operational playbook should define ownership, review requirements, supported RHEL releases, required collections, expected privileges, validation commands, rollback or recovery, and post-change tests. Clear task names and small, coherent roles help an operator connect a failed action to the resource that needs attention.
