@@ -1,78 +1,94 @@
 # Using Ansible in Large Environments
-## Advanced inventory
-Large Ansible estates rely on precise inventory targeting. Inventory can contain hostnames, IP addresses, and groups. If automation targets an IP address, that IP address needs to exist in inventory rather than relying on DNS alone. Ansible also provides implicit groups named `all` and `ungrouped`.
+RHEL 10 supplies `ansible-core` 2.16 for managing RHEL 9 and RHEL 10 nodes. Large environments require disciplined inventory design, controlled concurrency, and modular playbooks. These controls improve performance without sacrificing service availability or operational clarity.
+## Targeting inventory
+Ansible patterns select inventory names and groups. The implicit `all` group contains every host, while `ungrouped` contains hosts outside explicit groups.
 
-Quoted host patterns let Ansible expand wildcards instead of the shell. Patterns can match names, addresses, and group names, so operators need to choose them carefully. A pattern such as `web*` may match hosts like `web1` as well as a group such as `webservers`.
+| Intent | Pattern |
+| --- | --- |
+| Select two groups | `webservers:dbservers` |
+| Select their intersection | `webservers:&staging` |
+| Exclude a group | `webservers:!retired` |
+| Combine operations | `webservers:dbservers:&staging:!retired` |
+| Match inventory names | `web*.example.com` |
 
-```bash
-ansible -m ping 'ansible*'
-ansible -m ping 'web,&file'
-ansible -m ping 'web,!webserver1'
-ansible -m ping ansible1,192.168.4.202
+Commas can replace colons as separators and work better with IPv6 addresses and ranges. Shell commands should quote patterns that contain wildcards, `!`, or `&`:
+
+```shell
+ansible 'webservers:&staging:!retired' -m ansible.builtin.ping
 ```
 
-Commas are clearer than colons when combining targets because IPv6 addresses already contain colons. Host execution order is not guaranteed, so playbooks should not depend on one host running before another unless batching is configured explicitly.
-## Dynamic and combined inventory
-Static inventory suits stable environments. Fast-changing environments benefit from dynamic inventory, which now usually means inventory plugins rather than older executable scripts. Legacy scripts still work if they return JSON for `--list` and `--host` and have execute permission.
+Ansible evaluates unions first, intersections second, and exclusions last. The `--limit` option intersects another pattern with the play's `hosts` selection, which supports a controlled subset without editing the playbook.
 
-A minimal inventory source can discover hosts through `getent hosts` and expose them under `all`. The key implementation detail is `universal_newlines=True`, not `universal_newline=True`.
+Patterns resolve inventory names, not arbitrary DNS results. If inventory defines `web1` with `ansible_host: 192.0.2.10`, the pattern must use `web1`. A trailing comma can create a temporary host-list inventory, as in `-i '192.0.2.10,'`, but that source provides none of the variables attached to the normal inventory.
+## Dynamic and multiple inventory sources
+Changing infrastructure should use an inventory plugin supplied by `ansible-core` or an installed collection. Administrators should prefer plugins to custom executable scripts because plugins integrate with current inventory processing, configuration, and caching. The old Python 2 script and `ec2.py` plus `ec2.ini` model should not guide RHEL 10 deployments. Legacy scripts still work through `ansible.builtin.script` when they return valid JSON and implement the required interface.
 
-```python
-#!/usr/bin/python
-from subprocess import Popen, PIPE
-import json
+Plugin configuration normally uses YAML, a fully qualified plugin name, and the filename pattern required by that plugin. Administrators should obtain credentials from approved secret stores or Automation Platform credentials, restrict cache permissions, and set cache lifetimes that suit the rate of infrastructure change.
 
-pipe = Popen(['getent', 'hosts'], stdout=PIPE, universal_newlines=True)
-hosts = []
-for line in pipe.stdout:
-    hosts.extend(line.split())
+`ansible-inventory` reveals the compiled result:
 
-print(json.dumps({"all": {"hosts": hosts, "vars": {}}}))
+```shell
+ansible-inventory -i inventory --graph
+ansible-inventory -i inventory --list
+ansible-inventory -i inventory --host web1
 ```
 
-Dynamic inventory becomes most useful when the source of truth already exists elsewhere, such as FreeIPA, Active Directory, Satellite, VMware, or public cloud platforms. These sources often need separate configuration, credentials, and cache controls. `ansible-inventory` makes inventory easier to inspect and troubleshoot in machine-readable or graph form.
+Several `-i` options can combine static files, plugin configurations, directories, and scripts. An inventory directory aggregates supported sources and loads its top level alphabetically. Source order affects group construction and variable precedence. When several sources define the same variable, the last loaded value wins. Clear filenames, separate `group_vars` and `host_vars`, and review with `ansible-inventory` reduce accidental overrides.
 
-```bash
-ansible-inventory -i inventory_dir --graph
-ansible-inventory -i inventory -i dynamic_source --list
-```
+Production, testing, and development should normally remain separate inventory sources. Administrators should combine them deliberately and constrain the selected hosts with an exact play pattern or `--limit`.
+## Controlling execution
+The default `linear` strategy runs one task across the current host batch before starting the next task. Ansible uses five forks by default.
 
-An inventory directory can combine static files and executable dynamic sources in one place. Multiple `-i` options can merge several inventory sources for a single run, which makes it practical to overlay local hosts, lab systems, and cloud-discovered nodes.
-## Parallel and serial execution
-Ansible uses the linear strategy by default. It runs each task across the targeted hosts before moving to the next task and uses 5 forks unless configured otherwise. Raising `forks` can speed up work when managed nodes do most of the processing, but the control node still sets the practical limit. A higher value is useful only when CPU, memory, and network capacity can support it.
+| Control | Scope | Effect |
+| --- | --- | --- |
+| `forks` or `-f` | Controller or command | Sets the maximum worker count |
+| `serial` | Play | Completes the play on one host batch before starting the next |
+| `throttle` | Task or block | Lowers concurrency for a costly or rate-limited operation |
+| `strategy: free` | Play | Lets each host advance independently |
 
-Serial execution protects clustered or customer-facing services during change. Instead of updating every node at once, `serial` completes the full play on one batch before moving on.
+Administrators should tune forks against controller CPU and memory, network capacity, connection overhead, managed-service load, and API limits. Raising the value to 100 solely because targets run Linux can overload the controller or the service being changed.
+
+The `free` strategy improves throughput when hosts can progress independently, but it removes task-by-task lockstep between hosts. Coordinated cluster changes usually need the linear strategy, explicit batches, failure thresholds, and service health checks.
+
+Rolling work uses `serial` in the play, not `ansible.cfg`:
 
 ```yaml
-- hosts: web
-  serial: 2
+---
+- name: Update the web tier in batches
+  hosts: webservers
+  serial: 3
+  become: true
   tasks:
-    - name: Install Apache
-      ansible.builtin.package:
-        name: httpd
-        state: present
+    - name: Apply the service update
+      ansible.builtin.include_tasks: tasks/update_service.yml
 ```
 
-This pattern reduces the risk of taking an entire service offline during package upgrades or restarts. It also gives operators a clear point to validate the first batch before continuing.
-## Reusing playbooks and tasks
-Large playbooks stay maintainable when common logic moves into separate files. `import_playbook` works at the top level only and loads another playbook statically during parsing. `import_tasks` also loads tasks statically, which makes them visible to `--list-tasks` and suitable for predictable task graphs. `include_tasks` loads tasks dynamically at runtime, which is usually the better choice when conditions, loops, or filenames depend on values discovered during execution. Dynamically included tasks do not appear in `--list-tasks`, so static imports remain easier to preview.
+Ansible completes the play for three hosts before taking the next batch. `serial` also limits the default failure scope to the active batch. A percentage or sequence of batch sizes can support staged rollouts. `throttle` can reduce workers below the `forks` or `serial` ceiling, but it cannot raise that ceiling.
+## Reusing playbook content
+Static imports expand during parsing. Dynamic includes load when execution reaches them.
 
-Variables keep shared task files generic. A reusable task file should refer to package names, services, and firewall rules through variables rather than hard-coded values.
+| Statement | Behaviour and limits |
+| --- | --- |
+| `ansible.builtin.import_playbook` | Imports complete plays at the top level only |
+| `ansible.builtin.import_tasks` | Imports a task list statically and exposes its tasks to listing and start-at-task operations |
+| `ansible.builtin.include_tasks` | Loads tasks dynamically and supports run-time conditions, inventory variables, and loops |
+| `ansible.builtin.include_vars` | Loads variable files dynamically |
+
+An import statement cannot use a loop, although tasks inside an imported file can. Keywords on `import_tasks`, including conditions and tags, apply to every imported task. A templated import filename can use only values available during parsing, such as playbook variables or extra variables.
+
+An include can respond to facts and earlier task results. Its internal tasks do not appear under `--list-tasks`, and `--start-at-task` cannot begin inside it. Tasks must notify a dynamic handler include as a unit. They can notify individual handlers from a static handler import.
+
+Top-level orchestration can import specialised playbooks:
 
 ```yaml
-- hosts: ansible2
-  tasks:
-    - name: Configure service tasks dynamically
-      include_tasks: tasks/service.yml
-      vars:
-        package: httpd
-        service: httpd
+---
+- name: Load web server plays
+  ansible.builtin.import_playbook: webservers.yml
 
-    - name: Configure firewall tasks statically
-      import_tasks: tasks/firewall.yml
-      vars:
-        firewall_package: firewalld
-        firewall_service: firewalld
+- name: Load database plays
+  ansible.builtin.import_playbook: databases.yml
 ```
 
-This structure separates site-specific values from reusable automation and keeps large projects easier to test, delegate, and extend. Roles remain the better option when a whole feature set needs its own standard directory structure.
+Task files should accept variables instead of embedding environment-specific package, service, host, or port names. Roles suit larger reusable units that need defaults, handlers, files, templates, and metadata. Consistent use of fully qualified collection names prevents ambiguity.
+
+Before deployment, teams should use syntax checks, inventory graphs, host and task listings, check mode, and diff mode where the selected modules support them. Representative staging runs should confirm idempotence, batch behaviour, failure handling, and acceptable load.

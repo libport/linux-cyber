@@ -1,117 +1,95 @@
 # Managing Software with Ansible
-Ansible manages software on Linux with package, yum, dnf, apt, yum_repository, package_facts, rpm_key, redhat_subscription and rhsm_repository. The generic package module suits mixed environments. Platform-specific modules suit distribution-specific behaviour. On RHEL 8 and later, dnf is the package manager underneath even when older tooling still uses yum terminology.
-## Repository access
-Managed nodes need a reachable repository before they can install or update packages. The yum_repository module writes a .repo file under /etc/yum.repos.d/ and defines the repository name, description, file name, base URL and GPG behaviour.
+RHEL 10 supplies `ansible-core` 2.16 and supports RHEL 9 and RHEL 10 managed nodes. Software automation should control package state, repository trust, registration, and updates without exposing credentials or bypassing platform safeguards.
+## Package management
+RHEL 10 uses DNF for RPM content. Ansible provides these principal interfaces:
+
+| Interface | Purpose |
+|---|---|
+| `ansible.builtin.dnf` | Installs, updates, removes, and downloads packages and groups on DNF systems |
+| `ansible.builtin.package` | Uses the detected package manager for portable tasks |
+| `ansible.builtin.package_facts` | Adds installed-package data to `ansible_facts.packages` |
+
+The `yum` module name remains an alias for `ansible.builtin.dnf`, but the DNF fully qualified collection name states the RHEL 10 implementation clearly. `ansible.builtin.package` suits simple cross-platform tasks, while DNF-specific options require `ansible.builtin.dnf`.
+
+A single task should pass several package names as a list. This approach lets DNF resolve one transaction and avoids the overhead of a loop:
 
 ```yaml
-- name: Configure repository access
-  hosts: all
-  tasks:
-    - name: Add example repository
-      yum_repository:
-        name: example-repo
-        description: Example repository
-        file: example-repo
-        baseurl: ftp://control.example.com/repo/
-        enabled: yes
-        gpgcheck: yes
+- name: Install web packages
+  ansible.builtin.dnf:
+    name: [httpd, mod_ssl]
+    state: present
 ```
 
-GPG validation should stay enabled whenever a trusted key is available. Clients can import that key with rpm_key.
+`state: present` installs an available version and preserves idempotence. `state: latest` updates the selected packages. A full update uses `name: "*"` with `state: latest`, but administrators should test it, schedule a maintenance window, and assess whether the new kernel or libraries require a reboot.
 
-```yaml
-- name: Import repository signing key
-  hosts: all
-  tasks:
-    - name: Install GPG key
-      rpm_key:
-        key: ftp://control.example.com/repo/RPM-GPG-KEY
-        state: present
-```
-## Installing and updating packages
-The yum module installs, removes and updates individual packages, package groups and AppStream content. A full system update uses the wildcard package name and state: latest.
+RHEL 10 distributes core content through BaseOS and additional user-space content through AppStream. Both repositories are required. Initial RHEL 10 Application Streams ship as RPMs, so obsolete RHEL 8 modular syntax such as `@php:7.3/devel` does not apply. Package groups remain available and can be installed by group name or ID.
 
-```yaml
-- name: Update all packages
-  hosts: all
-  tasks:
-    - name: Bring installed packages to the latest version
-      yum:
-        name: '*'
-        state: latest
-```
+`download_only: true` downloads packages without installing them. `download_dir` selects an explicit destination, but it is not a mandatory companion argument.
 
-Package groups start with @. AppStream content uses the module stream and, if needed, a profile.
-
-```yaml
-- name: Install grouped software
-  hosts: all
-  tasks:
-    - name: Install a package group
-      yum:
-        name: '@Virtualization Host'
-        state: latest
-    - name: Install a module stream profile
-      yum:
-        name: '@php:7.3/devel'
-        state: present
-```
-
-When several packages are required, passing a list to name is more efficient than looping because the package manager resolves them in one transaction.
+`state: absent` removes named packages. `update_only: true` prevents an update task from installing a package that is currently absent. Security-focused maintenance can combine `state: latest`, `security: true`, and an explicit host limit. Options such as `allow_downgrade` and `allowerasing` can alter dependency resolution, so administrators should use them only after reviewing the resulting transaction.
 ## Package facts
-Standard fact gathering does not include installed package data. The package_facts module adds that information to ansible_facts.packages so tasks can test whether software is present and inspect version details.
+Normal fact gathering does not collect the installed package inventory. A separate task populates `ansible_facts.packages`:
 
 ```yaml
-- name: Gather package details
-  hosts: all
+- name: Gather installed package facts
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Report the installed HTTP server
+  ansible.builtin.debug:
+    var: ansible_facts.packages.httpd
+  when: "'httpd' in ansible_facts.packages"
+```
+
+Each package name maps to a list because multiple versions or architectures can coexist. A package-changing task must run before `package_facts` when later conditions need the new state.
+## Custom repository access
+`ansible.builtin.yum_repository` manages DNF repository definitions, normally as `.repo` files under `/etc/yum.repos.d/`. Its `name` identifies the unique repository ID. `file` selects the file name without the `.repo` suffix. `baseurl`, `enabled`, `gpgcheck`, `gpgkey`, and `state` define access and trust.
+
+```yaml
+- name: Configure the internal repository
+  ansible.builtin.yum_repository:
+    name: internal-tools
+    description: Internal tools for RHEL 10
+    file: internal
+    baseurl: https://repo.example.com/rhel/10/$basearch/
+    enabled: true
+    gpgcheck: true
+    gpgkey: https://repo.example.com/keys/RPM-GPG-KEY-internal
+    state: present
+```
+
+Administrators should use HTTPS, verify the signing-key fingerprint before import, and keep package signature checking enabled. `ansible.builtin.rpm_key` can import a key and verify its long-form fingerprint. `gpgcheck` validates package signatures. A repository that signs metadata can also enable `repo_gpgcheck`. Disabling checks converts a trust failure into a software supply-chain risk.
+## Publishing a custom repository
+A repository server needs RPM files, generated metadata, and a secure delivery service. The `createrepo_c` package supplies the metadata generator:
+
+```console
+createrepo_c --update /srv/www/repo
+```
+
+RHEL 10 uses Zstandard compression for non-database metadata by default, and `createrepo_c` no longer creates SQLite databases by default. Ansible can install `createrepo_c`, copy or download authorised RPMs, run the command when content changes, and publish the directory through HTTPS. The older anonymous FTP design exposes content and key retrieval to avoidable transport risks.
+
+The package-download task still needs access to an upstream repository. For a known HTTPS URL, `ansible.builtin.get_url` downloads a file to a managed node and can verify its checksum. `ansible.builtin.fetch` performs the opposite transfer by copying a file from a managed node to the control node, so it does not replace an HTTP downloader.
+## RHEL registration and entitled repositories
+RHEL 10 recommends activation keys and an organisation ID for unattended registration. The `redhat.rhel_system_roles.rhc` RHEL System Role can register systems and manage entitled repositories. It avoids the obsolete workflow that attached a host manually to a subscription pool before enabling content.
+
+```yaml
+- name: Apply registration and repository settings
+  ansible.builtin.include_role:
+    name: redhat.rhel_system_roles.rhc
   vars:
-    my_package: nmap
-  tasks:
-    - name: Ensure package is installed
-      yum:
-        name: "{{ my_package }}"
-        state: present
-
-    - name: Refresh package facts
-      package_facts:
-        manager: auto
-
-    - name: Show package details
-      debug:
-        var: ansible_facts.packages[my_package]
-      when: my_package in ansible_facts.packages
+    rhc_auth:
+      activation_keys:
+        keys: ["{{ rhc_activation_key }}"]
+    rhc_organization: "{{ rhc_organisation_id }}"
+    rhc_repositories: [{name: "{{ rhel10_appstream_repo_id }}", state: enabled}]
 ```
-## Building a local repository
-Ansible does not have a single module that creates a repository server from scratch. It combines standard modules to install the server, start the service, open the firewall, create the repository directory, stage packages and generate metadata.
 
-A simple FTP-based repository needs an FTP daemon, a directory such as /var/ftp/repo, downloaded RPMs and repository metadata. On RHEL 8, createrepo_c is the package and createrepo_c is the correct command to generate metadata. Using createrepo may work on some systems through compatibility links, but createrepo_c is the accurate choice.
+Repository IDs depend on architecture, subscription, and service configuration. Administrators should discover the available IDs instead of carrying RHEL 8 identifiers into RHEL 10 automation.
 
-When packages must be downloaded from an existing repository without installation, yum can use download_only and download_dir. When a file must be downloaded from a URL, get_url is the correct module. The fetch module copies files from managed nodes back to the control node and does not download from arbitrary URLs.
-## Managing RHEL subscriptions
-RHEL systems often need both repository configuration and a valid subscription. The redhat_subscription module registers the host and supports entitlement attachment. The rhsm_repository module enables repository IDs exposed through Subscription Manager. Credentials should never be stored in plain text inside a playbook. Ansible Vault should hold subscription secrets.
+The containing play should enable privilege escalation and load vaulted values through `vars_files`. Activation keys, passwords, and tokens must not appear as clear text in playbooks, inventory, shell commands, or command-line extra variables. Ansible Vault protects stored variables, although teams must also protect the vault password and restrict output. `no_log: true` should cover tasks that could return secret values.
 
-```yaml
-- name: Register a RHEL host and enable repositories
-  hosts: all
-  vars_files:
-    - vault.yml
-  tasks:
-    - name: Register host
-      redhat_subscription:
-        username: "{{ rhsm_user }}"
-        password: "{{ rhsm_password }}"
-        state: present
+The `community.general.redhat_subscription` and `community.general.rhsm_repository` modules provide another registration path. They belong to the `community.general` collection rather than `ansible-core`. Current `rhsm_repository` tasks use `state: enabled` or `state: disabled`, not the removed `present` and `absent` values.
+## Playbook structure and verification
+Inventory variables, `group_vars`, `host_vars`, and loaded variable files can provide values across several plays. Command-line extra variables have high precedence and suit deliberate overrides, but they expose secrets through process history and logs. Vault-encrypted files or an approved secret service provide safer inputs.
 
-    - name: Enable required repositories
-      rhsm_repository:
-        name:
-          - rh-gluster-3-client-for-rhel-8-x86_64-rpms
-          - rhel-8-for-x86_64-appstream-debug-rpms
-        state: present
-```
-## Practical playbook design
-A larger bootstrap playbook benefits from tags so operators can rerun only the required phase, such as inventory changes, host preparation or subscription registration. The playbook should add the host to inventory, make name resolution work, create an ansible administrative user, grant controlled sudo access and install an SSH public key.
-
-Some older examples use shell commands to set passwords and copy SSH keys manually. The safer approach is to use the user module with a hashed password and the authorized_key module to install SSH keys idempotently. Changes to sudoers should always use visudo validation.
-## Key points
-Software automation on RHEL relies on three layers. Repository access exposes packages. Package modules install, update and inspect software. Subscription modules unlock Red Hat content where entitlement is required. The most reliable playbooks keep repository trust explicit, prefer idempotent modules over shell commands, avoid clear-text secrets and organise complex provisioning work with tags.
+Software playbooks should use `become: true`, fully qualified collection names, descriptive task names, and handlers for actions that follow a reported change. Administrators should first run syntax checks, then check mode with diff output, and finally a live test limited to a non-production host. Tags can isolate registration, repository, installation, and verification phases without duplicating plays. A final `package_facts` task can confirm the installed name, version, release, and architecture.

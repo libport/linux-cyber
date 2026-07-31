@@ -19,11 +19,11 @@ The Name Service Switch configuration in `/etc/nsswitch.conf` determines where a
 
 `getent` queries the configured NSS databases and should take precedence over direct file searches when an account might come from a central service:
 
-```console
-$ getent passwd alice
-$ getent group developers
-$ id alice
-$ groups alice
+```shell
+getent passwd alice
+getent group developers
+id alice
+groups alice
 ```
 
 `getent passwd` without a key enumerates only sources that support and permit enumeration. SSSD commonly resolves a named remote user even when it does not enumerate every remote account. Administrators therefore should not treat an empty full listing as proof that no remote account exists.
@@ -32,9 +32,9 @@ The seven `/etc/passwd` fields are the login name, `x` password placeholder, UID
 
 Administrators can filter resolved records without bypassing NSS. `cut` selects known fields, while `awk` can apply numeric or textual conditions:
 
-```console
-$ getent passwd alice | cut -d: -f1,3,4,6,7
-$ getent passwd | awk -F: '$3 >= 1000 && $3 <= 60000 {print $1, $3}'
+```shell
+getent passwd alice | cut -d: -f1,3,4,6,7
+getent passwd | awk -F: '$3 >= 1000 && $3 <= 60000 {print $1, $3}'
 ```
 
 The first command prints Alice's login name, UID, primary GID, home directory, and shell. The second prints accounts in RHEL's default regular UID range from sources that allow enumeration. A direct command such as `grep '^alice:' /etc/passwd` examines only the local file and can miss a central identity. It can also find a different result from `getent` when NSS source order or account overrides apply.
@@ -43,7 +43,7 @@ Account-management commands lock and update related files consistently. Administ
 ## Creating and maintaining users
 `useradd` creates a local account. On a standard RHEL 8 host, it assigns the next available regular UID, creates a user private group with the same name, creates a home directory, copies initial files from `/etc/skel`, and assigns the configured shell.
 
-```console
+```shell
 # useradd alice
 # passwd alice
 # id alice
@@ -62,7 +62,7 @@ The `INACTIVE` value does not measure time since the user's last login. It speci
 
 Command-line options override defaults for one account:
 
-```console
+```shell
 # useradd -c "Carla Nguyen" -G developers,qa carla
 # useradd -M batchrunner
 # useradd -N -g users shareduser
@@ -77,7 +77,7 @@ The user private group's name commonly matches the login name, and its GID commo
 
 `usermod` changes an existing local account. The distinction between the primary group and supplementary groups is essential:
 
-```console
+```shell
 # usermod -g developers alice
 # usermod --append -G wheel,qa alice
 # usermod -G developers,qa alice
@@ -115,14 +115,14 @@ An exclamation mark at the start of field 2 locks the Unix password. It does not
 
 Root can inspect shadow records through NSS. A user can normally list that user's own ageing information:
 
-```console
+```shell
 # getent shadow alice
-$ chage -l "$USER"
+chage -l "$USER"
 ```
 
 `chage` applies per-account ageing and expiry values:
 
-```console
+```shell
 # chage -m 0 -M 90 -W 14 alice
 # chage -I 7 alice
 # chage -E 2027-12-31 contractor
@@ -137,7 +137,7 @@ Values such as `PASS_MIN_DAYS`, `PASS_MAX_DAYS`, and `PASS_WARN_AGE` in `/etc/lo
 
 `passwd` changes a password and performs other password-state operations:
 
-```console
+```shell
 # passwd alice
 # passwd -S alice
 # passwd -l alice
@@ -150,7 +150,7 @@ An ordinary user changes only that user's password and normally supplies the cur
 
 An administrator who must disable all login should use account expiry or another complete access-control procedure, then terminate active sessions and revoke other credentials where policy requires it:
 
-```console
+```shell
 # usermod --expiredate 1 alice
 # usermod --expiredate -1 alice
 ```
@@ -167,7 +167,7 @@ RHEL's user private group model creates a group for each regular user. The user 
 
 The following commands create a group and maintain memberships:
 
-```console
+```shell
 # groupadd marketing
 # usermod --append -G marketing alice
 # gpasswd -a bob marketing
@@ -178,9 +178,9 @@ The following commands create a group and maintain memberships:
 
 `getent group marketing` shows the explicit supplementary member list returned through NSS. For a local or enumerable database, an administrator can identify users whose primary GID matches the group:
 
-```console
-$ gid=$(getent group marketing | cut -d: -f3)
-$ getent passwd | awk -F: -v gid="$gid" '$4 == gid {print $1}'
+```shell
+gid=$(getent group marketing | cut -d: -f3)
+getent passwd | awk -F: -v gid="$gid" '$4 == gid {print $1}'
 ```
 
 The result depends on NSS enumeration. A central directory that disables enumeration requires a directory-specific query or a known user lookup.
@@ -199,7 +199,7 @@ Sharing the root password weakens individual accountability and complicates offb
 
 RHEL commonly grants broad administrative access through the `wheel` group:
 
-```console
+```shell
 # usermod --append -G wheel alice
 ```
 
@@ -207,7 +207,7 @@ The default sudoers rule usually resembles `%wheel ALL=(ALL) ALL`. The percent s
 
 Administrators should place custom policy in files under `/etc/sudoers.d` and edit each file with `visudo`:
 
-```console
+```shell
 # visudo -f /etc/sudoers.d/webops
 # visudo -cf /etc/sudoers.d/webops
 ```

@@ -1,104 +1,127 @@
 # Deploying Files
-## Managing files with Ansible
-Ansible manages files most effectively with purpose-built modules instead of ad hoc shell commands. Core modules cover inspection, attribute changes, content edits, transfer, synchronisation, access control, and template rendering. `stat` inspects file state. `file` creates, removes, and updates files, directories, links, ownership, and permissions. `copy`, `fetch`, and `synchronize` move data between the control node and managed nodes. `lineinfile`, `blockinfile`, and `replace` edit existing text files. `acl` manages filesystem access control lists. `template` renders configuration files from Jinja2 templates.
-## Inspecting and correcting file state
-`stat` collects facts about a path, including whether it exists, its type, mode, owner, checksum, and readability. Tasks can register that output and act only when the current state differs from the required state. This supports idempotent playbooks and avoids unnecessary changes.
+Ansible manages file attributes, content, transfers, SELinux labels, and generated configuration. RHEL 10 control nodes include `ansible-core` 2.16 for RHEL System Roles. Fully qualified collection names identify each module and expose dependencies outside `ansible-core`.
+## Selecting a file module
+Each operation should use the narrowest suitable module.
+
+| Requirement | Module |
+|---|---|
+| Inspect a path | `ansible.builtin.stat` |
+| Manage directories, links, ownership, modes, or deletion | `ansible.builtin.file` |
+| Deploy static content from the control node | `ansible.builtin.copy` |
+| Manage one line | `ansible.builtin.lineinfile` |
+| Manage a marked text block | `ansible.builtin.blockinfile` |
+| Replace every matching expression | `ansible.builtin.replace` |
+| Render variable data into a file | `ansible.builtin.template` |
+| Retrieve a remote file | `ansible.builtin.fetch` |
+| Locate remote paths | `ansible.builtin.find` |
+| Synchronise directory trees with rsync | `ansible.posix.synchronize` |
+
+`stat` returns data under a registered variable's `stat` key. A permission test therefore reads a value such as `result.stat.mode`, which is a string such as `'0640'`. A task that only needs to enforce attributes can call `file` directly because the module already reports `ok` when the path complies. `stat` remains useful for auditing or branching on existence, type, checksum, ownership, or timestamps. SHA-256 avoids the MD5 restriction on FIPS-enabled systems.
+
+File modes should always use quoted octal strings such as `'0640'` or symbolic forms such as `u=rw,g=r,o=`. `state: file` changes an existing file but does not create one. `state: touch` creates a missing file and updates timestamps on every run unless `access_time` and `modification_time` use `preserve`. `state: absent` removes a directory and its contents recursively.
+
+Direct state enforcement usually needs no preliminary test:
 
 ```yaml
-- stat:
-    path: /tmp/statfile
-  register: st
+- name: Create the application directory
+  ansible.builtin.file:
+    path: /srv/example
+    state: directory
+    owner: root
+    group: apache
+    mode: '0750'
 
-- file:
-    path: /tmp/statfile
+- name: Create a marker without changing existing timestamps
+  ansible.builtin.file:
+    path: /srv/example/.managed
+    state: touch
+    owner: root
+    group: apache
     mode: '0640'
-  when: st.stat.mode != '0640'
+    access_time: preserve
+    modification_time: preserve
 ```
 
-`file` should also replace shell commands such as `touch` where possible. It expresses intent clearly and keeps the playbook idempotent.
+`lineinfile` manages one line. Its regular expression should match both the original line and the replacement so repeated runs stay idempotent. `blockinfile` maintains several lines between marker lines, and each managed block in one file needs a distinct marker. `replace` suits repeated regular-expression substitutions. A template is safer when automation owns most of a configuration file. The `validate` option can test a temporary candidate before `copy`, `lineinfile`, or `template` replaces the live file.
 
-The `file` module handles common filesystem tasks:
-- create directories with `state: directory`
-- create empty files with `state: touch`
-- remove files or directory trees with `state: absent`
-- set owner, group, mode, and links
+Configuration tasks should set ownership and mode explicitly. `backup: true` preserves the previous destination when a module changes it. `ansible-playbook --check --diff` can preview supported changes, although a syntax check or check-mode run cannot prove that the resulting service will work. Diffs can expose secrets, so sensitive tasks need appropriate output controls.
+## Transferring files
+`copy` transfers a file only when its content or managed metadata differs. It does not create a fresh file on every run. `ansible.posix.synchronize` wraps rsync for efficient directory-tree transfers, originates on the control or delegated host, and requires rsync on both ends. It belongs to the `ansible.posix` collection rather than `ansible-core`.
 
-A task name on every task makes failures easier to trace during troubleshooting.
-## Editing file contents
-`lineinfile` manages a single line that matches a regular expression. It suits settings such as `PermitRootLogin no` in `sshd_config`. `blockinfile` manages a multi-line block and wraps the managed text with begin and end markers, which makes later updates predictable.
+By default, `copy.src` refers to the control node. `remote_src: true` instead reads an existing path on the managed host. The `content` parameter suits short, fixed text. A separate template should render structured content or variables. Large trees with hundreds of files favour `synchronize` because recursive `copy` does not scale well.
 
-```yaml
-- lineinfile:
-    path: /etc/ssh/sshd_config
-    regexp: '^PermitRootLogin'
-    line: 'PermitRootLogin no'
-  notify: restart sshd
-```
+`fetch` copies in the opposite direction. With `src: /etc/motd` and `dest: /backup`, the default destination is `/backup/<inventory-host>/etc/motd`. `flat: true` removes that host-and-path hierarchy, but hosts with the same source basename can overwrite one another.
+## Managing SELinux labels
+RHEL 10 normally runs the targeted SELinux policy in enforcing mode. A non-standard service directory needs a persistent file-context mapping and labels applied from that policy. Setting `setype` directly through `file`, `copy`, or `template` changes the current inode label but does not add a policy mapping, so a later relabel can undo it.
 
-`blockinfile` treats a literal block introduced with `|` as multiple lines. A folded block introduced with `>` collapses line breaks into one logical line, so it is unsuitable when the destination file needs separate lines.
-
-`copy` can also write fixed text to a file, but `lineinfile` and `blockinfile` give tighter control over where changes land in existing content. `replace` suits broader regex-based substitutions across a file when one managed line or one managed block is too narrow. `find` remains useful when a playbook must locate files by name, path, age, size, or other properties before acting on them.
-## Creating, removing, and transferring files
-File deployment usually follows three patterns.
-
-- `copy` sends files from the control node to managed nodes
-- `fetch` retrieves files from managed nodes to the control node
-- `synchronize` performs rsync-style synchronisation for larger trees or incremental updates
-
-`fetch` does not drop all retrieved files into one flat directory. It creates a host-specific path under the destination so files from different managed nodes do not overwrite each other. A fetch to `/tmp` can therefore produce paths such as `/tmp/ansible1/etc/motd`.
-
-`synchronize` does more than update an existing file. It can create, update, and remove files according to rsync behaviour and configured options. It is generally the better choice for larger content sets, while `copy` is simpler for smaller, direct transfers.
-## Managing SELinux correctly
-Persistent SELinux changes belong in policy, not only on individual files. `sefcontext` writes file-context rules into SELinux policy. `restorecon` then applies those rules to the filesystem. Directly setting a context with the `file` module can work, but a later relabel may overwrite that manual label.
-
-A typical workflow is:
+The `community.general.sefcontext` module manages persistent mappings and requires its collection plus the RHEL `policycoreutils-python-utils` package. It does not relabel existing files. `restorecon` must apply the mapping after the files exist.
 
 ```yaml
-- yum:
-    name: policycoreutils-python-utils
-    state: present
-
-- sefcontext:
+- name: Define the web content label
+  community.general.sefcontext:
     target: '/web(/.*)?'
     setype: httpd_sys_content_t
     state: present
 
-- command: restorecon -Rv /web
+- name: Apply SELinux labels
+  ansible.builtin.command: restorecon -irv /web
+  register: restorecon_result
+  changed_when: restorecon_result.stdout | length > 0
 ```
 
-`policycoreutils-python-utils` supplies the tools required for `sefcontext` and `restorecon` on the managed node.
+The relabelling task should not depend only on a handler notified by the mapping task. Existing mappings can remain unchanged while newly created or incorrectly labelled files still require `restorecon`.
 
-Other SELinux tasks use dedicated modules. `selinux` sets the system state to enforcing, permissive, or disabled, usually with the targeted policy. `seboolean` enables or disables booleans such as `httpd_read_user_content` and can make those changes persistent.
+The supported `redhat.rhel_system_roles.selinux` role can manage policy changes and restore directory contexts through `selinux_restore_dirs`. SELinux booleans should enable only policy-defined behaviour that the service requires. Broad permissions, writable content types, and permissive mode should not replace a specific policy correction.
 
-A non-default Apache document root requires more than an HTTP configuration change. Apache must point to the new directory, SELinux must label that path correctly, and the service must still be tested afterwards. A successful playbook run does not prove that the application now serves content correctly.
-## Generating configuration with Jinja2 templates
-Templates provide a cleaner approach than repeated line edits when configuration files have structure, repeated patterns, or host-specific values. A Jinja2 template can contain plain text, comments, variables, expressions, loops, conditionals, and filters. The `template` module renders the source `.j2` file on each managed node.
+Type selection follows the required access. Apache can read `httpd_sys_content_t` content, while content that the service must modify generally needs `httpd_sys_rw_content_t`. Filesystem ownership and mode still apply alongside SELinux. An administrator should verify both controls and inspect audit messages before changing policy.
+## Generating files with Jinja
+The `template` module renders UTF-8 Jinja source on the control node, then transfers the result to each managed host. Jinja uses three principal delimiters:
 
-```yaml
-- template:
-    src: vhost.conf.j2
-    dest: /etc/httpd/conf.d/vhost.conf
-    mode: '0644'
-```
+| Form | Purpose |
+|---|---|
+| `{{ expression }}` | Insert or transform a value |
+| `{% statement %}` | Control flow with `for`, `if`, and related statements |
+| `{# comment #}` | Add a template-only comment |
 
-Variables interpolate values such as host facts.
+A loop can generate an inventory-based hosts file:
 
 ```jinja2
-ServerName {{ ansible_facts['fqdn'] }}
-ErrorLog logs/{{ ansible_facts['hostname'] }}-error.log
+# Managed by Ansible
+{% for host in groups['all'] %}
+{% if hostvars[host]['ansible_facts']['default_ipv4'] is defined %}
+{{ hostvars[host]['ansible_facts']['default_ipv4']['address'] }} {{ hostvars[host]['ansible_facts']['fqdn'] }} {{ host }}
+{% endif %}
+{% endfor %}
 ```
 
-Control structures generate dynamic content. A `for` loop can iterate through inventory groups to build host lists. An `if` block can switch content according to a variable such as the package name or operating system.
+`groups['all']` supplies inventory names. `hostvars` exposes another host's variables, but its facts exist only after Ansible has gathered or cached them. Access through `hostvars[host]['ansible_facts']` does not depend on legacy fact injection.
 
-Filters transform output during rendering. Common examples include `to_json`, `to_yaml`, and `ipaddr`. The correct Jinja2 filter syntax uses a single pipe, for example `{{ myvar | to_yaml }}`, not a double pipe.
+Filters transform values inside expressions. `{{ data | to_json }}` produces JSON, and `{{ data | to_yaml }}` produces YAML. The source form with `|| to_yaml` is invalid. IP address processing uses the fully qualified `ansible.utils.ipaddr` filter, which requires the `ansible.utils` collection and the `netaddr` Python library on the control node.
 
-If the `ansible_managed` variable is configured, templates can stamp a managed-file comment at the top of rendered files. That warning helps reduce accidental manual edits.
-## Operational practice
-Reliable file automation depends on a small set of habits. Handlers should restart or reload services only when a notifying task reports change. That pattern reduces needless service disruption and keeps runs predictable.
+Undefined data should fail clearly or receive an intentional default. Expressions can use `default()` for an approved fallback and `mandatory` when omission must stop rendering. Template source belongs in version control, and a managed-file comment should warn administrators that automation owns the destination. In `ansible-core` 2.16, `ansible_managed` can supply a configurable marker.
 
-- prefer Ansible modules over `command` or `shell` unless no module fits the task
-- use conditionals and handlers so playbooks change only what needs changing
-- name tasks clearly
-- verify the end result with service checks, file inspection, or application tests
+Templates that manage service configuration should notify a handler instead of restarting the service unconditionally:
 
-These habits keep playbooks readable, repeatable, and safer to run across many hosts.
+```yaml
+- name: Configure the Apache HTTP Server
+  hosts: web
+  become: true
+  tasks:
+    - name: Deploy the Apache configuration
+      ansible.builtin.template:
+        src: templates/httpd.conf.j2
+        dest: /etc/httpd/conf.d/site.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+      notify: Restart httpd
+
+  handlers:
+    - name: Restart httpd
+      ansible.builtin.systemd_service:
+        name: httpd
+        state: restarted
+```
+
+RHEL 10 supplies Apache HTTP Server 2.4, so templates must use current directives such as `Require all granted` instead of the obsolete `Order` and `Allow` access controls. A successful playbook run confirms task execution, not service correctness. Syntax checks, service status checks, and functional requests should verify the deployed result.

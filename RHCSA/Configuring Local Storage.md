@@ -14,7 +14,7 @@ The `sd_mod` module provides the SCSI disk upper layer. Linux also routes many S
 
 Several commands reveal the relationship between devices and drivers:
 
-```bash
+```shell
 lsmod
 modinfo sd_mod
 lsblk
@@ -32,7 +32,7 @@ A loop device exposes a regular file as a block device. It supports useful lab w
 
 The administrator can associate an ISO image with the next available loop device and display the selected name:
 
-```bash
+```shell
 sudo losetup --find --show --read-only image.iso
 sudo losetup --list
 sudo mount -o ro /dev/loop0 /mnt
@@ -40,7 +40,7 @@ sudo mount -o ro /dev/loop0 /mnt
 
 ISO 9660 images normally mount read-only. After use, the administrator should unmount the filesystem before detaching the loop device:
 
-```bash
+```shell
 sudo umount /mnt
 sudo losetup --detach /dev/loop0
 ```
@@ -49,7 +49,7 @@ The `--detach-all` option detaches all unused loop devices, but broad cleanup ca
 
 Raw backing files support partitioning and filesystem exercises. `dd` writes data through the normal input and output path, while `fallocate` asks the filesystem to preallocate space. `fallocate` often completes much faster because it need not write every zero-filled block:
 
-```bash
+```shell
 time dd if=/dev/zero of=/var/disks/dd.disk bs=1M count=500 status=progress
 time fallocate -l 500M /var/disks/fa.disk
 ```
@@ -58,7 +58,7 @@ These commands do not guarantee identical allocation behaviour on every filesyst
 
 When the backing file contains a partition table, `losetup --partscan` asks the kernel to scan it during attachment:
 
-```bash
+```shell
 sudo losetup --find --show --partscan /var/disks/disk1
 lsblk /dev/loop0
 ```
@@ -82,7 +82,7 @@ The operating system, driver, hardware, and management tools can impose lower li
 
 The following sequence creates a GPT and one partition on a disposable loop device:
 
-```bash
+```shell
 sudo parted --script /dev/loop0 mklabel gpt
 sudo parted --script /dev/loop0 mkpart primary 1MiB 256MiB
 sudo partprobe /dev/loop0
@@ -93,7 +93,7 @@ Starting at 1 MiB normally gives suitable alignment. `parted` accepts percentage
 
 An LVM partition type or flag records the intended use of a partition. LVM does not require the flag before `pvcreate`, but the metadata helps installers, discovery tools, and administrators interpret the layout:
 
-```bash
+```shell
 sudo parted /dev/loop0 set 1 lvm on
 ```
 
@@ -101,7 +101,7 @@ Changing a partition table can erase access to existing data. The administrator 
 ## Filesystems, identifiers, and persistent mounts
 RHEL 8 supports XFS and ext4 as its principal local filesystems. `mkfs.xfs` creates XFS, and `mkfs.ext4` creates ext4. A filesystem can carry a human-readable label and a generated universally unique identifier:
 
-```bash
+```shell
 sudo mkfs.xfs -L DATA /dev/loop0p1
 sudo blkid /dev/loop0p1
 ```
@@ -110,7 +110,7 @@ A device name such as `/dev/sda1` can change when hardware detection order chang
 
 An administrator can mount a filesystem by device name, label, or UUID:
 
-```bash
+```shell
 sudo mkdir -p /data
 sudo mount UUID=12345678-1234-1234-1234-123456789abc /data
 findmnt /data
@@ -148,7 +148,7 @@ This example belongs in `/etc/systemd/system/loop-storage.service`. The `Before=
 
 After creating or changing the unit, the administrator runs:
 
-```bash
+```shell
 sudo systemctl daemon-reload
 sudo systemctl enable --now loop-storage.service
 systemctl status loop-storage.service
@@ -168,7 +168,7 @@ Device Mapper presents logical volumes to userspace. `dmsetup ls --tree` shows d
 
 An explicit creation sequence keeps each layer visible:
 
-```bash
+```shell
 sudo pvcreate /dev/loop0p1
 sudo vgcreate vg1 /dev/loop0p1
 sudo lvcreate -n data -L 200M vg1
@@ -181,7 +181,7 @@ sudo lvs
 
 LVM normally activates volume groups during boot. A loop device attached after boot may require explicit activation:
 
-```bash
+```shell
 sudo vgchange -ay vg1
 sudo mkfs.xfs /dev/vg1/data
 sudo mkdir -p /srv/data
@@ -194,7 +194,7 @@ LVM stores configuration metadata on its physical volumes. Additional metadata c
 ## Extending storage online
 A volume group needs free extents before it can enlarge a logical volume. `vgs` shows group capacity and free space. If the group lacks room, the administrator can initialise another block device and add it:
 
-```bash
+```shell
 sudo pvcreate /dev/loop0p2
 sudo vgextend vg1 /dev/loop0p2
 vgs vg1
@@ -202,7 +202,7 @@ vgs vg1
 
 The plus sign in an extension request means "add this amount". Without it, LVM treats the value as the requested final size:
 
-```bash
+```shell
 sudo lvextend -r -L +1G vg1/data
 ```
 
@@ -214,7 +214,7 @@ Disk-backed swap provides space for memory pages that the kernel can evict from 
 
 RHEL 8 can use a partition, an LVM logical volume, or a regular file as swap. `mkswap` writes a swap signature and UUID, while `swapon` activates the area:
 
-```bash
+```shell
 sudo lvcreate -n swap_extra -L 2G vg1
 sudo mkswap /dev/vg1/swap_extra
 sudo swapon /dev/vg1/swap_extra
@@ -232,7 +232,7 @@ The kernel prefers an active swap area with a higher numeric priority. It can di
 
 `swapoff` removes an area from active use:
 
-```bash
+```shell
 sudo swapoff /dev/vg1/swap_extra
 ```
 
@@ -257,7 +257,7 @@ A disposable lab can combine loop devices, GPT partitions, XFS, LVM, online grow
 ### Create and attach the first image
 The first image supplies one ordinary filesystem partition and one LVM partition:
 
-```bash
+```shell
 sudo mkdir -p /var/disks
 sudo fallocate -l 1GiB /var/disks/disk1
 sudo losetup --partscan /dev/loop1 /var/disks/disk1
@@ -268,7 +268,7 @@ lsblk /dev/loop1
 ### Partition the image
 The administrator creates a GPT, reserves the first 256 MiB for XFS, assigns the remaining capacity to LVM, and requests a fresh kernel scan:
 
-```bash
+```shell
 sudo parted --script /dev/loop1 mklabel gpt
 sudo parted --script /dev/loop1 mkpart primary xfs 1MiB 256MiB
 sudo parted --script /dev/loop1 mkpart primary 256MiB 100%
@@ -282,7 +282,7 @@ The 1 MiB starting offset leaves room for GPT metadata and aligns the first part
 ### Create and mount XFS
 The first partition receives an XFS filesystem and a label:
 
-```bash
+```shell
 sudo mkfs.xfs -L LABDATA /dev/loop1p1
 sudo mkdir -p /data
 sudo mount /dev/loop1p1 /data
@@ -294,7 +294,7 @@ The `blkid` output supplies the filesystem UUID for a persistent `fstab` entry. 
 ### Build LVM storage
 The second partition becomes a physical volume. A new volume group pools its extents, and a logical volume receives 300 MiB:
 
-```bash
+```shell
 sudo pvcreate /dev/loop1p2
 sudo vgcreate labvg /dev/loop1p2
 sudo lvcreate -n files -L 300M labvg
@@ -312,7 +312,7 @@ An `fstab` entry can identify the logical volume by `/dev/mapper/labvg-files` or
 ### Add capacity and grow XFS
 A second image demonstrates volume-group growth. LVM can use the whole loop device as a physical volume, so this image does not require a partition table:
 
-```bash
+```shell
 sudo fallocate -l 512MiB /var/disks/disk2
 sudo losetup /dev/loop2 /var/disks/disk2
 sudo pvcreate /dev/loop2
@@ -327,7 +327,7 @@ df -h /srv/files
 ### Add and inspect swap
 The remaining volume-group capacity can supply a small swap logical volume:
 
-```bash
+```shell
 sudo lvcreate -n swap_extra -L 128M labvg
 sudo mkswap /dev/labvg/swap_extra
 sudo swapon --priority 5 /dev/labvg/swap_extra
@@ -339,7 +339,7 @@ free -h
 ### Remove the lab in reverse order
 Safe removal unwinds consumers before providers. The administrator disables the added swap, unmounts both filesystems, removes any related `fstab` entries, reloads systemd, disables the loop service, and removes the LVM objects before detaching loop devices. Commands such as `lvremove`, `vgremove`, and `pvremove` erase LVM metadata and require exact targets.
 
-```bash
+```shell
 sudo swapoff /dev/labvg/swap_extra
 sudo umount /srv/files
 sudo umount /data

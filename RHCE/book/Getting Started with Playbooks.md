@@ -1,69 +1,106 @@
 # Getting Started with Playbooks
-## Playbooks and plays
-Ansible playbooks turn repeated command-line actions into reusable YAML files. A playbook is a list of plays. Each play selects target hosts and runs an ordered list of tasks to drive those hosts to a defined state. A play usually includes a descriptive `name`, a `hosts` selector, and `tasks`. The name is optional but strongly recommended because Ansible prints it during execution and troubleshooting.
+Red Hat Enterprise Linux 10 provides `ansible-core` 2.16 for supported management of RHEL 9 and RHEL 10 nodes. Playbooks express reusable configuration, deployment, and orchestration in YAML. Unlike a shell script that chains ad hoc commands, a playbook records host selection, privilege escalation, tasks, arguments, and desired state in one structured file.
+## Playbook structure
+A playbook is an ordered list of plays. Each play selects managed hosts with a pattern and runs tasks against them. Tasks execute from top to bottom and call modules or other Ansible actions. Multiple plays also execute in file order.
 
-A basic play can install a package and start its service in one pass.
+At minimum, a play selects hosts and defines work through at least one task, either directly or through a role. A descriptive `name` is optional but strongly recommended. `become: true` enables privilege escalation when administrative rights are required. Ansible gathers host facts at the start of each play by default unless `gather_facts: false` disables that step.
+
+The `hosts` pattern belongs to the play, while the command line supplies the inventory. Operators can use `--limit` to reduce the selected hosts for a maintenance window or staged rollout. A limit intersects the play's pattern and cannot add hosts that the play did not select.
+
+The YAML document marker `---` is conventional but optional. The closing marker `...` is also optional. Fully qualified collection names identify modules and roles without ambiguity.
 
 ```yaml
 ---
-- name: Install and start httpd
-  hosts: all
+- name: Configure RHEL 10 web servers
+  hosts: webservers
+  become: true
   tasks:
-    - name: Install package
-      yum:
+    - name: Install Apache HTTP Server
+      ansible.builtin.dnf:
         name: httpd
-        state: installed
-    - name: Start and enable service
-      service:
+        state: present
+
+    - name: Publish the welcome page
+      ansible.builtin.copy:
+        content: |
+          Welcome to the web service
+          Authorised access only
+        dest: /var/www/html/index.html
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Start and enable Apache
+      ansible.builtin.systemd_service:
         name: httpd
         state: started
-        enabled: yes
+        enabled: true
+
+    - name: Allow HTTP through firewalld
+      ansible.builtin.include_role:
+        name: redhat.rhel_system_roles.firewall
+      vars:
+        firewall:
+          - service: http
+            state: enabled
+            runtime: true
+            permanent: true
+
+- name: Validate the web service from the control node
+  hosts: localhost
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Require an HTTP success response
+      ansible.builtin.uri:
+        url: "http://web1.example.com/"
+        status_code: 200
 ```
 
-This structure replaces separate ad hoc commands with a single, repeatable definition.
-## YAML rules
-YAML relies on indentation to show hierarchy. Each level must line up consistently, and spaces must be used instead of tabs. A playbook begins as a list, so each play starts with `- name:` beneath the optional document marker `---`.
+The firewall task requires the `rhel-system-roles` package on the control node. The second play references `localhost`, so Ansible creates an implicit local host when inventory does not already define one. The URI check tests access from the control node. It does not confirm access from every client network.
 
-Standard YAML uses `key: value` pairs. Some Ansible module arguments can be passed in compact forms in limited contexts, but readable playbooks work best when arguments are written as properly indented mappings on separate lines. That approach reduces syntax mistakes and makes complex tasks easier to review.
+`state: present` installs `httpd` without forcing an upgrade on every run. `state: latest` should appear only when the automation intentionally applies the newest available package. Ansible has no universal undo command. Administrators reverse a change by declaring the required replacement state, such as `state: absent`, or by restoring a tested backup or snapshot.
 
-Lists hold multiple values under one key. Package installation is a common example.
+State-oriented modules usually support idempotent operation. After the first run establishes the requested state, another run should report `ok` instead of applying the same change again. Idempotence depends on each module and its arguments, so arbitrary command tasks require explicit safeguards.
+## YAML essentials
+YAML uses spaces to show hierarchy. Tabs cannot provide indentation. Two spaces per level form a common, readable convention, and sibling elements must align.
 
-```yaml
-- name: Install packages
-  yum:
-    name:
-      - nmap
-      - httpd
-      - vsftpd
-    state: latest
+A mapping uses `key: value` pairs. Ansible accepts `key=value` as shorthand for arguments in some contexts, but that form is a module argument string rather than a YAML mapping. Separate YAML keys provide clearer types, diffs, and maintenance.
+
+A sequence uses a hyphen for each item. A module accepts a list only when its documented argument type permits one. For example, `ansible.builtin.dnf` accepts several package names under `name`, while `ansible.builtin.systemd_service` accepts one unit name per task.
+
+Plain, single-quoted, and double-quoted strings are available. Quoting values such as file modes avoids unintended type conversion. A literal block scalar introduced by `|` preserves line breaks. A folded block scalar introduced by `>` replaces most line breaks with spaces, which keeps a long logical line readable in the YAML source.
+## Validation and execution
+An explicit inventory makes each command's scope clear:
+
+```shell
+ansible-playbook -i inventory site.yml --list-hosts
+ansible-playbook -i inventory site.yml --list-tasks
+ansible-playbook -i inventory site.yml --syntax-check
+ansible-playbook -i inventory site.yml --check --diff
+ansible-playbook -i inventory site.yml
 ```
 
-Strings may appear without quotes unless quoting improves clarity. Multiline text uses two common styles. The `|` form preserves line breaks exactly. The `>` form folds wrapped lines into a single line. That distinction matters when playbooks create files with the `copy` module.
-## Running playbooks
-`ansible-playbook playbook.yml` runs the selected plays, gathers facts by default, executes each task, and ends with a play recap. The output shows the play name first, then each task name, then a status for each managed host.
+`--list-hosts` displays the hosts selected by every play, and `--list-tasks` displays tasks available before dynamic execution. These inspections help expose an incorrect host pattern or unexpected task import before execution.
 
-The most useful status values are straightforward:
-- `ok` means the task succeeded and the host already matched the desired state
-- `changed` means the task succeeded and Ansible modified the host
-- `failed` means the task stopped with an error
-- `unreachable` means Ansible could not connect to the host
+`--syntax-check` parses the playbook without executing it. It can identify malformed YAML, invalid indentation, and some invalid Ansible structures, but it cannot detect a valid configuration that produces the wrong operational result.
 
-Fact gathering appears before user-defined tasks because Ansible collects system information that later tasks can use. The final recap summarises the result for every host.
+`--check`, or `-C`, simulates supported tasks without changing managed hosts. Modules without check-mode support may skip work or return limited information. Tasks that depend on values registered by earlier changes can also behave differently during simulation. `--diff` displays supported before-and-after differences, although operators should protect output that may contain sensitive data. A check run therefore complements testing but does not replace it.
 
-Ansible does not provide a general undo feature for playbooks. Reversal requires another playbook that defines a new desired state, such as stopping a service, removing a package, or restoring a previous file.
-## Syntax checks and dry runs
-Syntax errors usually come from bad indentation or misplaced keys. `ansible-playbook --syntax-check playbook.yml` identifies parsing problems before a full run. A normal playbook run also stops on syntax errors, so syntax checking is mainly a quick validation step during editing.
+Normal execution reports each task and host as `ok`, `changed`, `failed`, `unreachable`, or `skipped`. `ok` means the task succeeded without changing state. `changed` means it succeeded and reported a change. The play recap also records rescued and ignored failures where applicable. Partial failure can leave hosts at different points, so operators must review the recap rather than relying on the final task alone.
 
-`ansible-playbook -C playbook.yml` runs in check mode. It reports the changes Ansible would make without applying them. This is a practical way to estimate impact before touching managed nodes, although results depend on whether individual modules support check mode.
+A cautious rollout first targets a test inventory or a narrow `--limit`, confirms the resulting service, and then expands to the intended group. A successful command exit and a clean recap confirm Ansible's execution, while application checks confirm that the resulting system actually serves its purpose.
 
-Verbose output helps when a playbook fails, but more detail is not always better. `-v` adds task results, `-vv` adds more task detail, `-vvv` adds connection information, and `-vvvv` exposes low-level debugging output. Moderate verbosity is usually enough. Excessive output hides the real problem under transport and plug-in noise.
-## Multiplay playbooks
-A single playbook can contain multiple plays. This is useful when one play configures remote systems and another validates the result from a different execution context. For example, one play can install and start `httpd` on managed hosts, while a second play runs on `localhost` and uses the `uri` module to test whether a web page is reachable and returns HTTP 200.
+Repeated `-v` options increase diagnostic detail:
 
-This pattern separates configuration from verification. It also shows that success inside a managed host does not guarantee end-to-end availability. A service may be installed and running while a firewall rule, routing problem, or other connectivity issue still blocks access from the control node.
+```shell
+ansible-playbook -i inventory site.yml -vv
+```
 
-Multiplay playbooks can also override connection behaviour per play, such as changing privilege escalation or the remote user. Even so, large files quickly become hard to reason about. Smaller, focused playbooks and reusable includes are usually easier to test, debug, and maintain.
-## Practical guidance
-A first practice playbook can install and enable `vsftpd`. Another useful exercise compares the `|` and `>` multiline string styles by writing two files and inspecting the results. A third exercise can build a simple web server playbook with a follow-up validation play on `localhost`.
+Moderate verbosity often reveals task arguments and results. Higher levels add connection and plugin details, increase output substantially, and can expose operational data. Operators should increase verbosity only as far as diagnosis requires.
+## Managing multiple plays
+Separate plays suit workflows that target different host groups or use different connection, user, privilege, or fact-gathering settings. A deployment can configure application servers, configure database servers, and then validate the service from the control node.
 
-The most reliable habit is to keep each play simple, name every play and task clearly, and let the structure explain the intent. Most playbook failures come from logic and layout mistakes rather than obscure Ansible internals. Clear indentation, small plays, and deliberate validation steps prevent most of those errors.
+Each play may set its own `remote_user`, `become`, and `gather_facts` values. These settings support ordered orchestration across systems with different access requirements. They do not schedule plays independently, because one `ansible-playbook` run processes the plays as a single ordered workflow.
+
+Large automation remains easier to test and maintain when roles, imported task files, or included task files hold reusable units. Each play should retain a clear purpose, and each task name should describe the state or action that its result represents.

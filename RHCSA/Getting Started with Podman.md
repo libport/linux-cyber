@@ -14,7 +14,7 @@ Rootless Podman places container root inside a user namespace. UID 0 in the cont
 
 Runtime options can strengthen a workload according to its needs:
 
-```bash
+```shell
 podman run --rm \
   --read-only \
   --cap-drop all \
@@ -29,7 +29,7 @@ podman run --rm \
 
 The `unshare` command demonstrates the kernel primitives beneath containers. A root shell can create private PID, mount, and network namespaces without using Podman:
 
-```bash
+```shell
 sudo unshare --fork --pid --mount-proc bash
 ps
 exit
@@ -45,7 +45,7 @@ A small RHEL 9, Fedora, Rocky Linux, or AlmaLinux virtual machine can support a 
 
 RHEL provides the `container-tools` package group and also offers Podman, Buildah, and Skopeo separately. A minimal installation uses:
 
-```bash
+```shell
 sudo dnf install -y podman skopeo
 podman version
 podman info
@@ -57,7 +57,7 @@ That separation explains why an image pulled as a regular user does not appear i
 
 The lab should record its actual versions rather than assume a course version:
 
-```bash
+```shell
 cat /etc/os-release
 podman version
 skopeo --version
@@ -68,7 +68,7 @@ Current commands and features can differ from Podman 4 demonstrations. Local man
 
 Compose support requires an external provider. `podman compose` acts as a wrapper around a provider such as `podman-compose` or Docker Compose. The administrator should install a provider supported by the distribution, then confirm the selected implementation:
 
-```bash
+```shell
 podman compose version
 podman compose --help
 ```
@@ -95,7 +95,7 @@ The main image commands are:
 
 Skopeo reads remote image metadata without first storing the image locally. It can inspect a tag, display its digest, list repository tags, and copy images between supported transports:
 
-```bash
+```shell
 skopeo inspect docker://docker.io/library/ubuntu:24.04
 skopeo inspect --format '{{.Digest}}' \
   docker://docker.io/library/ubuntu:24.04
@@ -114,7 +114,7 @@ The tag communicates the intended release, while the digest fixes the content. T
 
 Local tags provide additional names for the same image ID:
 
-```bash
+```shell
 podman image tag \
   docker.io/library/ubuntu:24.04 \
   localhost/ubuntu-lab:24.04
@@ -125,7 +125,7 @@ Tagging does not duplicate image layers. Removing one tag does not necessarily r
 
 Podman can filter local metadata with Go templates:
 
-```bash
+```shell
 podman image inspect \
   --format '{{.Config.Cmd}}' \
   docker.io/library/ubuntu:24.04
@@ -135,13 +135,13 @@ The image configuration can define an entry point, a default command, environmen
 ## Creating and managing containers
 `podman run` creates and starts a container. If the referenced image is absent, Podman pulls it first. A short smoke test can run the Podman hello image and remove the stopped container automatically:
 
-```bash
+```shell
 podman run --rm quay.io/podman/hello
 ```
 
 An interactive Ubuntu shell uses an allocated terminal and standard input:
 
-```bash
+```shell
 podman run --rm -it \
   --name ubuntu \
   --hostname ubuntu \
@@ -153,7 +153,7 @@ podman run --rm -it \
 
 `podman create` separates definition from execution. It is useful when automation must inspect or prepare a container before the first start:
 
-```bash
+```shell
 podman create \
   --name ubuntu \
   --hostname ubuntu \
@@ -166,14 +166,14 @@ podman container start ubuntu
 
 The container inventory distinguishes running containers from all known containers:
 
-```bash
+```shell
 podman container ls
 podman container ls --all
 ```
 
 `podman ps` and `podman ps -a` provide equivalent shorter forms. A stopped container still retains its writable layer and metadata. Starting it again restores that state:
 
-```bash
+```shell
 podman container stop ubuntu
 podman container start ubuntu
 podman container rm ubuntu
@@ -194,7 +194,7 @@ A clear state model prevents accidental data loss:
 
 A detached container runs in the background:
 
-```bash
+```shell
 podman run -dit \
   --name ubuntu \
   --hostname ubuntu \
@@ -206,7 +206,7 @@ podman run -dit \
 
 Inspection and monitoring commands expose different evidence:
 
-```bash
+```shell
 podman container inspect ubuntu
 podman container top ubuntu
 podman container stats ubuntu
@@ -217,7 +217,7 @@ podman container logs ubuntu
 
 Useful troubleshooting starts with the container state and exit code, then proceeds to logs, configuration, mounts, ports, and events:
 
-```bash
+```shell
 podman inspect \
   --format '{{.State.Status}} {{.State.ExitCode}}' \
   ubuntu
@@ -231,7 +231,7 @@ The operator should preserve the failing state long enough to inspect it. Automa
 ## Ports, web content, and volumes
 A web server image can run without installing the server on the host. The following container serves a host directory with Apache HTTP Server:
 
-```bash
+```shell
 mkdir -p "$HOME/podman/www"
 printf '%s\n' '<h1>Podman web test</h1>' \
   > "$HOME/podman/www/index.html"
@@ -270,7 +270,7 @@ A writable application normally separates immutable content from data:
 
 Named volumes let Podman manage storage location and lifecycle:
 
-```bash
+```shell
 podman volume create app-data
 podman run --rm \
   -v app-data:/var/lib/example \
@@ -305,7 +305,7 @@ WantedBy=default.target
 
 The user reloads the systemd manager and starts the generated service:
 
-```bash
+```shell
 systemctl --user daemon-reload
 systemctl --user start web.service
 systemctl --user status web.service
@@ -313,7 +313,7 @@ systemctl --user status web.service
 
 The `[Install]` section instructs the generator to arrange startup for the relevant user target. A rootless service that must run after the user logs out may require administrator-approved lingering:
 
-```bash
+```shell
 sudo loginctl enable-linger "$USER"
 ```
 
@@ -321,7 +321,7 @@ System-wide Quadlet files normally belong in `/etc/containers/systemd/` and use 
 
 Systemd becomes the lifecycle authority for a Quadlet workload. Administrators should use `systemctl` to start and stop it rather than mixing manual `podman stop` operations with systemd management. Logs can appear through the container log driver and the journal:
 
-```bash
+```shell
 journalctl --user -u web.service
 systemctl --user restart web.service
 systemctl --user stop web.service
@@ -372,7 +372,7 @@ tux ALL=(ALL) NOPASSWD: ALL
 
 The host validates that file before the build:
 
-```bash
+```shell
 sudo visudo -cf tux-sudoers
 podman build \
   --tag localhost/ansible-controller:43 \
@@ -385,7 +385,7 @@ The build should also avoid a reusable account password. SSH public-key authenti
 
 When the image runs `/usr/sbin/init`, Podman normally recognises the command and enables systemd mode. An explicit lab command can state the intent:
 
-```bash
+```shell
 podman run -d \
   --name controller \
   --hostname controller \
@@ -397,7 +397,7 @@ podman run -d \
 
 Systemd mode prepares temporary filesystems, stop signals, and cgroup access for the init process. On an SELinux-separated host, a systemd container that writes to its cgroup hierarchy may require this host-wide Boolean:
 
-```bash
+```shell
 sudo setsebool -P container_manage_cgroup 1
 ```
 
@@ -411,7 +411,7 @@ Podman gives containers outbound networking by default unless the operator selec
 
 A user-defined bridge network creates a stable application boundary and supports container-to-container name resolution through its DNS plugin:
 
-```bash
+```shell
 podman network create ansible-lab
 podman network inspect ansible-lab
 ```
@@ -422,7 +422,7 @@ Network mode changes the isolation boundary. `--network none` creates no usable 
 
 Containers join the network at creation:
 
-```bash
+```shell
 podman run -d \
   --name controller \
   --hostname controller \
@@ -441,7 +441,7 @@ The host reaches the controller through the published SSH port. The controller r
 
 The operator can add aliases when one service needs a stable role name:
 
-```bash
+```shell
 podman run -d \
   --name ubuntu \
   --network ansible-lab \
@@ -486,7 +486,7 @@ The relative build contexts contain each node's `Containerfile` and public asset
 
 Compose manages the project from the directory containing the file:
 
-```bash
+```shell
 podman compose build
 podman compose up -d
 podman compose ps
@@ -535,14 +535,14 @@ The playbook refers to `apache_package` and `apache_service`, while Ansible sele
 
 After the operator configures verified SSH keys between the controller and managed nodes, Ansible can test Python connectivity:
 
-```bash
+```shell
 cd /srv/playbooks
 ansible all -m ping
 ```
 
 An ad hoc package task can exercise privilege elevation and each distribution's package manager:
 
-```bash
+```shell
 ansible all \
   --become \
   --module-name package \
@@ -551,7 +551,7 @@ ansible all \
 
 A playbook can install Apache, copy content, enable the service, and start it:
 
-```bash
+```shell
 ansible-playbook apache.yml
 ```
 
@@ -576,7 +576,7 @@ The lab still needs sound security boundaries. Passwords should not appear in im
 ## Cleanup and recovery
 Podman reports storage use before cleanup:
 
-```bash
+```shell
 podman system df
 podman container ls --all
 podman image ls
@@ -586,7 +586,7 @@ podman volume ls
 
 Targeted removal protects unrelated work:
 
-```bash
+```shell
 podman container rm CONTAINER
 podman image rm IMAGE
 podman network rm NETWORK
@@ -595,7 +595,7 @@ podman volume rm VOLUME
 
 Prune commands remove unused resources and require careful review:
 
-```bash
+```shell
 podman container prune
 podman image prune
 podman system prune

@@ -24,7 +24,7 @@ The comment at the end of a public key helps identify its owner and origin, but 
 
 An organisation should select a key algorithm and size that comply with its cryptographic policy. A typical setup generates a key pair, installs the public key for the intended remote account, and verifies public-key authentication:
 
-```bash
+```shell
 ssh-keygen -t ed25519
 ssh-copy-id -i ~/.ssh/id_ed25519.pub admin@server.example
 ssh -o PreferredAuthentications=publickey admin@server.example
@@ -34,7 +34,7 @@ Ed25519 does not suit every compliance mode, including some FIPS configurations.
 
 Common permissions include:
 
-```bash
+```shell
 chmod 700 ~/.ssh
 chmod 600 ~/.ssh/config
 chmod 600 ~/.ssh/authorized_keys
@@ -47,7 +47,7 @@ The exact private-key filename depends on the selected algorithm and any custom 
 ### Using `ssh-agent`
 A passphrase-protected key normally prompts for its passphrase when the client needs the key. `ssh-agent` does not cache the passphrase. It holds an unlocked private key in memory and answers signing requests on the user's behalf. `ssh-add` loads an identity into the running agent:
 
-```bash
+```shell
 eval "$(ssh-agent -s)"
 ssh-add -t 1h ~/.ssh/id_ed25519
 ssh-add -l
@@ -81,7 +81,7 @@ ChallengeResponseAuthentication no
 
 Included configuration files and `Match` blocks can affect the effective result. The daemon can validate syntax and display resolved settings:
 
-```bash
+```shell
 sshd -t
 sshd -T | grep -E 'pubkeyauthentication|passwordauthentication|challengeresponseauthentication'
 systemctl reload sshd
@@ -95,7 +95,7 @@ Traditional Linux mode bits define permissions for one owner, one owning group, 
 
 RHEL 8 normally supports POSIX ACLs on XFS and ext4. The `acl` package supplies `getfacl` and `setfacl`. Administrators can confirm the package, file-system type, and mount options:
 
-```bash
+```shell
 rpm -q acl
 findmnt -no FSTYPE,OPTIONS /srv/project
 getfacl /srv/project
@@ -109,7 +109,7 @@ The access decision also uses the process's effective user ID, effective group I
 ### Managing access ACLs
 `setfacl -m` adds or changes entries. `setfacl -x` removes a selected entry. The `X` permission adds execute access to directories and to files that already have an execute bit, which makes recursive directory operations safer than granting execute to every regular file.
 
-```bash
+```shell
 setfacl -m u:alice:rwX,g:auditors:rX /srv/project
 getfacl /srv/project
 setfacl -x u:alice /srv/project
@@ -119,7 +119,7 @@ Directory permissions have distinct meanings. Read lists names, write creates or
 ### Default ACLs and object creation
 A directory can give an operations group continuing access to new content while excluding other users:
 
-```bash
+```shell
 setfacl -m u::rwx,g::r-x,g:ops:rwx,m::rwx,o::--- /srv/project
 setfacl -m d:u::rwx,d:g::r-x,d:g:ops:rwx,d:m::rwx,d:o::--- /srv/project
 getfacl /srv/project
@@ -135,7 +135,7 @@ When an extended ACL exists, the group triplet displayed by `ls -l` represents t
 ### Removal, backup, and restoration
 An administrator can remove a named entry with `-x`, remove extended access entries with `-b`, and remove a directory's default ACL with `-k`. A recursive backup preserves ACL text for restoration:
 
-```bash
+```shell
 getfacl -R -p /srv/project > /root/project.acl
 setfacl --restore=/root/project.acl
 ```
@@ -160,7 +160,7 @@ RHEL 8 installs with the targeted policy in enforcing mode by default. Targeted 
 
 `getenforce` reports the current condition. `sestatus` also reports the loaded policy, current mode, and configured boot mode:
 
-```bash
+```shell
 getenforce
 sestatus
 ```
@@ -173,13 +173,13 @@ System-wide permissive mode removes enforcement from every domain. Where diagnos
 ### Policy tools and booleans
 The base packages provide commands such as `getenforce`, `setenforce`, and `restorecon`. RHEL 8 supplies `semanage` through `policycoreutils-python-utils`, while `setroubleshoot-server` provides higher-level denial analysis:
 
-```bash
+```shell
 dnf install policycoreutils-python-utils setroubleshoot-server
 ```
 
 SELinux booleans expose supported policy choices without requiring a new policy module. Administrators can inspect available settings and descriptions, then enable only the capability required by the service:
 
-```bash
+```shell
 getsebool -a
 semanage boolean -l
 setsebool -P use_nfs_home_dirs on
@@ -199,7 +199,7 @@ For example, the password-changing program can transition into a domain such as 
 
 Administrators can display contexts with:
 
-```bash
+```shell
 ls -Z /etc/shadow
 ps -eZ
 semanage port -l
@@ -207,7 +207,7 @@ semanage port -l
 
 `chcon` changes the label stored on an object, but it does not update the persistent file-context mapping. A later `restorecon` or full relabel can discard that change. `semanage fcontext` records a persistent pathname rule, and `restorecon` applies the expected label to existing objects:
 
-```bash
+```shell
 semanage fcontext -a -t httpd_sys_content_t '/web(/.*)?'
 restorecon -Rv /web
 matchpathcon -V /web/index.html
@@ -219,7 +219,7 @@ File-context expressions apply to full paths and use regular-expression syntax. 
 
 An equivalence rule can make a new tree follow an established tree's context mappings. A separate staff home hierarchy can mirror `/home`:
 
-```bash
+```shell
 mkdir /staff
 semanage fcontext -a -e /home /staff
 restorecon -Rv /staff
@@ -241,7 +241,7 @@ A disciplined diagnosis follows a short sequence:
 
 RHEL 8 can search recent audit records with:
 
-```bash
+```shell
 ausearch -m AVC,USER_AVC,SELINUX_ERR,USER_SELINUX_ERR -ts recent
 ```
 
@@ -263,13 +263,13 @@ Changing an HTTP service from port 80 to an uncommon port does not provide meani
 
 SELinux permits `httpd_t` to bind only to ports labelled with an allowed type. An administrator can inspect the current `http_port_t` assignments before choosing a port:
 
-```bash
+```shell
 semanage port -l | grep -w http_port_t
 ```
 
 If TCP port 3131 has no conflicting SELinux assignment and Apache must use it, the administrator can add the port label:
 
-```bash
+```shell
 semanage port -a -t http_port_t -p tcp 3131
 ```
 
@@ -290,7 +290,7 @@ DocumentRoot "/var/test_www/html"
 
 Apache also needs suitable discretionary permissions and SELinux labels for a custom document root. A new tree under `/var/test_www` can reuse the standard `/var/www` mappings:
 
-```bash
+```shell
 mkdir -p /var/test_www/html
 semanage fcontext -a -e /var/www /var/test_www
 restorecon -Rv /var/test_www
@@ -300,7 +300,7 @@ Apache configuration must set the new `DocumentRoot` and an appropriate `<Direct
 
 After the administrator changes the port, document root, and labels, the service should remain in enforcing mode during final verification. A local request can test both HTTP and content access:
 
-```bash
+```shell
 curl -I http://localhost:3131/
 ```
 

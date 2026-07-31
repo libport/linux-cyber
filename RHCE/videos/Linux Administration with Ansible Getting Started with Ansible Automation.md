@@ -2,678 +2,349 @@
 > [!NOTE]
 > Introduction on Ansible automation through a repeatable multi-platform lab, explaining how controllers, inventories, variables, modules, SSH, privilege escalation, and playbooks enable consistent, idempotent Linux administration.
 
-Ansible provides a lightweight way to automate Linux administration from a controller node. It relies on SSH, Python on the managed host, and a human-readable model that separates configuration, inventory, and execution. A practical starter workflow spans a small multi-distribution lab, Ansible installation, the main command-line tools, inventory design, and ad-hoc automation across Red Hat Enterprise Linux, CentOS Stream, and Ubuntu.
+Red Hat Enterprise Linux 10 provides `ansible-core` 2.16 through AppStream. A RHEL 10 control node can manage RHEL 9 and RHEL 10 hosts. Managed RHEL 10 hosts do not require Ansible, but modules generally require Python, and RHEL 10 supplies Python 3.12 as its default implementation. Administrators can install the control software and supported RHEL System Roles together:
 
-The material assumes basic Linux administration skills and routine command-line work. An administrator does not need a large estate to benefit from Ansible. The value appears as soon as repeated work begins to spread across multiple hosts, especially when those hosts do not all use the same package manager, repository layout, service names, or configuration file locations. Ansible reduces that variation to a smaller set of modules, variables, and inventory data.
-## Building a repeatable lab
-A simple lab can run on a host operating system with VirtualBox as the hypervisor and Vagrant as the machine manager. A three-node layout is enough to demonstrate cross-platform administration:
-- Red Hat Enterprise Linux 8 at 192.168.33.11
-- CentOS Stream 8 at 192.168.33.12
-- Ubuntu 20.04 at 192.168.33.13
-
-Each guest can use 1 GB of RAM and a private network so that the nodes can reach one another directly. The private network matters because Ansible depends on predictable connectivity between the controller and the managed nodes.
-
-A typical working directory keeps the Vagrant definition separate from unrelated projects:
-
-```bash
-mkdir -p ~/vagrant/ansible
-cd ~/vagrant/ansible
-```
-
-The `Vagrantfile` defines the three boxes, their hostnames, their RAM allocation, and their private IP addresses. Once the file exists, Vagrant can create the full lab from that single definition.
-
-```bash
-vagrant up
-vagrant status
-vagrant ssh rhel8
-vagrant halt
-```
-
-This approach has two benefits. First, it makes the lab reproducible. Secondly, it keeps the focus on Ansible rather than on guest provisioning. The controller can live on RHEL, CentOS Stream, or Ubuntu, but a Red Hat based controller keeps the workflow close to an enterprise environment.
-
-RHEL requires an active subscription before it can use Red Hat repositories. A free Red Hat Developer subscription is sufficient for a personal lab. Registration is straightforward:
-
-```bash
-sudo subscription-manager register --auto-attach \
-  --username <red-hat-username> \
-  --password <red-hat-password>
-
-sudo subscription-manager status
-```
-
-If the subscription is active, RHEL can install software from Red Hat content sources. If no subscription is available, CentOS Stream and Ubuntu still provide enough variation to practise most introductory tasks.
-## Why Ansible matters
-Manual administration works while the estate is small. An administrator can log in to each host, run the required commands, edit configuration files, and restart services. That model fails once the same change must be repeated across many nodes. Repetition introduces two problems:
-- time cost
-- inconsistency
-
-Shell scripts improve consistency, but they still force the administrator to encode every platform difference by hand. A package install is a good example. Ubuntu uses APT. RHEL 8 and CentOS Stream use YUM or DNF. Even when the package manager difference is hidden, the package name may still differ. The Vim editor illustrates the problem. Ubuntu installs `vim`. Red Hat based systems often install `vim-enhanced`.
-
-A shell solution can inspect `/etc/os-release` and branch on the operating system family:
-
-```bash
-#!/bin/bash
-id=$(grep '^ID=' /etc/os-release | cut -d= -f2)
-
-if [ "$id" = "ubuntu" ]
-then
-  sudo apt-get install -y vim
-else
-  sudo dnf install -y vim-enhanced
-fi
-```
-
-This script works, but it does not scale elegantly. Every new package, service, file path, and operating system adds more branching. Ansible improves the model by expressing the intended state through modules and variables. The controller chooses the right transport and often the right package backend. The inventory and variable layers handle the remaining differences.
-## Installing Ansible
-Ansible needs to be installed only on the controller. Managed nodes do not need the full Ansible package. They need SSH access and a suitable Python interpreter.
-### RHEL 8
-On RHEL 8, the controller can use Red Hat repositories. The first step is to inspect the available Ansible repositories under the active subscription.
-
-```bash
-sudo subscription-manager repos --list | grep -i ansible
-```
-
-The relevant Ansible repository can then be enabled. The exact repository identifier varies by subscription and repository set, so the command below uses a placeholder.
-
-```bash
-sudo subscription-manager repos --enable <ansible-repository-id>
-```
-
-A clean RHEL workflow also avoids accidental package selection from EPEL when the intention is to use Red Hat content. The `config-manager` command comes from `dnf-plugins-core`.
-
-```bash
-sudo dnf install -y dnf-plugins-core
-sudo dnf config-manager --set-disabled epel epel-modular
-sudo dnf install -y ansible
-```
-
-RHEL 8 still accepts `yum` syntax because YUM v4 uses DNF underneath. Either command works, though DNF is clearer in new documentation.
-### CentOS Stream
-CentOS Stream can install Ansible from EPEL.
-
-```bash
-sudo dnf install -y epel-release
-sudo dnf install -y ansible
-```
-
-CentOS Stream is not a rebuild of RHEL in the way that classic CentOS Linux was. It tracks just ahead of the current RHEL release, so it is useful for learning Red Hat style administration without being identical to RHEL.
-### Ubuntu 20.04
-Ubuntu 20.04 already ships Ansible 2.9.6 in the focal package stream. Some administrators still add the Ansible PPA when they want packaging that moves faster than the base distribution.
-
-```bash
-sudo apt update
-sudo add-apt-repository -y ppa:ansible/ansible
-sudo apt update
-sudo apt install -y ansible
-```
-
-Once Ansible is installed, the controller can confirm the executable path, file type, and version.
-
-```bash
-which ansible
-file "$(which ansible)"
+```shell
+sudo dnf install ansible-core rhel-system-roles
 ansible --version
 ```
 
-The version output also reveals the active configuration file, module search paths, executable location, and Python version. That command becomes one of the quickest ways to confirm which configuration file Ansible is actually using.
-## Understanding the core tools
-Ansible exposes a small group of command-line tools that matter immediately.
-### `ansible`
-The `ansible` command runs ad-hoc tasks against a host or group. It is useful for quick checks, one-off changes, and experimentation with modules.
+The `ansible-core` package contains the command-line tools, the `ansible.builtin` collection, and a small set of plugins. Other collections remain separate. Fully qualified collection names, such as `ansible.builtin.template` and `cisco.ios.ios_acls`, identify content unambiguously.
 
-```bash
-ansible localhost -m ping
-ansible localhost -m package -a "name=zsh state=present" -b
-ansible localhost -m package -a "name=zsh state=absent" -b
+RHEL subscriptions support the packaged RHEL System Roles and Red Hat-generated automation within the stated support scope for `ansible-core`. Organisations that require supported automation across broader workloads can use Red Hat Ansible Automation Platform and its execution environments.
+## Jinja templating
+Ansible renders Jinja templates on the control node, then transfers the resulting files to managed hosts. Managed hosts therefore need neither Jinja nor the source template. The `.j2` suffix signals a template by convention, but Ansible does not require it.
+
+`ansible.builtin.copy` transfers the same content to every target. `ansible.builtin.template` evaluates the source separately for each target, so inventory values and facts can produce a different result on every host. Ansible compares the rendered content with the destination and reports a change only when deployment alters the managed file. This idempotent behaviour allows a handler to restart a service only after its configuration changes.
+
+Jinja separates dynamic content from literal text:
+
+| Syntax | Purpose |
+|---|---|
+| `{{ expression }}` | Evaluates and inserts a value |
+| `{% statement %}` | Controls flow with constructs such as `if` and `for` |
+| `{# comment #}` | Adds a template comment that does not appear in the result |
+
+Templates can read play variables, inventory variables, role defaults, registered results, facts, and magic variables. Host-specific data produces host-specific files. The `groups` variable lists inventory groups and their members. The `hostvars` variable exposes variables for another inventory host. Facts accessed through `hostvars` must already exist through gathering or a fact cache.
+
+Variable scope should express the intended variation. A play variable normally gives every host in the play the same value. `group_vars` can describe an environment, location, or server class. `host_vars` should hold exceptional host-level data. Facts describe observed state. A template that depends on another host's fact also depends on that host participating in fact gathering or on a valid fact cache. Inventory variables often provide a stronger source for stable service addresses because they do not depend on discovery.
+
+RHEL 10 network interfaces can use names such as `enp1s0`, so templates should not assume `eth0` or `eth1`. The default route fact usually offers a more durable source for the primary address:
+
+```jinja2
+node_ip={{ ansible_facts.default_ipv4.address }}
+
+{% for host in groups['app_servers'] %}
+server {{ host }} {{ hostvars[host].ansible_facts.default_ipv4.address }}
+{% endfor %}
 ```
 
-The `-m` flag selects a module. The `-a` flag passes module arguments. The `-b` flag enables privilege escalation with `become`.
+Bracket notation remains safer when a key contains punctuation or conflicts with a dictionary attribute. Clear variable names and shallow data structures also reduce template errors.
 
-For `localhost`, Ansible uses an implicit host entry and a local connection. That makes it possible to validate the controller before any real inventory exists.
-### `ansible-playbook`
-The `ansible-playbook` command runs structured YAML playbooks. Playbooks provide the repeatability that ad-hoc commands lack. A playbook keeps the tasks, their order, and their variables in a file that can be reused safely.
+Filters transform values without altering the original variables. Common filters include `default`, `dict2items`, `items2dict`, `map`, `selectattr`, `unique`, `sort`, `to_json`, and `to_nice_yaml`. A default can handle an undefined variable:
 
-A minimal playbook that pings localhost and prints the operating system family looks like this:
+```jinja2
+character_set={{ character_set | default('utf8') }}
+```
+
+The optional second argument to `default` also replaces false values, empty strings, and empty collections. That behaviour can conceal valid input, so templates should enable it only when false-like values truly require replacement.
+
+Conditionals select content through tests, comparisons, and logical operators. Tests use forms such as `value is defined` and `release is version('10', '>=')`. RHEL-specific logic should use gathered facts instead of obsolete CentOS assumptions:
+
+```jinja2
+{% if ansible_facts.distribution == 'RedHat'
+      and ansible_facts.distribution_major_version | int >= 10 %}
+platform_generation=10
+{% endif %}
+```
+
+Jinja `for` loops iterate over lists, dictionaries, and inventory groups. Whitespace controls such as `{%-` and `-%}` remove adjacent whitespace, but aggressive trimming can join configuration lines and invalidate a file. Templates should keep policy and complex data manipulation in variables or tasks, leaving Jinja to format the desired configuration.
+
+A loop can generate repeated directives from a list:
+
+```jinja2
+{% for source in timesync_sources %}
+server {{ source.hostname }}{% if source.iburst | default(false) %} iburst{% endif %}
+{% endfor %}
+```
+
+Data should remain typed until final formatting. Numeric comparisons should convert text facts with `| int`, Boolean values should remain `true` or `false`, and lists should remain lists rather than comma-separated strings. `dict2items` can turn a mapping into loopable key-value records, while `items2dict` performs the reverse transformation. Filters can be chained, with each filter receiving the previous result.
+
+The `ansible.builtin.template` module manages ownership, permissions, backups, and atomic replacement. Its `validate` option runs a command against a temporary file before deployment. The command must contain `%s`, which Ansible replaces with the temporary path. Shell features such as pipes do not work directly because Ansible passes the command securely rather than through a shell.
+
+```yaml
+- name: Deploy sudo policy
+  ansible.builtin.template:
+    src: admins.j2
+    dest: /etc/sudoers.d/admins
+    owner: root
+    group: root
+    mode: "0440"
+    backup: true
+    validate: "/usr/sbin/visudo -cf %s"
+```
+
+Sensitive configuration may require `mode: "0600"`, an appropriate SELinux context, and `no_log: true` on tasks that could expose secrets. A backup aids recovery, but version control, syntax checks, check mode, and application-specific validation provide stronger assurance.
+
+Modes should use quoted strings, such as `"0644"`, to avoid YAML number interpretation. A template should normally set `owner`, `group`, and `mode` explicitly. Critical configuration also needs a handler, a validation command where available, and a post-change service check. `backup: true` creates a timestamped copy on the managed host, but administrators still need retention controls and a recovery procedure.
+## Roles and modular configuration
+A role groups related tasks, handlers, templates, files, variables, and metadata behind a stable interface. A focused role can configure one service or capability, while a playbook composes several roles into a complete deployment. This separation supports reuse, testing, review, and version control.
+
+Ansible recognises seven main role directories:
+
+| Directory | Content |
+|---|---|
+| `tasks/` | Tasks, normally loaded from `main.yml` |
+| `handlers/` | Handlers notified by changed tasks |
+| `templates/` | Jinja templates rendered by template tasks |
+| `files/` | Static files used by copy or script tasks |
+| `defaults/` | Easily overridden role input defaults |
+| `vars/` | High-precedence role variables |
+| `meta/` | Dependencies, role metadata, and argument specifications |
+
+Unused directories can remain absent. `ansible-galaxy role init role_name` creates a conventional skeleton, while a small role can use only the directories it needs. `meta/argument_specs.yml` can define and validate the role's public inputs.
+
+Role defaults have very low variable precedence and suit settings that consumers may override. Role vars have high precedence and suit internal constants. Namespaced variables such as `web_tls_port` reduce collisions. A role should document each public variable, its type, its default, and any constraints. Secrets should not appear in defaults.
+
+Migration from a large playbook starts by finding cohesive task groups. Package installation, configuration deployment, service management, variables, files, templates, and handlers for one capability can move into one role. Application orchestration and environment ordering should remain in the playbook. This boundary keeps a role generic enough for reuse without forcing unrelated deployment policy into it.
+
+Every reference must move with the task group. A renamed, namespaced variable requires updates in tasks, templates, handlers, and calling playbooks. A copied file belongs under `files/`, while a rendered file belongs under `templates/`. Role-relative lookup lets tasks use a short source name. The migration is complete only after the original tasks and variables have been removed, otherwise variable precedence can mask defects.
+
+Handlers run only after a notifying task reports a change. A handler name or `listen` topic must match the notification. A configuration task should notify a restart or reload handler instead of restarting a service on every run. Descriptive task names, fully qualified module names, and idempotent modules keep role output understandable.
+
+Roles can enter a play in four ways:
+
+| Method | Processing and order |
+|---|---|
+| `roles:` | Static processing, after `pre_tasks` and before normal tasks |
+| `ansible.builtin.import_role` | Static processing at the task position |
+| `ansible.builtin.include_role` | Dynamic processing when execution reaches the task |
+| Role dependency | Runs before the dependent role |
+
+Static imports expose their task structure during parsing. Conditions and tags attached to an import apply to the imported tasks. Dynamic includes support runtime conditions and loops. Task keywords on `include_role` apply to the include itself unless the role receives them through `apply`.
+
+Ansible executes a play in a defined sequence. It runs `pre_tasks`, their notified handlers, roles listed under `roles:` in listed order, normal tasks, notified handlers, `post_tasks`, and their notified handlers. A role dependency runs before the role that declares it. Recursive dependencies can create hidden coupling, so explicit playbook composition often remains easier to understand.
+
+In `ansible-core` 2.16, role parameters normally remain private instead of leaking into the wider play as older releases allowed. `include_role` also keeps role defaults and vars private unless `public: true` exposes them to later tasks. Consumers should pass inputs deliberately and should not rely on accidental visibility.
+
+Tags on a role under `roles:` or on `import_role` propagate to every task in that role. Tags on `include_role` do not automatically propagate. Selective execution with a dynamic include requires tags on both the include and the selected role tasks, or an `apply` mapping that adds tags to all included tasks.
+
+`ansible-playbook site.yml --tags install` selects tagged work, while `--skip-tags` excludes it. Tags can bypass prerequisites and handlers, so they should support diagnostics or bounded operations rather than define the only valid execution path. Role tests should include `--syntax-check`, `ansible-lint`, idempotence checks, supported RHEL versions, and failure cases for invalid arguments.
+
+RHEL 10 supplies supported System Roles for common administration. The `timesync` role configures `chronyd`, which RHEL 10 uses for NTP. It provides a safer starting point than a hand-built Chrony role:
 
 ```yaml
 ---
-- name: Simple play
-  hosts: localhost
-  connection: local
+- name: Configure time synchronisation
+  hosts: rhel10
+  become: true
   tasks:
-    - name: Ping localhost
-      ping:
-    - name: Show OS family
-      debug:
-        msg: "{{ ansible_os_family }}"
+    - name: Configure trusted NTP sources
+      ansible.builtin.include_role:
+        name: redhat.rhel_system_roles.timesync
+      vars:
+        timesync_ntp_servers:
+          - hostname: time.example.com
+            trusted: true
+            prefer: true
+            iburst: true
+          - hostname: 0.rhel.pool.ntp.org
+            pool: true
+            iburst: true
 ```
 
-The playbook runs with:
+The role replaces the provider's time configuration, so the variable set must describe every setting that the host must retain. RHEL 10 installs the `chrony` package by default, runs the `chronyd` service, and uses `/etc/chrony.conf`. `chronyc sources` and `chronyc tracking` verify synchronisation. NTS-capable environments can configure authenticated time sources through the same role.
 
-```bash
-ansible-playbook my.yml
+A custom role remains appropriate when no supported role covers the required configuration. For Chrony, such a role would install `chrony` with `ansible.builtin.package`, render `/etc/chrony.conf`, notify a handler for `chronyd`, enable and start the service, and verify its sources. The supported System Role already handles provider selection and cross-version details, which reduces local maintenance.
+## Collections and content sharing
+A collection packages modules, plugins, roles, playbooks, documentation, and metadata under a namespace and collection name. An FQCN combines the namespace, collection, and content name. `ansible.builtin.package` comes with `ansible-core`, while `community.general.timezone` and `cisco.ios.ios_facts` require their respective collections.
+
+Short module names may still work through built-in lookup or compatibility redirection, but they can collide across collections and can obscure the required dependency. FQCNs remain the recommended form. Roles inside collections also use three-part names, such as `redhat.rhel_system_roles.timesync`.
+
+Ansible Galaxy distributes community content. Red Hat Automation Hub distributes supported certified content for Ansible Automation Platform. Private automation hub can curate approved versions for an organisation. Before adoption, maintainers should review source code, licence terms, supported platforms, release activity, tests, dependencies, documentation, issue history, and change logs. Popularity alone does not establish production suitability.
+
+The collection subcommand installs collections:
+
+```shell
+ansible-galaxy collection install cisco.ios
+ansible-galaxy collection list
 ```
 
-By default, Ansible gathers facts before it runs the explicit tasks. That is why a playbook often shows an extra `Gathering Facts` step before the named tasks. Facts become variables such as `ansible_os_family`, `ansible_distribution`, and interface data.
-### `ansible-doc`
-`ansible-doc` is essential. It lists available modules and shows argument details and examples for each module.
+Standalone roles use the role subcommand:
 
-```bash
-ansible-doc -l
-ansible-doc ping
-ansible-doc package
-ansible-doc user
+```shell
+ansible-galaxy role install namespace.role_name
+ansible-galaxy role install namespace.role_name --roles-path ./roles
 ```
 
-Ansible ships with thousands of modules and plugins, so direct familiarity with every module is unrealistic. Effective use depends on recognising the likely module category and then checking the built-in documentation.
-### `ansible-config`
-`ansible-config` shows the active configuration and the default values.
+Projects should record direct dependencies and tested versions in `requirements.yml`:
 
-```bash
-ansible-config view
-ansible-config list
-ansible-config dump
-ansible-config dump --only-changed
+```yaml
+---
+collections:
+  - name: cisco.ios
+    version: "11.4.2"
+  - name: ansible.netcommon
+    version: "8.6.0"
 ```
 
-`dump --only-changed` is especially useful after editing `ansible.cfg` because it shows only the values that differ from the defaults.
-### `ansible-inventory`
-`ansible-inventory` shows how Ansible sees the host inventory after it merges all files and variables.
-
-```bash
-ansible-inventory --host localhost
-ansible-inventory --list
-ansible-inventory --list -y
+```shell
+ansible-galaxy collection install -r requirements.yml
 ```
 
-JSON is the default output format for `--list`. YAML can be easier to read during manual review.
-## Facts, variables, and Jinja
-Ansible facts let the controller adapt to different systems without hard-coding every branch. Facts are available after the `setup` module runs, either explicitly or through playbook fact gathering.
+By default, Ansible installs collections under `~/.ansible/collections`. A project can install them under `collections/ansible_collections/` beside its playbooks, which isolates dependencies and supports repeatable builds. Ansible Automation Platform execution environments go further by packaging `ansible-core`, collections, Python packages, and system dependencies in a container image.
 
-```bash
-ansible localhost -m setup -a "filter=ansible_os_family"
-ansible localhost -m setup -a "filter=ansible_distribution"
+Different collection paths can contain different versions. Search-path order then controls which copy Ansible loads. Project-local installation or a versioned execution environment avoids accidental selection from a user-level path. Teams should test upgrades before changing pinned versions and should review transitive dependencies as carefully as direct ones.
+
+Collections installed manually do not automatically upgrade with `ansible-core`. An upgrade can alter module arguments, return values, or platform support even when a playbook stays unchanged. A controlled workflow updates one dependency set, rebuilds the execution environment, runs automated tests, and promotes the tested image by immutable tag or digest.
+## Ansible Vault
+Ansible Vault encrypts files or individual YAML values at rest. It allows encrypted secrets to remain beside playbooks in source control. Vault does not provide runtime access control, protect secrets after decryption, or prevent a task from printing a value. Repository permissions, credential controls, and careful task output remain essential.
+
+`ansible-vault create`, `edit`, `view`, `encrypt`, `decrypt`, and `rekey` manage encrypted files. `encrypt_string` produces an encrypted YAML value. A prompt avoids placing plaintext in shell history:
+
+```shell
+ansible-vault create --vault-id prod@prompt group_vars/prod/vault.yml
+ansible-vault encrypt_string --vault-id prod@prompt --stdin-name db_password
+ansible-playbook --vault-id prod@prompt site.yml
 ```
 
-The operating system family is more useful than the exact distribution in many tasks because it groups related platforms. RHEL and CentOS Stream share the `RedHat` family. Ubuntu belongs to the `Debian` family.
+An existing file can be encrypted or assigned a new password:
 
-Variables become most useful when Ansible can choose the backend automatically but still needs help with names or paths. The `package` module can choose APT or DNF, but it cannot guess that one family uses `vim` and another uses `vim-enhanced`. Jinja expressions fill that gap.
-
-A practical pattern is to define a variable such as `vim_editor` and set its value per group. The command or playbook can then refer to the variable rather than to the platform-specific package name.
-## Managing `ansible.cfg`
-Ansible reads configuration in a clear precedence order. The highest priority is the `ANSIBLE_CONFIG` environment variable. Below that comes `./ansible.cfg` in the current working directory, then `~/.ansible.cfg`, and finally `/etc/ansible/ansible.cfg`.
-
-A quick check confirms the active file:
-
-```bash
-ansible --version
+```shell
+ansible-vault encrypt --vault-id prod@prompt group_vars/prod/secrets.yml
+ansible-vault rekey --vault-id prod@prompt --new-vault-id prod_new@prompt group_vars/prod/secrets.yml
 ```
 
-A practical user-level configuration might look like this:
+Playbooks that use several identities can supply each one:
+
+```shell
+ansible-playbook \
+  --vault-id dev@dev-password-client \
+  --vault-id prod@prod-password-client \
+  site.yml
+```
+
+Vault IDs associate encrypted content with labels such as `dev` and `prod`. Each label can obtain its password from a prompt, a protected file, or an executable password-client script. Labels guide password selection but do not enforce separation by themselves. Separate credentials and access policies must establish that boundary.
+
+A password file must stay outside source control and use restrictive permissions. A password-client script can retrieve the secret from an external secret manager at runtime. Configuration keys such as `vault_identity_list` and `vault_password_file` can remove repeated command options, but they must not embed plaintext credentials in a committed `ansible.cfg`.
+
+Whole-file encryption suits variable files whose contents are all sensitive. Encrypted strings suit files that need readable names and non-secret context. File rekeying changes the encryption password. Individual encrypted strings cannot use `rekey`, so administrators must encrypt them again.
+
+Whole-file encryption can protect any file content, but automatic decryption depends on how Ansible loads or transfers that file. Encrypted variable files loaded through `vars_files` decrypt transparently after Ansible obtains the correct secret. An encrypted scalar carries the `!vault` tag and decrypts when Ansible evaluates that value. Neither form should hold a password hash when the target system expects a one-way hash instead of a recoverable secret.
+
+Tasks that consume secrets should use `no_log: true` when their arguments or results could reveal data. Debug output can still expose secrets, and global debug mode can bypass normal redaction. Logs, registered variables, generated files, backups, and downstream commands all require review. Vault encryption complements these controls rather than replacing them.
+## Parallelism and execution control
+Ansible uses the `linear` strategy and five forks by default. Linear execution runs a task across the current host batch before starting the next task. Several controls alter this behaviour:
+
+| Control | Effect |
+|---|---|
+| `forks` | Sets the maximum worker-process count |
+| `serial` | Divides hosts into batches that complete the whole play in turn |
+| `throttle` | Caps workers for one task or block |
+| `strategy` | Selects how Ansible schedules tasks and hosts |
+| `run_once` | Runs a task once for each serial batch |
+
+The `free` strategy lets each host advance through the play without waiting for slower hosts. `host_pinned` also permits independent progress, but a worker stays with one host until that host completes the play. The `debug` strategy follows linear scheduling and opens an interactive debugger when a task fails.
+
+`serial` accepts a number, percentage, or progression list, making it suitable for rolling changes. It also changes failure scope from the whole target set to the current batch. `throttle` can reduce concurrency below `forks` or `serial`, but it cannot increase either limit. Rate-limited APIs, shared databases, and CPU-heavy commands often need a low task-level throttle.
+
+No fixed fork count suits every environment. Administrators should raise it gradually while measuring control-node CPU and memory, network capacity, SSH limits, target load, and external-service limits. A larger value can shorten independent work but can also amplify failures or exhaust dependencies.
+
+The configuration file and command line can set the worker limit:
 
 ```ini
 [defaults]
-inventory = ~/inventory
-remote_user = tux
-private_key_file = ~/.ssh/id_rsa
-
-[privilege_escalation]
-become = True
+forks = 30
+strategy = linear
 ```
 
-This file does three things:
-- points Ansible at the chosen inventory
-- sets a dedicated remote login account
-- enables privilege escalation by default
-
-A project-specific `./ansible.cfg` can override the user-level configuration. That is helpful when one project needs a different inventory, key, or default remote user.
-
-An administrator can also enforce a configuration path through the shell environment:
-
-```bash
-export ANSIBLE_CONFIG=/etc/ansible/ansible.cfg
+```shell
+ansible-playbook -f 30 site.yml
 ```
 
-A read-only exported variable makes that setting harder to override in a shell session:
+The effective concurrency cannot exceed the smallest applicable limit from `forks`, the current `serial` batch, and `throttle`. `throttle` limits concurrent workers, not requests per second. A service that enforces a true rate limit may also require pauses, retries with backoff, or an API-specific module.
 
-```bash
-declare -xr ANSIBLE_CONFIG=/etc/ansible/ansible.cfg
-```
+A progressive rollout can use `serial: [1, 5, "25%"]`. The first batch contains one host, the second contains five, and subsequent batches contain 25% of the play's host set until completion. `max_fail_percentage` can stop a batch after excessive failures, while `any_errors_fatal` can stop all active hosts after a fatal task. Failure handling should reflect the application topology.
 
-This is useful in managed lab environments and in tightly controlled shared systems. It is less useful where individual projects need their own local configuration files.
-## Building an inventory
-The inventory is the list of hosts and groups that Ansible targets. INI format is easy to read and easy to maintain, though JSON and YAML are also valid.
+The `free` strategy suits independent host configuration such as time-client deployment. Coordinated application changes usually require `serial`, health checks, failure thresholds, and explicit load-balancer steps. `--syntax-check`, check mode, diff mode, canary batches, and idempotence tests should precede broad production runs.
 
-A minimal flat inventory can begin with raw host entries:
+`run_once` executes once in every serial batch, not once across the entire play. A truly global action needs an explicit host condition based on `ansible_play_hosts_all`, or a separate play that targets the control node. Delegated tasks can still run concurrently when several hosts delegate to the same destination, so shared controller files and central APIs may need `throttle: 1`.
+## Network device automation
+Network modules usually run on the control node and communicate through persistent connections such as `ansible.netcommon.network_cli`, `ansible.netcommon.netconf`, or `ansible.netcommon.httpapi`. Network devices do not need Python. Platform collections provide the connection, facts, command, configuration, and resource modules.
 
-```ini
-192.168.33.11
-192.168.33.12
-192.168.33.13
-```
-
-Ansible automatically creates two useful groups:
-- `all` for every host in the inventory
-- `ungrouped` for hosts that do not belong to any explicit group
-
-A more practical inventory assigns meaningful groups:
-
-```ini
-[rhel]
-192.168.33.11
-
-[stream]
-192.168.33.12
-
-[ubuntu]
-192.168.33.13
-
-[redhat:children]
-rhel
-stream
-```
-
-This layout supports several targeting strategies:
-- `rhel` for the RHEL node
-- `stream` for the CentOS Stream node
-- `ubuntu` for the Ubuntu node
-- `redhat` for both Red Hat family systems
-- `all` for the full estate
-
-Host and group membership can be inspected directly:
-
-```bash
-ansible-inventory --host 192.168.33.11
-ansible-inventory --list -y
-```
-
-Patterns such as `www[001:006]` are also valid when hosts follow a strict naming scheme. That can simplify large inventories.
-## Host variables and group variables
-Inventory variables allow host-specific and group-specific customisation without cluttering the main inventory file. Ansible loads these from `host_vars` and `group_vars` relative to the inventory or playbook directory.
-
-Create the variable directories first:
-
-```bash
-mkdir -p host_vars group_vars
-```
-
-A host variable can override the connection method for a specific host. In a lab, the RHEL controller can be managed locally even when it appears in the inventory by IP address.
-
-```bash
-cat > host_vars/192.168.33.11.yml <<'EOF'
-ansible_connection: local
-EOF
-```
-
-This lets the controller address `192.168.33.11` without SSH while still treating it as a real inventory member.
-
-Group variables solve platform-specific naming issues. The Vim example can be expressed cleanly as YAML.
-
-```bash
-cat > group_vars/redhat.yml <<'EOF'
-vim_editor: vim-enhanced
-EOF
-
-cat > group_vars/ubuntu.yml <<'EOF'
-vim_editor: vim
-EOF
-```
-
-Ansible merges the correct variable based on group membership. The resulting command stays simple:
-
-```bash
-ansible all -m package -a "name={{ vim_editor }} state=present" -b
-```
-
-The same pattern works for service names, configuration paths, repository packages, firewall tools, and other cross-platform differences. For example, a time service variable can capture whether a system expects one service name or another. A configuration path variable can point to `/etc/chrony.conf` on one family and a different path on another, though chrony commonly uses `/etc/chrony.conf` on both modern Ubuntu and RHEL based systems.
-## Dynamic inventory and host discovery
-Static inventories are easiest to start with, but automation can also discover hosts dynamically. One simple lab method scans for SSH listeners and extracts the IP addresses from the scan output.
-
-```bash
-sudo dnf install -y nmap
-
-sudo nmap -Pn -p 22 -oG - 192.168.33.0/24 | awk '/22\/open/ {print $2}'
-```
-
-This command does the following:
-- skips the ICMP host discovery phase with `-Pn`
-- probes only TCP port 22
-- prints greppable output with `-oG -`
-- extracts the second field from lines where port 22 is open
-
-The output can be redirected into a file and used as the basis of a generated inventory. In production, dynamic inventory usually integrates with cloud APIs, virtualisation platforms, or CMDB tooling rather than with a port scan, but the lab example shows the principle clearly.
-## Preparing SSH access
-The controller needs passwordless SSH access to the managed hosts. Vagrant already creates SSH keys for its own access model, so the lab can reuse those keys during the first stage of setup.
-
-On the host operating system, Vagrant can show the SSH settings for each guest:
-
-```bash
-vagrant ssh-config stream
-vagrant ssh-config ubuntu
-```
-
-The `IdentityFile` values point to the private keys that Vagrant uses. A controller running inside the RHEL guest needs copies of the keys for the Stream and Ubuntu guests. A Vagrant SCP plugin makes this convenient.
-
-```bash
-vagrant plugin install vagrant-scp
-```
-
-A typical workflow copies the Vagrant-generated keys into the controller guest under descriptive names such as `stream.key` and `ubuntu.key`. Once the keys are present, the controller can verify direct SSH access:
-
-```bash
-ssh -i ~/stream.key vagrant@192.168.33.12
-ssh -i ~/ubuntu.key vagrant@192.168.33.13
-```
-
-This first access also records the remote host keys in `known_hosts`, which prevents later prompts during Ansible runs.
-## Creating a dedicated Ansible account
-Using a dedicated remote account is cleaner than using Vagrant for long-term administration. The account can be created on the managed nodes with ad-hoc commands, using the temporary Vagrant access only for bootstrapping.
-
-Create the account on the Red Hat family host:
-
-```bash
-ansible stream -u vagrant --private-key ~/stream.key \
-  -m user -a "name=tux state=present" -b
-```
-
-Create the same account on Ubuntu:
-
-```bash
-ansible ubuntu -u vagrant --private-key ~/ubuntu.key \
-  -m user -a "name=tux state=present" -b
-```
-
-The new account needs passwordless sudo access if the controller is expected to install packages, manage services, and modify system files without interactive prompts. A standard sudoers drop-in works well.
-
-```bash
-printf 'tux ALL=(ALL) NOPASSWD: ALL\n' > tux
-visudo -cf tux
-```
-
-After validation, copy the file to each managed host:
-
-```bash
-ansible stream -u vagrant --private-key ~/stream.key \
-  -m copy -a "src=tux dest=/etc/sudoers.d/tux mode=0440" -b
-
-ansible ubuntu -u vagrant --private-key ~/ubuntu.key \
-  -m copy -a "src=tux dest=/etc/sudoers.d/tux mode=0440" -b
-```
-
-This stage finishes the account bootstrap. The controller now needs its own SSH keypair for the permanent `tux` login.
-## Deploying the controller's SSH key
-Generate a controller-side keypair if one does not already exist:
-
-```bash
-ssh-keygen -t rsa -b 4096 -N '' -f ~/.ssh/id_rsa
-```
-
-The controller can then push the public key to the `tux` account with the `authorized_key` module. The Jinja `lookup("file", ...)` call reads the local public key file.
-
-```bash
-ansible stream -u vagrant --private-key ~/stream.key \
-  -m authorized_key \
-  -a "user=tux state=present key='{{ lookup(\"file\", \"~/.ssh/id_rsa.pub\") }}'" \
-  -b
-
-ansible ubuntu -u vagrant --private-key ~/ubuntu.key \
-  -m authorized_key \
-  -a "user=tux state=present key='{{ lookup(\"file\", \"~/.ssh/id_rsa.pub\") }}'" \
-  -b
-```
-
-Once the key is in place, the controller no longer needs the temporary per-host Vagrant keys for routine Ansible work. The permanent access path becomes:
-- remote user `tux`
-- controller private key `~/.ssh/id_rsa`
-- privilege escalation through sudo
-
-That model aligns cleanly with the earlier `ansible.cfg` example.
-## Verifying the completed environment
-After the inventory, remote user, and private key are configured, the controller can test the entire estate with a single command.
-
-```bash
-ansible all -m ping
-```
-
-A successful result means that:
-- the inventory resolves the correct hosts
-- SSH authentication works
-- Python is available on the managed nodes
-- `become` succeeds where needed
-
-At that point, ad-hoc commands become genuinely useful. The `package` module can install a package shared across all distributions without caring about the package manager backend.
-
-```bash
-ansible all -m package -a "name=tree state=present" -b
-```
-
-Running the same command twice shows Ansible's idempotent behaviour. The first run changes hosts that need the package. The second run reports success without changes because the estate already matches the requested state.
-
-The same principle applies to removal:
-
-```bash
-ansible all -m package -a "name=tree state=absent" -b
-```
-
-When package names differ, the variable layer restores portability:
-
-```bash
-ansible all -m package -a "name={{ vim_editor }} state=present" -b
-```
-
-This is the practical centre of beginner-level Ansible administration. Modules describe the task. Inventory defines the target. Variables absorb platform differences. SSH and privilege escalation make the execution model consistent.
-## A sensible beginner workflow
-A useful working method for new Ansible administrators follows a predictable sequence.
-### 1. Build the lab
-Use Vagrant and VirtualBox to produce a small mixed environment quickly. Confirm that each guest has the expected IP address and that the private network works.
-### 2. Register RHEL if required
-RHEL needs repository access before it can serve as a controller or managed node. A valid subscription removes package installation friction later.
-### 3. Install Ansible only on the controller
-The controller holds the Ansible package. Managed nodes need SSH and Python, not the full Ansible installation.
-### 4. Validate the controller locally
-Use `ansible localhost -m ping`, `ansible-doc`, `ansible-config`, and `ansible --version` before attempting remote work.
-### 5. Create a clean configuration
-Set the inventory path, remote user, private key file, and privilege escalation defaults in `ansible.cfg`. Keep the configuration in `~/.ansible.cfg` or in the project directory.
-### 6. Build the inventory
-Start with explicit IP addresses and small groups. Add child groups where they simplify targeting.
-### 7. Introduce host and group variables
-Use variables for real differences, especially package names, service names, file paths, and connection settings.
-### 8. Bootstrap SSH and the remote user
-Use temporary access only long enough to create the permanent Ansible user, install sudoers policy, and deploy the controller's public key.
-### 9. Favour modules over shell commands
-Modules know how to express state. They reduce error handling, improve readability, and remain idempotent.
-### 10. Move repeated commands into playbooks
-Ad-hoc commands are excellent for learning and for one-off changes. Repeated operational tasks belong in playbooks because the file becomes the repeatable source of truth.
-## Practical limits of ad-hoc commands
-Ad-hoc commands are intentionally narrow. They suit quick checks such as:
-- connectivity
-- package presence
-- service state
-- user creation
-- file copy
-- one-off fact gathering
-
-They become awkward when the workflow needs ordering, conditional execution, loops, templates, handlers, roles, or version-controlled history. Playbooks take over at that point. A new administrator should still spend time with ad-hoc commands because they expose the building blocks clearly. Every playbook task still uses the same module logic underneath.
-## What a beginner should remember
-Ansible becomes easier once a few ideas are fixed firmly.
-
-- The controller is the only machine that needs the Ansible package.
-- SSH is the transport for most Linux administration.
-- Python on the managed node is required for the common module model.
-- `ansible` runs ad-hoc commands.
-- `ansible-playbook` runs YAML playbooks.
-- `ansible-doc` explains modules and their arguments.
-- `ansible-config` shows configuration and precedence.
-- `ansible-inventory` shows the processed inventory.
-- Facts describe the remote system.
-- Jinja expressions insert variables into commands and playbooks.
-- Modules describe state rather than shell procedure.
-- Group variables and host variables are the cleanest place to absorb platform differences.
-
-A small mixed lab is enough to practise all of these fundamentals. Once the controller can reach the estate reliably, the next logical step is to replace repetitive ad-hoc work with structured playbooks, roles, and templated configuration.
-## Working locally before remote execution
-The implicit `localhost` entry is more useful than it first appears. It provides a safe place to prove that the controller can run modules, gather facts, and resolve configuration before any remote authentication is involved. That reduces the number of moving parts during early troubleshooting.
-
-A sensible first sequence on the controller is:
-
-```bash
-ansible localhost -m ping
-ansible localhost -m setup -a "filter=ansible_os_family"
-ansible-doc package
-ansible-config dump --only-changed
-```
-
-If those commands succeed, the controller is already capable of reading its configuration, loading modules, calling Python, and printing facts. Failure at this stage usually points to a bad installation, a broken Python environment, or an unexpected configuration file rather than to an SSH issue.
-
-Local execution also demonstrates an important Ansible habit. The administrator asks for a state, not for a procedure. For package management, that difference matters. A shell workflow says "run `apt install` or `dnf install`". Ansible says "make sure this package is present". The module handles the implementation detail.
-## Reading module behaviour properly
-Each module has its own expected arguments, defaults, and return values. The built-in documentation is therefore part of normal administration rather than an optional reference.
-
-The `ping` module is a good example because its name can mislead. It does not send an ICMP echo request like the system `ping` command. It checks whether Ansible can run a simple Python-based module on the target and receive a normal response. That makes it a connectivity test, an authentication test, and a Python test at the same time.
-
-The `package` module demonstrates Ansible's portability layer. It abstracts the package manager so that one task can work across APT, YUM, and DNF. It does not remove the need for variables when package names differ, but it removes the need to write separate tasks for different package tools.
-
-The `user` module is equally important in early setup. It can create a user, assign groups, set shells, define system users, and manage home directory behaviour. The basic bootstrap example uses only `name=tux state=present`, but the module supports much richer account policy.
-
-The `copy` module handles straightforward file delivery from the controller to the managed node. It is ideal for sudoers drop-ins, static configuration snippets, and small policy files. The `authorized_key` module is then the clean way to manage SSH public keys in a user's `authorized_keys` file.
-
-This pattern is worth remembering because it reflects how a real Ansible build-out often starts:
-- `ping` to verify access
-- `user` to create the administration account
-- `copy` to apply sudo policy
-- `authorized_key` to install permanent SSH trust
-- `package` to enforce baseline software
-## Playbooks and YAML discipline
-A playbook is a YAML file that contains one or more plays. Each play targets hosts and runs tasks. YAML uses indentation to express structure, so spacing is not cosmetic. A misplaced indent changes the meaning of the file or makes it invalid.
-
-A minimal playbook usually contains these elements:
-- a list of plays marked by `-`
-- a `name` for readability
-- a `hosts` target
-- optional connection or privilege settings
-- a `tasks` list
-- one or more module calls under each task
-
-That structure makes playbooks more reliable than repeated ad-hoc commands. The file preserves the order of operations. It also preserves intent. A reader can inspect the playbook later and see exactly what state the administrator wanted.
-
-A slightly fuller example shows facts, a package install, and variable use in one place:
+A Cisco IOS inventory normally sets the connection and platform at group level:
 
 ```yaml
 ---
-- name: Baseline editor install
-  hosts: all
-  become: true
-  tasks:
-    - name: Show the platform family
-      debug:
-        msg: "{{ ansible_os_family }}"
-
-    - name: Ensure the preferred editor is installed
-      package:
-        name: "{{ vim_editor }}"
-        state: present
+ios:
+  hosts:
+    edge01:
+      ansible_host: 192.0.2.10
+  vars:
+    ansible_connection: ansible.netcommon.network_cli
+    ansible_network_os: cisco.ios.ios
+    ansible_become: true
+    ansible_become_method: enable
 ```
 
-This playbook illustrates several core behaviours at once. The task names read clearly. `become: true` applies privilege escalation to the play. `debug` exposes a fact. `package` remains portable because the inventory supplies the correct package name per group.
+Credentials should come from SSH keys, an automation-platform credential, or encrypted variables. Inventory must not contain plaintext passwords.
 
-The value of playbooks increases with every repeated task. A one-line package check might remain ad-hoc. A baseline build, security hardening step, or common configuration policy belongs in a playbook.
-## Configuration precedence in practice
-Configuration precedence matters because Ansible often appears to "ignore" a setting when it is actually reading a different file. The precedence model solves that mystery.
+Network configuration supports three broad approaches. Command and config modules send platform-native commands. Jinja templates generate those commands from variables. Resource modules accept structured data for a defined resource such as ACLs, interfaces, VLANs, or routes. Resource modules reduce command parsing and provide a similar operating model across supported platforms, although each platform retains its own schema and capabilities.
 
-An administrator can test precedence quickly with empty files. A blank `~/.ansible.cfg` is enough to override `/etc/ansible/ansible.cfg`. A blank `./ansible.cfg` in the current working directory is enough to override `~/.ansible.cfg`. The file does not need meaningful content to prove which path Ansible prefers.
+Command modules suit operational queries and exceptional commands. Config modules provide change detection and platform-aware configuration modes, but the author must still know the native syntax. Templates help when many commands share a stable structure, though large multi-vendor templates can become difficult to maintain. Resource modules provide the strongest data model when the collection implements the required feature.
 
-A practical test sequence looks like this:
+`cisco.ios.ios_facts` can collect both basic facts and selected resource facts:
 
-```bash
-ansible --version
-touch ~/.ansible.cfg
-ansible --version
-mkdir -p ~/ansible/test
-cd ~/ansible/test
-ansible --version
-touch ansible.cfg
-ansible --version
+```yaml
+- name: Gather IOS resource facts
+  cisco.ios.ios_facts:
+    gather_subset:
+      - min
+    gather_network_resources:
+      - interfaces
+      - l3_interfaces
+      - acls
 ```
 
-Each `ansible --version` call shows the configuration file currently in use. That makes it easy to confirm whether Ansible is reading the expected path.
+The requested resource data appears under `ansible_facts.network_resources`. A resource module with `state: gathered` can retrieve one resource directly and returns it through the registered result's `gathered` key.
 
-The same technique helps when a project behaves differently from another project on the same controller. If one directory contains its own `ansible.cfg`, that file may override the user's global defaults entirely. The correct response is not guesswork. It is to check `ansible --version` and then inspect the active file with `ansible-config view`.
+The play should set `gather_facts: false` for network devices because the normal Linux setup module cannot run there. A platform facts task then requests only the needed subsets. Limiting fact collection reduces commands and execution time. `available_network_resources: true` can report which resource facts the installed collection supports.
 
-A project-specific file is often the right choice. It allows one repository to carry its own inventory path, SSH key, and output settings without affecting every other Ansible project. The user-level file remains useful for defaults that make sense everywhere, such as a preferred editor or general output behaviour.
-## Inventory inspection and grouping strategy
-Inventories become easier to manage when the grouping model mirrors the way systems are administered. A poor inventory groups hosts by arbitrary labels. A good inventory groups them by operational meaning.
+Common resource states have distinct scopes:
 
-In the small lab, the following group types make sense:
-- platform groups such as `rhel`, `stream`, and `ubuntu`
-- family groups such as `redhat`
-- global groups such as `all`
+| State | Result |
+|---|---|
+| `merged` | Adds or updates supplied data without replacing the whole resource |
+| `replaced` | Replaces supplied resource subsections |
+| `overridden` | Makes the supplied data authoritative for the complete resource |
+| `deleted` | Removes selected resource configuration or restores defaults |
+| `gathered` | Retrieves structured data from a device |
+| `rendered` | Converts structured data into native commands offline |
+| `parsed` | Converts supplied native configuration into structured data offline |
 
-That structure supports both narrow targeting and broad targeting. An administrator can address a single platform, an operating system family, or the full estate without rewriting commands.
+Modules support states according to their platform and resource. Documentation for the installed collection version remains authoritative. `overridden` requires special care because omitted configuration can disappear, including management access. A narrow ACL change normally favours `merged`, while an intentional full-resource declaration may justify `overridden`.
 
-The group hierarchy also influences variable inheritance. A variable placed in `group_vars/redhat.yml` applies to both `rhel` and `stream` because both groups are children of `redhat`. That makes family-wide defaults easy to express. A narrower variable in `group_vars/rhel.yml` can still override the family value if RHEL needs a special case later.
+`merged` does not always update an existing item in place. Cisco IOS ACL entries with an existing sequence number can require `replaced`, and missing ACE sequence numbers can prevent idempotence. `replaced` changes only the named ACLs. `overridden` changes the named ACLs and deletes other non-default ACLs. `state: gathered` needs no empty `config` argument.
 
-`ansible-inventory` is therefore more than a display tool. It is a diagnostic tool for inheritance and merge behaviour. Two commands are especially useful:
+Controller-side backups require explicit local execution. Without delegation, `ansible.builtin.copy` targets the inventory host:
 
-```bash
-ansible-inventory --host 192.168.33.11
-ansible-inventory --list -y
+```yaml
+- name: Gather ACL configuration
+  cisco.ios.ios_acls:
+    state: gathered
+  register: acl_state
+
+- name: Save ACL configuration on the control node
+  ansible.builtin.copy:
+    content: "{{ acl_state.gathered | to_nice_yaml }}"
+    dest: "{{ playbook_dir }}/{{ inventory_hostname }}-acls.yml"
+    mode: "0600"
+  delegate_to: localhost
+  become: false
 ```
 
-The `--host` form shows the merged variables for a single host. The `--list -y` form shows the overall inventory tree and group structure in readable YAML. When a variable appears to be missing, these commands usually show whether it never loaded, loaded under the wrong name, or was overridden by a higher-precedence value.
-## Using variables for real platform differences
-Variables matter most when the controller needs to keep a single task portable across systems that differ in a meaningful way. Package names are the simplest example, but they are not the only one.
+A safe ACL workflow gathers the current state, stores a versioned backup, constructs the desired data, renders proposed commands offline, reviews the diff, applies the narrowest suitable state, and gathers the state again for verification. Stable ACE sequence numbers support idempotence. An NTP client-request exception must permit UDP destination port 123 before a broader deny rule, and the network path and ACL direction must match the intended traffic.
 
-Common variable categories include:
-- package names
-- service names
-- configuration file paths
-- repository enablement packages
-- firewall tools
-- file ownership and group policy
+The `rendered` state can generate native commands without opening a device connection. The `parsed` state can turn saved native configuration into structured data. These non-changing states support review, migration, and testing. Check mode and diff mode add useful evidence where the module supports them, but neither mode substitutes for a device backup and an independent reachability check.
 
-A time synchronisation example illustrates the pattern well. One platform might use a service called `chronyd`. Another might use a different name or package dependency. Rather than branching repeatedly in each task, the inventory can define variables such as `time_pkg`, `time_service`, and `time_conf`. The playbook or ad-hoc command then refers only to those variables.
-
-The result is not just shorter code. It is cleaner operational intent. The task says "manage the time service" rather than "run this platform-specific command". Inventory becomes the place where the platform difference lives.
-
-This separation also makes audits easier. A reviewer can inspect the inventory variables and immediately see what differs between platforms, instead of scanning many tasks for repeated conditional logic.
-## Managing privilege escalation sensibly
-Most real administration requires elevated privileges. Package installation, service control, file placement in `/etc`, and user creation all need root-level access. Ansible handles this through `become`.
-
-At the ad-hoc command line, `-b` is enough in the common case:
-
-```bash
-ansible all -m package -a "name=tree state=present" -b
-```
-
-In playbooks, `become: true` can be set at the play level or task level. A default `become = True` in `ansible.cfg` can also reduce repetition, though that convenience should be used with intent. Some administrators prefer explicit privilege escalation in playbooks so that the file makes the privilege boundary obvious.
-
-A dedicated remote account such as `tux` is usually preferable to logging in directly as `root`. It creates an auditable boundary between connection identity and privilege. The account authenticates over SSH, then escalates through sudo only for tasks that need it.
-
-That is why the bootstrap sequence matters so much. It establishes:
-- a named administration account
-- explicit sudo policy
-- a controller-controlled SSH key
-- predictable privilege escalation
-
-Once those pieces are in place, the rest of the Ansible workflow becomes far more stable.
-## Idempotence and repeatability
-One of Ansible's defining behaviours is idempotence. If the requested state already exists, Ansible does not apply the change again. It reports success without change.
-
-Package tasks show this behaviour clearly. The first run installs the missing package. The second run confirms that the package is already present. The same logic applies to user accounts, copied files, and authorised keys.
-
-This changes the way the administrator thinks about operations. The goal is not to write a script that "does the install". The goal is to declare the end state safely enough that repeating the declaration causes no harm.
-
-That is also why modules are better than raw shell commands for most configuration work. A shell command may or may not be safe to rerun. A well-designed module is usually built around repeatable state checks.
-## Moving from ad-hoc work to structured automation
-Ad-hoc commands are the right starting point because they expose the essentials without hiding anything behind a larger framework. A beginner sees the host pattern, the module name, the arguments, and the privilege flag directly.
-
-Over time, repeated ad-hoc commands should migrate into playbooks. The trigger is easy to recognise. If the same command starts to appear in shell history repeatedly, it probably belongs in a playbook. The same applies when a task depends on ordering or when success requires multiple coordinated steps.
-
-A common progression looks like this:
-- verify connectivity with ad-hoc `ping`
-- create users and install packages with ad-hoc commands
-- move the repeated baseline into a playbook
-- add variables and templates
-- break larger playbooks into roles
-
-This progression matters because it keeps early learning concrete while still moving towards maintainable automation. It also respects how most administrators actually learn Ansible. They start with one command that saves time. They then generalise that command into a repeatable file.
+Out-of-band access and a tested rollback remain essential when automation changes routing, interfaces, authentication, or management ACLs. Structured data improves consistency, but it does not remove the operational risk of an incorrect desired state.

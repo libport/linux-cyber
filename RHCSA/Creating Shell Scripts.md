@@ -10,7 +10,7 @@ A shell script is a plain-text file. Any editor that preserves plain text can cr
 
 Variable assignments contain no spaces around `=`:
 
-```bash
+```shell
 greeting='Hello'
 user_name='alice'
 ```
@@ -19,13 +19,13 @@ Spaces would make Bash treat the first word as a command name. Lowercase names s
 
 Parameter expansion retrieves a value:
 
-```bash
+```shell
 printf '%s, %s\n' "$greeting" "$user_name"
 ```
 
 Braces separate a variable name from adjacent text:
 
-```bash
+```shell
 archive="${user_name}_files.tar"
 ```
 
@@ -33,7 +33,7 @@ Double quotes allow parameter expansion and command substitution while preservin
 
 Command substitution captures a command's standard output:
 
-```bash
+```shell
 program_name=$(basename -- "$0")
 ```
 
@@ -43,7 +43,7 @@ Every Bash command returns an integer status from 0 to 255. Status 0 denotes suc
 
 `$?` expands to the status of the most recently completed foreground pipeline. Another command immediately replaces that value, so a script should test the command directly or save the status at once.
 
-```bash
+```shell
 getent passwd alice >/dev/null
 status=$?
 
@@ -59,13 +59,13 @@ The `&&` and `||` operators form conditional command lists:
 
 They suit short operations whose relationship remains obvious.
 
-```bash
+```shell
 mkdir -p "$HOME/work/sales" && cd "$HOME/work/sales"
 ```
 
 Longer or consequential operations benefit from an `if` statement because it makes each branch explicit.
 
-```bash
+```shell
 if getent passwd alice >/dev/null
 then
   printf 'Account alice already exists.\n' >&2
@@ -78,7 +78,7 @@ A shell interprets a newline as a command separator. It also accepts a semicolon
 
 A pipeline normally reports the status of its final command. That rule can conceal an earlier failure:
 
-```bash
+```shell
 generate_report | compress_report
 ```
 
@@ -88,7 +88,7 @@ With `set -o pipefail`, the pipeline reports failure when any component fails. T
 ## Loops at the command line and in scripts
 A `for` loop processes a list. The shell assigns each item to a variable, runs the body, and continues until it exhausts the list.
 
-```bash
+```shell
 for message in hi salut ciao
 do
   printf '%s\n' "$message"
@@ -97,7 +97,7 @@ done
 
 A `while` loop repeats while its condition succeeds. The loop must normally change the state tested by that condition.
 
-```bash
+```shell
 i=3
 
 while (( i > 0 ))
@@ -111,7 +111,7 @@ Both forms work interactively and in script files. At an interactive continuatio
 
 A loop over `"$@"` preserves every argument exactly, including an argument that contains spaces. A loop over unquoted command substitution does not provide the same protection because Bash splits the resulting text and expands matching pathnames. Scripts should process structured input through positional parameters, arrays, or a line-reading loop instead of parsing `ls` output.
 
-```bash
+```shell
 while IFS= read -r line
 do
   printf 'Input: %s\n' "$line"
@@ -124,13 +124,13 @@ Loop bodies should quote data, check consequential commands, and guarantee progr
 ## Interpreters, permissions, and command lookup
 A directly executed Bash script should begin with this shebang on RHEL 8:
 
-```bash
+```shell
 #!/bin/bash
 ```
 
 The kernel recognises `#!` only at the start of an executable file and launches the named interpreter. Bash treats the same line as a comment after the interpreter starts. The shebang therefore controls direct execution:
 
-```bash
+```shell
 chmod u+x report.sh
 ./report.sh
 ```
@@ -147,7 +147,7 @@ The shell searches the directories in `PATH` when a command contains no slash. I
 
 Personal scripts can reside in `$HOME/bin` when the user's startup configuration includes that directory in `PATH`.
 
-```bash
+```shell
 mkdir -p "$HOME/bin"
 mv report.sh "$HOME/bin/"
 export PATH="$HOME/bin:$PATH"
@@ -172,7 +172,7 @@ Arguments supplied after a script name become positional parameters. Bash tempor
 
 `"$@"` preserves argument boundaries and therefore suits most loops:
 
-```bash
+```shell
 for user in "$@"
 do
   printf 'User: %s\n' "$user"
@@ -189,14 +189,14 @@ An array and the special parameter `@` are related but not identical. Bash maint
 
 `$0` preserves the form used at invocation. A script can obtain only its final path component when producing a usage message:
 
-```bash
+```shell
 program_name=$(basename -- "$0")
 printf 'Usage: %s USER...\n' "$program_name" >&2
 ```
 ## Conditions and input
 An `if` statement runs a command or test and chooses a branch from its status. Bash closes the construct with `fi`.
 
-```bash
+```shell
 if (( $# == 0 ))
 then
   printf 'At least one user name is required.\n' >&2
@@ -206,7 +206,7 @@ fi
 
 `test`, `[ ... ]`, and Bash's `[[ ... ]]` construct evaluate expressions. `[[ ... ]]` provides safer Bash-specific string handling and pattern matching. A command can serve as the condition without brackets:
 
-```bash
+```shell
 if getent passwd "$user" >/dev/null
 then
   printf 'Account %s already exists.\n' "$user" >&2
@@ -217,7 +217,7 @@ fi
 
 Arithmetic conditions use numeric comparisons, while string conditions compare text. Mixing them can produce incorrect branches.
 
-```bash
+```shell
 if (( count > 0 ))
 then
   printf '%d accounts remain.\n' "$count"
@@ -233,14 +233,14 @@ File tests such as `[[ -e $path ]]`, `[[ -d $path ]]`, and `[[ -x $path ]]` exam
 
 The `read` builtin gathers input during execution. `-r` preserves backslashes, `-s` suppresses terminal echo, and `-p` displays a prompt. Silent input reduces shoulder-surfing risk, but it does not encrypt the value or remove it from the script's memory. A password should not appear as a command-line argument because process listings, logs, or shell history may expose it.
 
-```bash
+```shell
 IFS= read -r -s -p "Password for $user: " password
 printf '\n'
 ```
 
 An empty string and a whitespace-only string require different checks. `[[ -n $password ]]` accepts spaces because spaces give the string a non-zero length. A loop can require at least one non-whitespace character:
 
-```bash
+```shell
 while true
 do
   IFS= read -r -s -p "Password for $user: " password
@@ -257,7 +257,7 @@ done
 ## Functions and structured automation
 A function gives a related command sequence a name. Bash executes a function in the current shell context, so variable changes can affect the surrounding script unless the function declares local variables.
 
-```bash
+```shell
 show_user() {
   local user=$1
   getent passwd "$user"
@@ -278,7 +278,7 @@ Account creation requires administrative authority and careful password handling
 
 The script below accepts one or more user names, refuses existing accounts, prompts twice for each new password, creates a home directory, and reports failures. RHEL 8 supplies the `passwd --stdin` option used here. Other distributions may require a different password-setting command.
 
-```bash
+```shell
 #!/bin/bash
 set -o nounset
 set -o pipefail

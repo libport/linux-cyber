@@ -1,43 +1,107 @@
-# Ad Hoc commands
-Ad hoc commands apply a single task to managed hosts without a playbook. They suit one-off setup, quick validation after a change, and short discovery tasks. A typical command specifies the Ansible executable, a host pattern, a module, and module arguments.
+# Ad Hoc Commands
+Red Hat Enterprise Linux 10 provides `ansible-core` 2.16. A RHEL 10 control node can manage RHEL 9 and RHEL 10 hosts without installing Ansible on those managed hosts.
+## Purpose and syntax
+An ad hoc command uses the `ansible` command-line tool to run one task across one host or a host pattern. It suits quick checks, one-off changes, service recovery, and information gathering. It does not preserve the task as reusable automation, so a playbook remains the better choice for repeated or multi-step work.
 
-```bash
-ansible all -m user -a "name=lisa"
+The general form is:
+
+```shell
+ansible PATTERN -i INVENTORY -m MODULE -a 'ARGUMENTS'
 ```
 
-Run ad hoc commands as the Ansible user from a project directory that contains `inventory` and `ansible.cfg`. Ansible compares the requested state with the current state and applies only the changes needed to reach the target state. In a user-management task, `SUCCESS` means the host already matched the request. `CHANGED` means Ansible modified the host.
+The operator selects hosts through an inventory and supplies valid connection credentials. An `ansible.cfg` file can provide defaults, but Ansible does not require a particular project directory or login name. Tasks that need administrative rights use `-b` for privilege escalation and, when required, `-K` to request the escalation password.
 
-Many Ansible modules are idempotent, but not every ad hoc command is. Resource modules such as `user`, `copy`, `yum`, and `service` usually converge on the same state across repeated runs. Generic execution modules such as `command`, `shell`, and `raw` do not guarantee that behaviour and can report changes even when they only inspected state.
-## Core modules
-Ansible depends on modules:
-- `command` runs a command directly and does not process shell features such as pipes or redirects
-- `shell` runs through a shell and supports pipes, redirects, and other shell syntax
-- `raw` sends a command over SSH without requiring Python on the managed host, which helps when bootstrapping minimal systems
-- `copy` writes files or simple text content to a destination path
-- `yum` manages packages on RHEL-family systems
-- `service` manages service state and boot-time enablement
-- `ping` tests whether a host is manageable through Ansible, not whether it answers ICMP echo
+Host patterns can select one host, a group, several groups, or the complete inventory. Operators should confirm the pattern before a change and can add `--limit` to narrow an existing selection. The `-f` option controls parallel forks when the default concurrency does not suit the environment.
 
-Use the most specific module available. That choice improves readability, supports idempotent behaviour where possible, and makes results easier to audit. Package installation belongs in `yum` rather than `shell`, and a service that must survive reboot needs both `state=started` and `enabled=yes`.
-## Module discovery and documentation
-`ansible-doc` is the main on-system reference for modules. It supports three common workflows.
+These commands verify access, create an account, inspect it, and remove it:
 
-- `ansible-doc -l` lists available modules
-- `ansible-doc modulename` shows full documentation
-- `ansible-doc -s modulename` shows a compact, playbook-oriented synopsis
-
-The full entry usually includes the module purpose, maintainer, options, related modules, examples, and return values. The compact synopsis is often more useful during authoring because it shows required parameters and expected structure without extra detail. Searching the module list with `grep` narrows the field quickly when several modules could fit the same task.
-
-Online documentation complements `ansible-doc`. It mirrors the core reference material and helps locate modules by task area when the exact module name is unknown.
-## Shell scripts for repeatable ad hoc work
-Short shell scripts can package repeatable ad hoc tasks into a single runnable file. This is useful when the same setup must be applied again to fresh hosts. A script should be plain text, begin with a shebang, and contain explicit Ansible commands.
-
-```bash
-#!/bin/bash
-ansible all -m yum -a "name=httpd state=latest"
-ansible all -m service -a "name=httpd state=started enabled=yes"
+```shell
+ansible all -i inventory -m ansible.builtin.ping
+ansible all -i inventory -b -m ansible.builtin.user -a 'name=lisa state=present'
+ansible all -i inventory -m ansible.builtin.command -a 'id lisa'
+ansible all -i inventory -b -m ansible.builtin.user -a 'name=lisa state=absent remove=true'
 ```
 
-Make the script executable with `chmod +x setup.sh`. Run it from the current directory with `./setup.sh`, or place it in a directory on `PATH`. The `.sh` suffix is optional, but it helps identify the file as a script.
+State-oriented modules usually report `CHANGED` only when they alter a host. A second run often reports success without a change. This behaviour depends on the module and its arguments. Ansible commands are not universally idempotent, especially when they invoke arbitrary commands.
 
-Shell scripts are practical for small, repeatable operations. Playbooks remain the better tool for larger automation because they organise state clearly, scale more cleanly, and express intent more precisely.
+Ansible reports a result for each selected host. `UNREACHABLE` indicates a connection or authentication failure. `FAILED` indicates that Ansible reached the host but could not complete the task. Partial success can therefore leave hosts in different states. Once an operator corrects the cause, a state-oriented module can usually run again and change only the outstanding hosts.
+
+`--check` requests a dry run from modules that support check mode:
+
+```shell
+ansible webservers -i inventory -b --check -m ansible.builtin.dnf -a 'name=httpd state=present'
+```
+
+Check mode estimates changes and cannot replace validation on a suitable test system. Modules that lack check-mode support may skip the operation or provide limited information.
+## Choosing modules
+Ansible distributes modules and other plugins in collections. The `ansible.builtin` collection accompanies `ansible-core`, while installed collections add support for other platforms and products. Fully qualified collection names identify the intended module and avoid name collisions.
+
+| Module | Appropriate use |
+|---|---|
+| `ansible.builtin.command` | Runs a program without a shell |
+| `ansible.builtin.shell` | Runs a command through `/bin/sh` |
+| `ansible.builtin.raw` | Sends a command through the connection without the module subsystem |
+| `ansible.builtin.copy` | Transfers a file or writes fixed content |
+| `ansible.builtin.dnf` | Manages RHEL 10 packages |
+| `ansible.builtin.systemd_service` | Manages systemd units |
+| `ansible.builtin.ping` | Tests login and a usable remote Python interpreter |
+
+`command` is the default module for the `ansible` utility. It passes arguments directly to a program, so pipes, redirection, wildcards, and other shell syntax do not operate. This check requires no shell:
+
+```shell
+ansible webservers -i inventory -m ansible.builtin.command -a 'rpm -q httpd'
+```
+
+`shell` supports pipes and redirection because it invokes a remote shell. Shell parsing also increases injection risk, particularly when data comes from variables or users. `command` or a purpose-built module should take priority whenever either can perform the task safely.
+
+`raw` bypasses the module subsystem and does not require Python on the managed host. It can bootstrap an unusually minimal host or address a device that lacks Python. It offers limited change reporting and no check-mode support, so normal administration should use a dedicated module.
+
+The generic `ansible.builtin.package` and `ansible.builtin.service` modules can support mixed operating systems. On RHEL 10, `ansible.builtin.dnf` and `ansible.builtin.systemd_service` expose the platform's native capabilities more directly. Purpose-built modules also describe desired state more clearly than equivalent shell commands.
+## RHEL 10 administration
+RHEL 10 uses DNF for package management and systemd for services. The following commands install Apache HTTP Server, start it, and enable it at boot:
+
+```shell
+ansible webservers -i inventory -b -m ansible.builtin.dnf -a 'name=httpd state=present'
+ansible webservers -i inventory -b -m ansible.builtin.systemd_service -a 'name=httpd state=started enabled=true'
+```
+
+`state=present` installs an available package without forcing every run to upgrade it. Administrators should use `state=latest` only when the task intentionally applies the newest available version.
+
+The `copy` module can set a short login banner and its file attributes:
+
+```shell
+ansible all -i inventory -b -m ansible.builtin.copy -a '{"content":"Authorised systems only\n","dest":"/etc/motd","owner":"root","group":"root","mode":"0644"}'
+```
+
+The `content` argument replaces the destination with fixed text. The `src` argument instead transfers a file from the control node. Templates, managed blocks, or line-oriented modules suit content that requires variables or selective editing.
+
+`ansible.builtin.ping` returns `pong` after Ansible logs in and runs Python. It does not send an ICMP echo request. Windows and network devices require their platform-specific ping modules.
+## Finding documentation
+Installed documentation reflects the available collections and versions:
+
+```shell
+ansible-doc -t module -l
+ansible-doc ansible.builtin.dnf
+ansible-doc -s ansible.builtin.systemd_service
+ansible-galaxy collection list
+```
+
+Module documentation describes parameters, requirements, examples, return values, and check-mode support. Administrators should extend Ansible through a custom collection or contribute upstream instead of editing installed module files, which package updates can replace.
+## Sequencing commands
+A Bash script can sequence a small set of ad hoc commands:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+inventory=${1:?Provide an inventory path}
+
+ansible webservers -i "$inventory" -b -m ansible.builtin.dnf \
+  -a 'name=httpd state=present'
+ansible webservers -i "$inventory" -b -m ansible.builtin.systemd_service \
+  -a 'name=httpd state=started enabled=true'
+```
+
+After `chmod +x configure-httpd`, the operator can run `./configure-httpd inventory`. A playbook provides clearer review, reuse, variables, handlers, and error control when automation grows beyond a short operational sequence.
+
+The shebang selects Bash, and the executable bit permits direct invocation. A `.sh` extension remains optional. `set -euo pipefail` stops the wrapper after common command, variable, or pipeline errors, but operators must still review Ansible's per-host results.

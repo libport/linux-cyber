@@ -1,56 +1,45 @@
-# Managing Services and the Boot Process
-Ansible manages service state, scheduled jobs, boot targets, and reboots with a small set of focused modules. The generic `service` module works across several init systems. `service_facts` collects service state information. Systemd-specific behaviour such as `daemon_reload` and `masked` belongs in `ansible.builtin.systemd_service`.
-## Managing services
-Use the generic service interface for portable playbooks across mixed environments. Use the systemd-specific module when a playbook must reload unit files, mask a unit, or work with unit-specific behaviour that the generic module does not expose clearly.
+# Managing Services and the Boot Process on RHEL 10
+Red Hat Enterprise Linux 10 uses systemd to manage services, scheduled work, boot targets, and shutdowns. Ansible can maintain this state consistently across managed hosts.
+## Managing systemd services
+`ansible.builtin.systemd_service` is the preferred module for systemd units. Its earlier name, `ansible.builtin.systemd`, remains an alias. `ansible.builtin.service` provides a generic interface for different init systems, but it exposes fewer systemd-specific controls.
+
+| Requirement | Ansible interface |
+| --- | --- |
+| Start, stop, enable, disable, mask, or unmask a unit | `ansible.builtin.systemd_service` |
+| Control services through a generic init-system interface | `ansible.builtin.service` |
+| Collect service state and enablement facts | `ansible.builtin.service_facts` |
+| Manage units, unit files, and drop-ins at scale | `redhat.rhel_system_roles.systemd` |
 
 ```yaml
-- name: Start and enable httpd
+- name: Keep the web service enabled and running
   ansible.builtin.systemd_service:
-    name: httpd
+    name: httpd.service
     enabled: true
     state: started
-    masked: false
-    daemon_reload: true
 ```
-## Scheduling jobs
-`cron` manages recurring jobs. Ansible identifies each cron entry by `name`, so every managed job needs a unique name. Without `user`, the module edits the current user's crontab. `special_time` can express nicknames such as `daily` or `reboot` when a fixed schedule is unnecessary. A valid trim example uses `fstrim -a`, not bare `fstrim`.
+
+The `started` and `stopped` states are idempotent. The `restarted` and `reloaded` states always act, and `reloaded` starts an inactive unit. Setting `masked: true` prevents any start operation, while `masked: false` removes the mask. A task should set `daemon_reload: true` only after changing a unit file or drop-in, commonly through a handler.
+
+`service_facts` must run separately from normal fact gathering. It records properties such as `state` and `status`. Bracket notation safely accesses names that contain punctuation:
 
 ```yaml
-- name: Run trim twice daily
-  ansible.builtin.cron:
-    name: run fstrim
-    minute: "5"
-    hour: "4,19"
-    job: "fstrim -a"
+ansible_facts.services['sshd.service'].state
 ```
 
-The `at` module schedules a one-off job in the future. It uses `count` with `units`, and it supports `state: present` and `state: absent`. `unique: true` prevents duplicate queued jobs and keeps one-off automation idempotent.
+Service facts do not report package versions. `ansible.builtin.package_facts` supplies that information.
+## Scheduling work
+Systemd timers provide the native RHEL 10 scheduler for service-aware tasks. A timer activates a matching service unit. `OnCalendar` defines calendar schedules, `Persistent=true` catches up a missed calendar event after downtime, and a randomised delay can spread work across a fleet. Ansible can deploy the unit and timer files, then enable and start the timer with `systemd_service` or the RHEL system role.
 
-```yaml
-- name: Run a command once in five minutes
-  ansible.posix.at:
-    command: "date > /tmp/my-at-file"
-    count: 5
-    units: minutes
-    unique: true
-    state: present
-```
-## Managing boot behaviour
-Ansible does not provide a dedicated module for changing the default boot target. Systemd stores that setting through the `default.target` alias, so a playbook can manage the symlink directly with `file`. In practice, that usually points to `multi-user.target` or `graphical.target`.
+`ansible.builtin.cron` remains suitable for established cron workloads. It requires a compatible implementation such as `cronie`, but the module does not install the package or start `crond`. Each job needs a unique `name`, which Ansible stores in a `#Ansible:` marker. Reusing the name updates the job, and `state: absent` removes it. `special_time: reboot` represents an `@reboot` entry. A system-wide `cron_file` also requires a `user`.
 
-```yaml
-- name: Set the default boot target
-  ansible.builtin.file:
-    src: /usr/lib/systemd/system/graphical.target
-    dest: /etc/systemd/system/default.target
-    state: link
-```
+Cron normally runs commands through `/bin/sh`, unless its environment selects another shell. A literal `%` in a command requires escaping. A scheduled command should call `/usr/bin/date` or `logger` when it needs its actual execution time because `ansible_date_time` reflects the earlier fact-gathering instant.
 
-The `reboot` module restarts a host and resumes the play when the machine becomes reachable again. `test_command` checks readiness after boot and defaults to `whoami` if omitted. `pre_reboot_delay`, `post_reboot_delay`, `connect_timeout`, and `reboot_timeout` control how patiently the play waits for shutdown and recovery.
+Historical `at` automation depends on an external collection and the host's `at` service. A systemd one-shot or transient timer usually provides a better RHEL 10 design.
+## Configuring the default boot target
+Systemd reads `/etc/systemd/system/default.target` to select the default boot target. Ansible can manage this path as a symbolic link to `/usr/lib/systemd/system/multi-user.target` for a text-oriented server or `graphical.target` for a graphical system. The `ansible.builtin.file` module with `state: link` keeps the link idempotent.
+## Rebooting managed hosts
+`ansible.builtin.reboot` initiates a restart, waits for the host to disconnect and return, verifies that the boot identifier changed, and runs a validation command. The default validation command is `whoami`, while an application readiness check provides stronger assurance.
 
-```yaml
-- name: Reboot the host
-  ansible.builtin.reboot:
-    msg: reboot initiated by Ansible
-    test_command: whoami
-```
+`reboot_timeout` defaults to 600 seconds and applies separately to reboot verification and post-boot validation. `connect_timeout` limits each connection attempt. On Linux, `pre_reboot_delay` converts to whole minutes, so values below 60 seconds become zero. `post_reboot_delay` pauses before validation. A custom `reboot_command` bypasses the normal message and delay handling.
+
+Production fleets should reboot in controlled batches with `serial`, drain affected nodes, validate application health, and restore traffic before continuing. A handler can restrict reboots to hosts whose configuration changed. Unconditional cron-based reboots should not replace controlled maintenance.

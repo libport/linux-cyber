@@ -1,189 +1,88 @@
 # Managing Storage
-Ansible manages storage in two stages. It first discovers the devices, partitions, volume groups, logical volumes and mount points that already exist. It then changes only the required parts of that state. Reliable storage playbooks therefore start with fact gathering, use conditionals to select the correct device name for each host and apply idempotent tasks that can run more than once without breaking the system.
+Red Hat Enterprise Linux 10 includes `ansible-core` 2.16 for Red Hat automation content. The `redhat.rhel_system_roles.storage` system role provides the supported, high-level interface for local file systems, LVM, mounts, swap, RAID, LUKS2, and LVM-VDO. Storage changes can destroy data, so automation must confirm device identity, current use, capacity, and recovery arrangements before changing a disk.
+## Current automation interfaces
+| Interface | Purpose |
+| --- | --- |
+| `ansible.builtin.setup` | Gathers device, mount, and LVM facts |
+| `ansible.builtin.assert` | Stops work when a storage precondition fails |
+| `community.general.parted` | Creates, inspects, resizes, or removes partitions |
+| `community.general.lvg` | Creates or changes LVM volume groups |
+| `community.general.lvol` | Creates or changes LVM logical volumes |
+| `community.general.filesystem` | Creates or grows file systems |
+| `ansible.posix.mount` | Controls active mounts and `/etc/fstab` entries |
+| `redhat.rhel_system_roles.storage` | Manages an integrated RHEL storage configuration |
 
-The main storage modules are `parted` for partitions, `lvg` for volume groups, `lvol` for logical volumes, `filesystem` for file systems and `mount` for active mounts and `/etc/fstab` entries. Device names vary across platforms, so safe playbooks test for presence before they act. Common names include `/dev/sdb` on many virtual machines, `/dev/vdb` on KVM guests and `/dev/nvme0n1` on NVMe devices.
-## Discovering storage facts
-Ansible collects storage facts during normal fact gathering. Three facts matter most:
-- `ansible_devices` lists block devices and partitions
-- `ansible_device_links` shows alternate device references such as IDs and UUIDs
-- `ansible_mounts` lists active mounts and their source devices
+The old short names `parted`, `lvg`, `lvol`, `filesystem`, and `mount` conceal their collection dependencies. Fully qualified collection names make those dependencies explicit. The `community.general` and `ansible.posix` modules do not ship with `ansible-core`, so the control node needs collection releases compatible with its Ansible version. A RHEL 10 controller should not install a newer collection that has dropped support for `ansible-core` 2.16. The RHEL system role comes from the `rhel-system-roles` package and supplies a stable interface across supported RHEL releases.
+## Discovering and validating storage
+Normal fact gathering records disks in `ansible_facts['devices']`, alternative device links in `ansible_facts['device_links']`, and active mounts in `ansible_facts['mounts']`. The `devices` and `mounts` gather subsets can limit collection. The `setup` module's `filter` option accepts shell-style patterns but filters only first-level fact keys.
 
-The setup filter must match the fact name exactly.
+Kernel names such as `sdb`, `vdb`, and `nvme0n1` depend on hardware and virtualisation. Inventory should declare each intended device, preferably through a stable `/dev/disk/by-id/` path when the automation accepts it. A playbook should not guess that the second enumerated disk is unused.
 
-```bash
-ansible ansible1 -m setup -a 'filter=ansible_devices'
-```
-
-That output exposes the device model, size, partition table details, UUIDs and any LVM holders. Storage logic should use those facts instead of assuming a fixed device name. Device facts also reveal whether a device is rotational, removable, virtual or already claimed by a device-mapper target, which helps the playbook avoid destructive changes on the wrong block device.
-## Choosing control flow
-A storage playbook usually needs one of two control paths. It can fail loudly when a required device is missing, or it can skip that host and continue elsewhere. `assert` suits hard requirements because it prints a specific failure message. `when` suits conditional execution when absence is acceptable. For mixed fleets, the cleanest pattern is to report the issue and end that host before the play touches partitions, file systems or LVM metadata.
-## Selecting the correct device safely
-Storage playbooks fail when they test undefined keys directly. A safe conditional checks membership first. When a required device is absent, the host should stop cleanly before any partitioning task runs.
-
-```yaml
-- name: report missing device
-  debug:
-    msg: device sdb not present
-  when: "'sdb' not in ansible_facts['devices']"
-
-- name: stop work on hosts without sdb
-  meta: end_host
-  when: "'sdb' not in ansible_facts['devices']"
-```
-
-When hosts may expose different second-disk names, the playbook can detect the first matching candidate and store it in a variable.
+Membership or definition tests handle absent devices without generating ignored failures:
 
 ```yaml
-- name: detect second disk
-  set_fact:
-    disk2name: "{{ item }}"
-  loop:
-    - sdb
-    - vdb
-    - nvme0n2
-  when: item in ansible_facts['devices']
+- name: Confirm that the declared disk exists
+  ansible.builtin.assert:
+    that:
+      - storage_disk_name in ansible_facts['devices']
+    fail_msg: "The declared storage disk is absent"
 ```
 
-This pattern avoids undefined-variable errors and removes the need for `ignore_errors`. It also makes later tasks easier to read because the playbook can refer to `disk2name` instead of duplicating several device tests.
-## Creating partitions and LVM
-Partitioning needs explicit boundaries. The `parted` module does not infer the next free region automatically, so each partition requires `part_start` and `part_end`. GPT partitions also require a `name`. The `label` argument sets the partition table type, not a file system label.
+An assertion should also reject a disk that hosts the root file system, an active mount, swap, an LVM physical volume, RAID, encryption, or required data. Empty partition facts alone do not prove that a device is unused because whole-disk signatures can remain. Blindly overwriting the first megabytes with `dd` is not a safe reset procedure.
 
-A consistent layout uses the first partition for swap and the second for LVM data.
+Facts represent a snapshot. A play that creates a volume group must gather the relevant facts again before reading its new size. Capacity values returned as strings should use the `float` filter when a fractional value affects a decision. Converting 5.9 GiB to an integer produces 5 and can select the wrong branch. A requested 6 GiB logical volume also requires more than a nominal 5 GiB threshold, so the condition must compare available extents with the requested allocation and overhead.
+## Managing partitions
+`community.general.parted` operates through the `parted` utility on the managed host. Its key settings have precise effects:
+
+| Setting | Behaviour |
+| --- | --- |
+| `device` | Identifies the disk to change |
+| `label: gpt` | Selects GPT and can replace an existing partition table |
+| `name` | Supplies the partition name required by the module for GPT |
+| `number` | Identifies the partition |
+| `part_start` | Sets an offset from the start of the disk |
+| `part_end` | Sets the ending offset, not the partition length |
+| `flags` | Records attributes such as `lvm` |
+| `state` | Uses `info`, `present`, or `absent` |
+
+A first partition commonly starts at `1MiB` for alignment. A second 2 GiB partition after a first 2 GiB partition therefore ends near `4GiB`, rather than at `2GiB`. Omitting the boundaries defaults to the whole available span. Changing the disk label can erase prior partition information, and `state: absent` removes a partition. The `lvm` flag records intended use, but LVM can initialise either a whole block device or a partition.
+
+Current releases default `state` to `info`, so a creation task must state `present`. A disk label, a GPT partition name, and a file system label are separate properties. The storage role sets a file system label with `fs_label`, while the lower-level file system module passes format-specific label options through `opts` where required.
+
+The RHEL storage role manages whole disks and logical volumes directly. It does not create a file system on a partition. An explicit partition layout still requires a partitioning module or another approved provisioning layer.
+## Building LVM and file systems
+LVM combines physical volumes into a volume group and allocates logical volumes from that pool. `community.general.lvg` uses `pvs` for the backing devices, `vg` for the group name, and `pesize` for the physical extent size. The extent size defaults to 4 MiB, must meet LVM alignment rules, and cannot be changed on an existing volume group through the module.
+
+`community.general.lvol` uses `vg`, `lv`, and `size` to define a logical volume. An absolute target such as `6G` supports repeatable convergence. Relative values and percentages of free space, including `+100%FREE`, are not idempotent. `resizefs: true` can grow a supported file system with its logical volume. Shrinking needs explicit protection and workload-specific preparation. XFS can grow but cannot shrink.
+
+Storage layers have a strict dependency order. A normal creation path prepares a disk or partition, initialises the physical volume, creates the volume group, allocates the logical volume, creates the file system, and mounts it. Each task should expose a stable desired size instead of recalculating from whatever free capacity remains during that run.
+
+The RHEL storage role can express the pool, logical volume, XFS file system, and persistent mount as one desired state:
 
 ```yaml
-- name: create swap partition
-  parted:
-    device: /dev/sdb
-    label: gpt
-    number: 1
-    name: swap
-    state: present
-    part_start: 1MiB
-    part_end: 2GiB
-
-- name: create LVM partition
-  parted:
-    device: /dev/sdb
-    label: gpt
-    number: 2
-    name: data
-    state: present
-    part_start: 2GiB
-    part_end: 100%
-    flags:
-      - lvm
+- name: Create and mount an XFS logical volume
+  ansible.builtin.include_role:
+    name: redhat.rhel_system_roles.storage
+  vars:
+    storage_pools:
+      - name: vgfiles
+        disks:
+          - /dev/disk/by-id/<dedicated-disk>
+        volumes:
+          - name: lvfiles
+            size: "6 GiB"
+            fs_type: xfs
+            mount_point: /files
 ```
 
-The `flags` setting marks the second partition for LVM. Without that marker, the storage layout becomes harder to inspect and less consistent with standard Linux administration practice.
+`storage_safe_mode` defaults to protection against automatic removal or formatting. Disabling it belongs only in an authorised workflow that has already verified the target and accepted the destructive change.
 
-The LVM layer uses the partition marked for LVM, not the swap partition.
+For lower-level control, `community.general.filesystem` creates XFS, ext4, swap, and other supported formats. `force: true` can overwrite an existing file system, while `state: absent` wipes detected signatures. XFS is the default general-purpose local file system on RHEL 10. Its growth operation requires the file system to be mounted.
 
-```yaml
-- name: create volume group
-  lvg:
-    vg: vgdata
-    pvs: /dev/sdb2
-    pesize: 8
+`ansible.posix.mount` with `state: mounted` creates the mount point, writes the `/etc/fstab` entry, and mounts the file system. `state: present` changes only `/etc/fstab`, while `state: ephemeral` mounts without changing that file. A UUID, label, or stable device link avoids dependence on a transient kernel name. `findmnt` verifies both the source and mount options. The declared mount path must remain consistent, such as `/files` throughout the play.
+## Configuring swap and VDO
+Swap provides disk-backed virtual memory under pressure, but it does not replace adequate RAM. Its size depends on workload, memory, crash-dump requirements, and hibernation policy. The storage role creates and activates a swap volume with `fs_type: swap`, avoiding an unconditional `command: swapon` task that reports a change on every run. Changes to active swap can require `swapoff`, sufficient free memory, and a maintenance window.
 
-- name: create logical volume
-  lvol:
-    vg: vgdata
-    lv: lvdata
-    size: 6g
-```
-
-`lvg` creates or extends the volume group from the listed physical volumes. `lvol` creates the logical volume inside that group and can later resize it. Absolute sizes keep the play idempotent. Relative values such as `100%FREE` can succeed on the first run and fail on the second run because the free space has already been consumed.
-## Creating file systems, mounts and swap
-After the block device layer exists, the system can create a file system and mount it. The `filesystem` module writes the on-disk structure, while the `mount` module controls both the live mount state and the matching `/etc/fstab` entry.
-
-```yaml
-- name: create XFS file system
-  filesystem:
-    dev: /dev/vgdata/lvdata
-    fstype: xfs
-
-- name: mount file system
-  mount:
-    src: /dev/vgdata/lvdata
-    path: /data
-    fstype: xfs
-    state: mounted
-```
-
-`state: mounted` ensures the file system is mounted now and recorded for future boots. `state: present` only writes the `/etc/fstab` entry. This distinction matters when the playbook prepares storage for later use but should not activate it immediately.
-
-Swap uses a different workflow. The device first receives a swap signature. It then becomes active only when the host runs `swapon`, and it remains persistent across reboots only when `/etc/fstab` contains a swap entry.
-
-```yaml
-- name: add swap when total swap is low
-  block:
-    - name: create swap signature
-      filesystem:
-        dev: /dev/sdb1
-        fstype: swap
-
-    - name: record swap in fstab
-      mount:
-        src: /dev/sdb1
-        path: none
-        fstype: swap
-        state: present
-
-    - name: activate swap now
-      command: swapon /dev/sdb1
-  when: ansible_swaptotal_mb < 256
-```
-
-This approach keeps the configuration conditional and persistent. The threshold can change to suit the host role.
-## Refreshing facts after storage changes
-Facts gathered at the start of a play do not update automatically after Ansible creates a partition or volume group. Any later task that reads `ansible_facts['lvm']` must refresh facts first.
-
-```yaml
-- name: refresh facts
-  setup:
-- name: store volume group size
-  set_fact:
-    vgsize_g: "{{ ansible_facts['lvm']['vgs']['vgfiles']['size_g'] | float }}"
-```
-
-Volume-group size comparisons should use numeric values, not raw strings. `float` preserves decimal precision better than `int` when the logic depends on a threshold such as 5 GB.
-
-```yaml
-- name: create larger logical volume
-  lvol:
-    vg: vgfiles
-    lv: lvfiles
-    size: 6g
-  when: vgsize_g > 5.0
-
-- name: create smaller logical volume
-  lvol:
-    vg: vgfiles
-    lv: lvfiles
-    size: 3g
-  when: vgsize_g <= 5.0
-```
-
-The final XFS logical volume mounts on `/files`.
-
-```yaml
-- name: format logical volume
-  filesystem:
-    dev: /dev/vgfiles/lvfiles
-    fstype: xfs
-
-- name: mount logical volume
-  mount:
-    src: /dev/vgfiles/lvfiles
-    path: /files
-    fstype: xfs
-    state: mounted
-```
-## Operational rules
-- Wipe reused lab disks before repartitioning them
-- Reboot a host if stale kernel partition state prevents reuse
-- Refresh facts after creating or changing LVM objects
-- Prefer absolute LV sizes in repeatable playbooks
-- Use clear failure or skip behaviour before destructive tasks run
-
-These rules reduce false positives during testing and keep repeated runs predictable across different lab hosts.
+RHEL 10 implements deduplication and compression through LVM-VDO. The former standalone VDO description and `vdo` module no longer represent the preferred design. The storage role can create an LVM-VDO pool and volume with declared physical capacity, virtual capacity, compression, deduplication, file system, and mount point.
+## Verification and repeatability
+Syntax checking confirms YAML and module syntax but cannot detect a wrong yet valid disk path. A safe run resolves the device, checks existing signatures and consumers, confirms backups, applies the smallest required change, refreshes facts, and verifies the result with `lsblk --fs`, `pvs`, `vgs`, `lvs`, `findmnt`, and `/proc/swaps`. A second run in a test environment should report no unintended changes. Removal workflows must reverse dependencies from mount and file system through logical volume, volume group, physical volume, and partition.

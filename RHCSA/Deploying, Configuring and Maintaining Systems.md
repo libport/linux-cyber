@@ -16,24 +16,24 @@ The available streams, profiles, and support periods depend on the RHEL 8 minor 
 
 Registration and repository access can be checked with:
 
-```bash
-$ subscription-manager identity
-$ sudo subscription-manager repos --list-enabled
-$ sudo dnf repolist
+```shell
+subscription-manager identity
+sudo subscription-manager repos --list-enabled
+sudo dnf repolist
 ```
 
 Extra Packages for Enterprise Linux, commonly called EPEL, is a separate community repository. Red Hat does not include EPEL packages in the RHEL subscription or support them as RHEL packages.
 
 Unprivileged users can search cached repository metadata, while installation, removal, and system-wide updates require suitable privilege. Common operations include:
 
-```bash
-$ dnf list tree
-$ dnf info tree
-$ dnf provides '*/bin/tree'
-$ sudo dnf install tree
-$ sudo dnf remove tree
-$ sudo dnf check-update
-$ sudo dnf update
+```shell
+dnf list tree
+dnf info tree
+dnf provides '*/bin/tree'
+sudo dnf install tree
+sudo dnf remove tree
+sudo dnf check-update
+sudo dnf update
 ```
 
 `dnf search` searches package names and descriptions. `dnf list installed` inventories installed packages, while `dnf list available` shows content from enabled repositories. `dnf provides` identifies the package that supplies a path. Quoting a wildcard such as `'*/bin/tree'` prevents the shell from expanding it before DNF receives it.
@@ -48,11 +48,11 @@ DNF treats kernels and other packages listed by the `installonlypkgs` setting di
 ### Transaction history
 DNF records package transactions. Administrators can inspect the record and reverse suitable installation or removal transactions:
 
-```bash
-$ sudo dnf history
-$ sudo dnf history info 17
-$ sudo dnf history undo 17
-$ sudo dnf history rollback 12
+```shell
+sudo dnf history
+sudo dnf history info 17
+sudo dnf history undo 17
+sudo dnf history rollback 12
 ```
 
 `history undo` reverses one transaction. `history rollback` reverses later transactions until the system reaches the state associated with the selected transaction number. Both operations require the relevant package versions to remain available.
@@ -63,13 +63,13 @@ Repository definitions reside in `/etc/yum.repos.d/` as files ending in `.repo`.
 
 A RHEL installation DVD already contains repository metadata for its BaseOS and AppStream trees. An administrator can mount the media read-only and add both locations:
 
-```bash
-$ sudo mkdir -p /mnt/rhel8
-$ sudo mount -o ro /dev/sr0 /mnt/rhel8
-$ sudo dnf install dnf-plugins-core
-$ sudo dnf config-manager --add-repo file:///mnt/rhel8/BaseOS
-$ sudo dnf config-manager --add-repo file:///mnt/rhel8/AppStream
-$ sudo dnf makecache
+```shell
+sudo mkdir -p /mnt/rhel8
+sudo mount -o ro /dev/sr0 /mnt/rhel8
+sudo dnf install dnf-plugins-core
+sudo dnf config-manager --add-repo file:///mnt/rhel8/BaseOS
+sudo dnf config-manager --add-repo file:///mnt/rhel8/AppStream
+sudo dnf makecache
 ```
 
 The directory names and URL paths are case-sensitive. A file repository remains available only while the media or copied content remains mounted at the configured path.
@@ -89,9 +89,9 @@ The bracketed identifier must remain unique across configured repositories. `nam
 
 Administrators can isolate a test to selected repositories without permanently changing the definitions:
 
-```bash
-$ sudo dnf --disablerepo='*' --enablerepo=local-baseos repolist
-$ sudo dnf --disablerepo='*' --enablerepo=local-baseos list available
+```shell
+sudo dnf --disablerepo='*' --enablerepo=local-baseos repolist
+sudo dnf --disablerepo='*' --enablerepo=local-baseos list available
 ```
 
 `dnf clean metadata` discards cached metadata when a repository changes. `dnf makecache` then retrieves a fresh copy. Removing a repository normally means deleting or disabling its specific `.repo` definition, followed by a metadata refresh.
@@ -102,18 +102,18 @@ DVD content reflects the release recorded on the media. It does not replace acce
 ### Security updates and advisories
 RHEL repository metadata identifies security advisories, bug fixes, and enhancements. Administrators can review security errata before changing the system:
 
-```bash
-$ sudo dnf updateinfo summary
-$ sudo dnf updateinfo list --security
-$ sudo dnf updateinfo info RHSA-YYYY:NNNN
+```shell
+sudo dnf updateinfo summary
+sudo dnf updateinfo list --security
+sudo dnf updateinfo info RHSA-YYYY:NNNN
 ```
 
 DNF can apply all available security updates, restrict an update to a severity, or apply a named Red Hat Security Advisory:
 
-```bash
-$ sudo dnf update --security
-$ sudo dnf update --security --sec-severity=Important
-$ sudo dnf update --advisory=RHSA-YYYY:NNNN
+```shell
+sudo dnf update --security
+sudo dnf update --security --sec-severity=Important
+sudo dnf update --advisory=RHSA-YYYY:NNNN
 ```
 
 An advisory can update several packages, and one package transaction can address several advisories. Administrators should review the proposed transaction, test changes where operational risk warrants it, and reboot when a new kernel or affected service requires activation.
@@ -126,11 +126,11 @@ Before an update, the host should have enough free space, a recoverable configur
 ### Application Streams
 Module commands show the content available on the current host:
 
-```bash
-$ dnf module list
-$ dnf module info NAME:STREAM
-$ sudo dnf module install NAME:STREAM/PROFILE
-$ sudo dnf module reset NAME
+```shell
+dnf module list
+dnf module info NAME:STREAM
+sudo dnf module install NAME:STREAM/PROFILE
+sudo dnf module reset NAME
 ```
 
 The colon separates a module name from its stream, and the slash separates a stream from its profile. If the command omits a stream or profile, DNF uses an applicable default. A reset removes the stream selection but does not remove installed packages. Stream changes can alter dependencies, so administrators should follow the documented switching procedure and confirm that the destination stream supports the application.
@@ -141,30 +141,30 @@ Accurate time supports log correlation, authentication, certificate validation, 
 ### Time zones, clocks, and services
 The following commands install and activate chrony, display the current time configuration, and set a time zone:
 
-```bash
-$ sudo dnf install chrony
-$ sudo systemctl enable --now chronyd
-$ timedatectl
-$ timedatectl list-timezones
-$ sudo timedatectl set-timezone Australia/Sydney
+```shell
+sudo dnf install chrony
+sudo systemctl enable --now chronyd
+timedatectl
+timedatectl list-timezones
+sudo timedatectl set-timezone Australia/Sydney
 ```
 
 Linux systems should normally keep the hardware real-time clock in UTC and derive local civil time from the configured time zone. This arrangement handles daylight-saving changes without rewriting the hardware clock:
 
-```bash
-$ sudo timedatectl set-local-rtc 0
+```shell
+sudo timedatectl set-local-rtc 0
 ```
 
 `timedatectl set-timezone` manages `/etc/localtime`. Administrators should not routinely replace that link by hand. If the command fails, they should investigate the error, confirm that the time-zone database exists, and repair the underlying configuration.
 
 `systemctl` controls both the current service state and its boot-time enablement:
 
-```bash
-$ systemctl status chronyd
-$ sudo systemctl restart chronyd
-$ sudo systemctl disable --now chronyd
-$ sudo systemctl enable --now chronyd
-$ systemctl cat chronyd
+```shell
+systemctl status chronyd
+sudo systemctl restart chronyd
+sudo systemctl disable --now chronyd
+sudo systemctl enable --now chronyd
+systemctl cat chronyd
 ```
 
 `systemctl disable` alone changes boot-time enablement but does not stop a running service. The `--now` option also changes the current state. `systemctl cat` shows the vendor unit and any overrides. Administrators should normally use `systemctl edit chronyd` to create a focused drop-in override. `systemctl edit --full` creates a complete replacement under `/etc/systemd/system/`, which can hide later vendor-unit changes and therefore requires deliberate maintenance.
@@ -180,11 +180,11 @@ The `iburst` option accelerates initial synchronisation when a source becomes re
 
 Comments in the packaged configuration explain important defaults and provide operational context. Removing every comment and blank line adds little value and can make later maintenance harder. Administrators should back up the file, change only the required directives, and use a configuration-management template or targeted edit when many hosts need the same settings. They should then restart `chronyd` and verify the result:
 
-```bash
-$ sudo systemctl restart chronyd
-$ chronyc tracking
-$ chronyc sources -v
-$ timedatectl
+```shell
+sudo systemctl restart chronyd
+chronyc tracking
+chronyc sources -v
+timedatectl
 ```
 
 `chronyc tracking` reports the selected reference, system offset, frequency correction, leap status, and stratum. `chronyc sources -v` reports all candidate sources and their selection states. A stratum 1 server connects directly to a reference source. Stratum 16 indicates an unsynchronised source, not a usable tier. The interactive `chronyc` shell exposes the same commands, but direct subcommands suit scripts and routine checks.
@@ -199,10 +199,10 @@ A systemd target groups units into an operational state. Targets replace the cen
 
 Several targets can remain active because a high-level target pulls in supporting targets. Administrators can list active targets and inspect the configured default:
 
-```bash
-$ systemctl list-units --type=target --state=active
-$ systemctl get-default
-$ systemctl cat multi-user.target
+```shell
+systemctl list-units --type=target --state=active
+systemctl get-default
+systemctl cat multi-user.target
 ```
 
 Targets express dependencies through directives such as `Wants=` and `Requires=`, and ordering through directives such as `After=` and `Before=`. A target does not contain a linear script of services. Systemd builds a dependency graph, starts independent work concurrently, and records each unit's state.
@@ -213,24 +213,24 @@ Administrators can manage ordinary services with `start`, `stop`, `restart`, `re
 
 The default target controls a normal boot when no kernel argument overrides it:
 
-```bash
-$ sudo systemctl set-default multi-user.target
+```shell
+sudo systemctl set-default multi-user.target
 ```
 
 `set-default` changes later boots but does not change the current state. `isolate` starts the named target and stops units that the target does not require:
 
-```bash
-$ sudo systemctl isolate graphical.target
+```shell
+sudo systemctl isolate graphical.target
 ```
 
 Isolation can close sessions, stop network services, or disrupt workloads. An administrator should confirm console or recovery access before isolating a target on a remote or production host.
 
 The `grubby` utility displays boot entries and edits their kernel arguments:
 
-```bash
-$ sudo grubby --info=ALL
-$ sudo grubby --update-kernel=ALL --args="systemd.unit=graphical.target"
-$ sudo grubby --update-kernel=ALL --remove-args="systemd.unit"
+```shell
+sudo grubby --info=ALL
+sudo grubby --update-kernel=ALL --args="systemd.unit=graphical.target"
+sudo grubby --update-kernel=ALL --remove-args="systemd.unit"
 ```
 
 The correct kernel parameter is `systemd.unit`, with a full stop between the words. A temporary GRUB edit can apply the parameter to one boot. A persistent change to `ALL` affects every current kernel entry, so the default target usually provides the simpler system-wide choice. A distinct GRUB entry suits a genuine alternative boot path.
@@ -247,10 +247,10 @@ The scheduler starts a command, but the command still needs safe locking, error 
 ### One-off jobs with at
 The `at` package supplies the `at` client and the `atd` service:
 
-```bash
-$ sudo dnf install at
-$ sudo systemctl enable --now atd
-$ at 17:00 tomorrow
+```shell
+sudo dnf install at
+sudo systemctl enable --now atd
+at 17:00 tomorrow
 at> /usr/local/sbin/archive-data >>/var/log/archive-data.log 2>&1
 at> <Ctrl-D>
 ```
@@ -259,10 +259,10 @@ at> <Ctrl-D>
 
 Administrators and users can inspect or remove queued jobs:
 
-```bash
-$ atq
-$ at -c 4
-$ atrm 4
+```shell
+atq
+at -c 4
+atrm 4
 ```
 
 `/etc/at.allow` and `/etc/at.deny` control user access. If `at.allow` exists, only listed users may submit jobs. Otherwise, `at.deny` excludes listed users. If neither file exists, only root may use `at`. Root retains administrative control.
@@ -288,10 +288,10 @@ This system schedule runs a backup at 07:15 each Saturday:
 
 A user crontab omits the user field because the owner supplies the execution identity:
 
-```bash
-$ EDITOR=nano crontab -e
-$ crontab -l
-$ crontab -r -i
+```shell
+EDITOR=nano crontab -e
+crontab -l
+crontab -r -i
 ```
 
 An every-five-minutes expression uses `*/5`, not `*-5`:
@@ -312,8 +312,8 @@ A systemd timer activates a service unit with the same base name unless `Unit=` 
 
 Calendar expressions can describe weekdays, dates, and times. For example, `OnCalendar=Mon..Fri 03:30` runs on weekdays at 03:30. Administrators can validate an expression before installing a unit:
 
-```bash
-$ systemd-analyze calendar 'Mon..Fri 03:30'
+```shell
+systemd-analyze calendar 'Mon..Fri 03:30'
 ```
 
 Monotonic timers measure time from an event. `OnBootSec=10m` schedules an activation ten minutes after boot, while `OnUnitInactiveSec=1h` schedules an hour after the activated service last became inactive. Combining calendar and monotonic settings can create more than one trigger, so each directive needs an intentional purpose.
@@ -347,12 +347,12 @@ WantedBy=timers.target
 
 Both files belong in `/etc/systemd/system/`. The administrator then reloads the manager, enables the timer, and checks its schedule and service log:
 
-```bash
-$ sudo systemctl daemon-reload
-$ sudo systemctl enable --now cache-report.timer
-$ systemctl list-timers --all
-$ systemctl status cache-report.timer
-$ journalctl -u cache-report.service
+```shell
+sudo systemctl daemon-reload
+sudo systemctl enable --now cache-report.timer
+systemctl list-timers --all
+systemctl status cache-report.timer
+journalctl -u cache-report.service
 ```
 
 `systemctl list-timers --all` shows the last and next activations, the timer unit, and the service it triggers. The journal records service output and failures. These features make timers suitable when jobs need dependency ordering, missed-run handling, central logs, resource controls, or clear operational status.

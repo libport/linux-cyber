@@ -1,24 +1,27 @@
 # Understanding Configuration Management
-## Ansible and automation
-Ansible is an automation platform for managing systems at scale. It grew beyond traditional configuration management because large estates of servers, virtual machines and cloud instances are too numerous for manual administration. Ad hoc shell scripts can automate isolated tasks, but they scale poorly across mixed environments and do not reliably deliver the same outcome every time.
-## DevOps and infrastructure as code
-Modern software delivery links development and operations across the full application lifecycle. Teams write and review code, build and test it, package and release it, configure the supporting infrastructure and monitor the result in production. Ansible supports this workflow most strongly through infrastructure as code.
+## Automation and infrastructure as code
+Manual administration and ad hoc shell scripts become difficult to audit, repeat, and scale across large estates. Scripts also tend to encode procedures instead of a desired end state, and they may handle changed starting conditions poorly.
 
-Infrastructure as code defines the desired state of systems in machine-readable files and applies that definition consistently. Teams store those files in version control, usually Git, so they can review changes, track history and roll back when needed. This practice strengthens collaboration because developers can inspect infrastructure changes and operators can enforce the required state.
-## Core Ansible components
-Ansible uses a controller node running Linux to manage remote systems listed in an inventory. It usually connects over SSH on Linux, WinRM on Windows and SSH or APIs on network devices. Unlike agent-based tools, Ansible can manage many targets without installing extra software on each node.
+Configuration management records the intended state as machine-readable text and applies only the changes required to reach it. Teams should keep this infrastructure-as-code content in a version-control system, usually Git, so they can review changes, trace history, test revisions, and restore earlier versions. CVS names a particular legacy version-control product, not the general category.
 
-Playbooks written in YAML define plays and tasks. Modules perform the work on managed nodes, and plugins extend Ansible’s capabilities. Effective playbooks are idempotent and self-contained so repeated runs leave systems in the same intended state.
+This approach supports DevOps by connecting software delivery with infrastructure operations. Automated building, testing, release, deployment, configuration, and monitoring shorten feedback cycles and reduce manual variation.
+## Ansible architecture
+Ansible uses four core elements:
+- A control node runs `ansible-core` and initiates automation.
+- An inventory identifies managed nodes and organises them into groups.
+- YAML playbooks contain plays and ordered tasks.
+- Modules perform work, while plug-ins alter Ansible behaviour.
 
-Python underpins Ansible and many of its components, which helps integration with custom scripts. Administrators do not need to write Python to use Ansible well.
-## Positioning and working style
-Ansible sits alongside tools such as Puppet, Chef and SaltStack, but it emphasises readable YAML playbooks and agentless operation. That combination can lower the learning curve and simplify deployment.
+Collections distribute related modules, plug-ins, roles, and playbooks. Ansible usually needs no agent on managed nodes. It connects to POSIX systems through SSH, to Windows through PSRP, WinRM, or supported SSH configurations, and to network or cloud services through connection plug-ins and APIs. Most POSIX modules require Python on the managed node, although Ansible itself need not be installed there.
 
-Good Ansible practice stays simple, readable and declarative. Playbooks should describe the end state rather than spell out every step. Teams should use the most specific module available instead of generic command execution because specialised modules express intent more clearly and produce more predictable results.
-## Common uses
-Ansible is widely used for:
-- configuration management
-- provisioning in virtual and cloud environments
-- automation within continuous delivery pipelines
+Agentless operation reduces installed software, but it does not remove dependencies. Credentials, network access, privilege escalation, Python or PowerShell, and module-specific libraries must suit the chosen transport and task. Teams should protect credentials and grant only necessary privileges.
 
-A command-line deployment uses Ansible Engine. Tower adds web-based management, role-based access control, scheduling, security controls and centralised logging.
+RHEL 10 supplies Python 3.12 as its default implementation and includes `ansible-core` 2.16. A RHEL 10 control node supports RHEL 9 and RHEL 10 managed nodes. Installing `rhel-system-roles` also installs `ansible-core` and the `redhat.rhel_system_roles` collection, which provides supported roles for services including networking, storage, SELinux, firewalls, Podman, logging, and time synchronisation.
+## Effective automation
+Declarative tasks specify a desired state. Purpose-built modules, such as package, service, file, and user modules, usually detect whether change is necessary. Repeating an idempotent task therefore leaves an already compliant system unchanged. Not every module or playbook is idempotent, especially when it runs arbitrary commands, so teams must test repeated execution and use check mode where supported.
+
+Readable playbooks, meaningful task names, fully qualified collection names, version control, and small reusable roles improve maintenance. Playbooks may import roles and other content, so they need not be self-contained.
+## Platform and use cases
+`Ansible Engine` and `Ansible Tower` are obsolete product names. `ansible-core` provides command-line automation. Red Hat Ansible Automation Platform adds automation controller, role-based access control, credential handling, scheduling, logging, APIs, and execution environments. AWX remains the upstream community project. Execution environments package Ansible Core, Runner, collections, Python libraries, and system dependencies in shareable container images.
+
+Ansible primarily manages configuration, but it also deploys applications, orchestrates services, provisions cloud, virtual, network, and bare-metal resources through suitable APIs, supports delivery pipelines, and responds to events. Provisioning calls the relevant platform rather than pushing a virtual-machine configuration file to a new host.

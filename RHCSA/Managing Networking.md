@@ -8,7 +8,7 @@ The `iproute2` suite replaces older tools such as `ifconfig`, `route`, and `arp`
 
 Most `ip` objects and actions accept unambiguous abbreviations. For example, `ip a` displays addresses and `ip r` displays routes because `show` is the default action. Full object names remain safer in scripts and operational records. The `-4` and `-6` options select an address family, while `-brief` presents a compact status view:
 
-```bash
+```shell
 ip -brief link
 ip -brief address
 ip -4 route show
@@ -19,7 +19,7 @@ Unprivileged users can inspect most state. Address, route, neighbour, link, and 
 ### Addresses and routes
 The following commands inspect IPv4 and IPv6 addresses, limit output to one interface, and add or remove a temporary IPv4 address:
 
-```bash
+```shell
 ip address show
 ip -4 address show dev eth1
 ip -6 address show dev eth1
@@ -33,7 +33,7 @@ Each address includes a prefix length that defines its local subnet. `172.16.1.1
 
 `ip route show` displays the main routing table. The kernel creates connected routes for directly attached networks, and NetworkManager or another service commonly supplies the default route. A static route must identify the correct destination prefix and either a reachable next hop or an output device:
 
-```bash
+```shell
 ip route show
 sudo ip route add 192.168.100.0/24 via 10.0.0.1 dev veth0
 sudo ip route del 192.168.100.0/24
@@ -43,7 +43,7 @@ Private IPv4 networks can cross routers when administrators configure routes for
 
 Route selection uses the most specific matching prefix. When two routes have the same prefix length, metrics and policy-routing rules can influence the result. `ip route get <destination>` asks the kernel which path it would use and reports the selected interface, source address, and next hop:
 
-```bash
+```shell
 ip route get 192.168.100.1
 ```
 
@@ -51,7 +51,7 @@ This query often exposes errors faster than a complete routing-table listing. A 
 ### Neighbour discovery
 The neighbour table maps network-layer addresses to link-layer addresses on the local link. IPv4 uses the Address Resolution Protocol, while IPv6 uses the Neighbour Discovery Protocol. Remote internet hosts do not appear as local neighbours. The local host instead resolves the link-layer address of the next-hop router.
 
-```bash
+```shell
 ip neighbour show
 sudo ip neighbour del 192.168.33.12 dev eth1
 ```
@@ -64,7 +64,7 @@ The `net.ipv4.neigh.default.gc_stale_time` sysctl defaults to 60 seconds on stan
 
 Administrators can inspect the current values with `sysctl`:
 
-```bash
+```shell
 sysctl net.ipv4.neigh.default.gc_stale_time
 sysctl -a | grep gc_stale_time
 ```
@@ -77,7 +77,7 @@ A network namespace provides an independent set of interfaces, addresses, routes
 
 The following sequence creates `net1`, places one end of a virtual Ethernet pair inside it, assigns addresses, and activates the links:
 
-```bash
+```shell
 sudo ip netns add net1
 sudo ip link add veth0 type veth peer name veth1
 sudo ip link set veth1 netns net1
@@ -92,7 +92,7 @@ sudo ip netns exec net1 ip link set veth1 up
 
 Commands run in the default namespace unless `ip netns exec` selects another one. The two endpoints can communicate after both links have addresses from the same subnet. The following commands add a second subnet inside `net1`, install the correct route in the default namespace, and test the path:
 
-```bash
+```shell
 sudo ip netns exec net1 ip address add 192.168.100.1/24 dev veth1
 sudo ip route add 192.168.100.0/24 via 10.0.0.1 dev veth0
 ping -c 1 192.168.100.1
@@ -100,7 +100,7 @@ ping -c 1 192.168.100.1
 
 The route uses `192.168.100.0/24`, not `192.168.0.0/24`, and its next hop is the peer address `10.0.0.1`, not the local address `10.0.0.2`. Deleting `net1` also removes its namespace-side devices and the associated peer:
 
-```bash
+```shell
 sudo ip netns del net1
 ```
 
@@ -108,7 +108,7 @@ sudo ip netns del net1
 ## Persistent configuration with NetworkManager
 RHEL 8 uses NetworkManager by default. A device is a network interface, while a connection profile contains the settings that NetworkManager can apply to a device. Several profiles can target the same interface, but only a compatible active profile supplies its current configuration.
 
-```bash
+```shell
 systemctl is-enabled NetworkManager
 systemctl is-active NetworkManager
 nmcli device status
@@ -121,7 +121,7 @@ Traditional `ifcfg` profiles can contain keys such as `DEVICE`, `BOOTPROTO`, `IP
 ### Creating a static profile
 `nmcli` writes persistent profile data and can activate it immediately. Shell completion exposes available objects and properties, which reduces errors in long commands.
 
-```bash
+```shell
 sudo nmcli connection add \
   type ethernet \
   ifname eth1 \
@@ -138,7 +138,7 @@ Activating `cafe` can displace another profile on `eth1`. Administrators should 
 
 The profile can also carry a gateway and persistent routes:
 
-```bash
+```shell
 sudo nmcli connection modify cafe ipv4.gateway 192.168.100.254
 sudo nmcli connection modify cafe +ipv4.routes "198.51.100.0/24 192.168.100.254"
 ```
@@ -149,7 +149,7 @@ Profile changes remain separate from ad hoc `ip` changes. `nmcli connection modi
 
 Runtime and stored settings can diverge after manual `ip` commands, direct file edits, DHCP renewal, or partial profile activation. A disciplined check compares three views: the connection profile, NetworkManager's active device data, and the kernel state. The following commands expose those layers without changing them:
 
-```bash
+```shell
 nmcli connection show cafe
 nmcli device show eth1
 ip address show dev eth1
@@ -160,7 +160,7 @@ An unexpected difference does not always indicate failure. DHCP leases, automati
 ### DNS selection
 NetworkManager normally writes `/etc/resolv.conf`. Direct edits to that file can disappear when a connection changes. DNS servers, search domains, automatic DNS behaviour, and priority belong in connection profiles.
 
-```bash
+```shell
 sudo nmcli connection modify cafe ipv4.dns "<dns-server>"
 sudo nmcli connection modify cafe ipv4.ignore-auto-dns yes
 sudo nmcli connection modify cafe ipv4.dns-priority 10
@@ -179,7 +179,7 @@ Zones classify traffic by trust. NetworkManager connections or interfaces can se
 
 The default zone handles traffic that has no more specific assignment. An active zone normally has at least one interface or source. A zone definition can also include rich rules, port forwards, masquerading, ICMP controls, and protocols. Administrators should keep zone assignments aligned with connection profiles so that a portable host does not retain office access rules on an untrusted network.
 
-```bash
+```shell
 sudo firewall-cmd --state
 sudo firewall-cmd --get-default-zone
 sudo firewall-cmd --get-active-zones
@@ -191,7 +191,7 @@ The default zone often starts as `public`, but administrators must inspect the h
 ### Runtime and permanent rules
 `firewalld` maintains separate runtime and permanent configurations. Runtime changes take effect immediately and disappear after a reload, restart, or reboot. Permanent changes become active after a reload or restart. This separation supports a test-first workflow:
 
-```bash
+```shell
 sudo dnf install httpd
 sudo systemctl enable --now httpd
 sudo firewall-cmd --add-service=http
@@ -205,7 +205,7 @@ The `http` service opens the ports defined by its service object, normally TCP p
 
 A timeout creates a temporary runtime rule:
 
-```bash
+```shell
 sudo firewall-cmd --add-port=443/tcp --timeout=10m
 ```
 
@@ -213,7 +213,7 @@ The rule expires automatically and cannot form part of permanent configuration. 
 ### Zones, interfaces, and sources
 Adding a service to an interface's zone can expose it to every source that reaches that interface. A source-based zone narrows access to an address or prefix:
 
-```bash
+```shell
 sudo firewall-cmd --zone=internal --add-service=http
 sudo firewall-cmd --zone=internal --add-source=192.168.33.0/24
 sudo firewall-cmd --zone=internal --list-all
@@ -226,7 +226,7 @@ When source ranges overlap across zones, firewalld cannot apply both zone rule s
 
 A dedicated custom service keeps related ports under a clear name without changing the meaning of a vendor service:
 
-```bash
+```shell
 sudo firewall-cmd --permanent --new-service=web
 sudo firewall-cmd --permanent --service=web --add-port=80/tcp
 sudo firewall-cmd --permanent --service=web --add-port=443/tcp
@@ -254,7 +254,7 @@ backend = systemd
 
 The example bans a source for 72 hours after three failures within 10 minutes. Production values should reflect user behaviour, exposure, address sharing, and support procedures. After saving the configuration under `/etc/fail2ban/jail.d/`, administrators can start the service and inspect the jail:
 
-```bash
+```shell
 sudo systemctl enable --now fail2ban
 sudo fail2ban-client status sshd
 sudo fail2ban-client set sshd unbanip <ip-address>
@@ -270,7 +270,7 @@ Linux introduced nftables with kernel 3.13. RHEL 8 uses it as the default firewa
 
 Administrators should run only one firewall manager on a RHEL host. `firewalld`, the `nftables` service, and legacy `iptables` services can interfere with one another when they control the same hooks. Direct `nftables` management therefore requires stopping and disabling `firewalld`:
 
-```bash
+```shell
 sudo systemctl disable --now firewalld
 sudo nft list ruleset
 ```
@@ -279,7 +279,7 @@ Stopping `firewalld` does not guarantee that every rule has disappeared. Adminis
 
 Basic inspection commands separate structure from detail:
 
-```bash
+```shell
 sudo nft list tables
 sudo nft list ruleset
 sudo nft --handle list ruleset
@@ -322,7 +322,7 @@ The `counter` statement records packets that reach the end of the chain. The cha
 ### Validation and persistence
 Administrators should store custom scripts under `/etc/nftables/`, validate them without applying them, and then load them atomically:
 
-```bash
+```shell
 sudo nft --check --file /etc/nftables/filter.nft
 sudo nft --file /etc/nftables/filter.nft
 sudo nft list ruleset
@@ -342,7 +342,7 @@ include "/etc/nftables/filter.nft"
 
 After adding the include, administrators can enable the service:
 
-```bash
+```shell
 sudo systemctl enable --now nftables
 sudo systemctl reload nftables
 sudo nft list ruleset

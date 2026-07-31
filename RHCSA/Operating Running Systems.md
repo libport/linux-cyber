@@ -52,7 +52,7 @@ The following RHEL 8 procedure resets the password and requests a complete SELin
 
 The corresponding commands are:
 
-```bash
+```shell
 mount -o remount,rw /sysroot
 chroot /sysroot
 passwd root
@@ -66,7 +66,7 @@ The relabel can take substantial time, and the system restarts when it finishes.
 
 RHEL 8 also supports a targeted alternative that avoids a full relabel. The administrator appends both `rd.break` and `enforcing=0`, resets the password, completes the boot in permissive mode, restores the policy-defined label on `/etc/shadow`, and re-enables enforcement:
 
-```bash
+```shell
 restorecon /etc/shadow
 setenforce 1
 getenforce
@@ -99,7 +99,7 @@ The `--now` option adds an immediate runtime action to enable or disable. Enabli
 
 `systemctl status` reports the loaded unit path, enablement state, active state, main process, control group, and recent journal entries. It provides a strong first diagnostic, but it does not replace deeper log review. The following commands distinguish loaded runtime units from installed unit files:
 
-```bash
+```shell
 systemctl list-units --type=service
 systemctl list-units --type=service --all
 systemctl list-unit-files --type=service
@@ -110,7 +110,7 @@ systemctl --failed
 
 Systemd can operate on several explicitly named units in one command. An administrator may restart related services together after checking their dependencies and combined impact:
 
-```bash
+```shell
 sudo systemctl restart crond.service chronyd.service
 ```
 
@@ -130,7 +130,7 @@ Administrators should not edit vendor files in `/usr/lib/systemd/system/` becaus
 
 `sudo systemctl edit --full atd.service` creates a complete replacement for the main unit. That approach can be necessary for extensive changes, but it also copies vendor settings that may become stale. After `systemctl edit` closes successfully, systemd reloads its configuration automatically. An administrator who changes unit files by another editor must run:
 
-```bash
+```shell
 sudo systemctl daemon-reload
 ```
 
@@ -138,7 +138,7 @@ The administrator then restarts or reloads the affected service when the changed
 
 Masking provides a stronger control than disabling. `systemctl mask` creates a link to `/dev/null`, so manual starts and dependency-based starts fail until the unit is unmasked. Masking without `--now` does not guarantee that an already active service stops.
 
-```bash
+```shell
 sudo systemctl mask --now atd.service
 sudo systemctl unmask atd.service
 ```
@@ -151,7 +151,7 @@ A socket unit lets systemd open a listening socket before the associated service
 
 RHEL 8 Cockpit provides a common example:
 
-```bash
+```shell
 sudo dnf install cockpit
 sudo systemctl enable --now cockpit.socket
 systemctl status cockpit.socket
@@ -164,7 +164,7 @@ Targets group units and provide synchronisation points during boot. They replace
 
 The administrator can inspect and change the default target:
 
-```bash
+```shell
 systemctl get-default
 systemctl list-units --type=target
 sudo systemctl set-default multi-user.target
@@ -184,7 +184,7 @@ The load values are not normalised for processor count. A sustained load near th
 
 The following commands establish the available CPU topology:
 
-```bash
+```shell
 nproc
 lscpu
 lscpu -e
@@ -202,7 +202,7 @@ Appending `&` starts a shell command in the background. The `jobs` command repor
 
 System-wide process tools operate independently of the shell's job table:
 
-```bash
+```shell
 ps -ef
 ps -eo pid,ppid,user,ni,pri,stat,pcpu,pmem,comm
 pgrep -a sshd
@@ -213,7 +213,7 @@ pgrep -f 'complete command pattern'
 ### Niceness and signals
 Normal Linux processes use nice values from -20 to 19. Lower values give a process more favourable scheduling weight, and higher values give it less. The default is usually 0. `nice` starts a command with an adjustment, while `renice` changes the value of a running process:
 
-```bash
+```shell
 nice -n 10 long-running-command &
 renice -n 15 -p 12345
 ```
@@ -224,7 +224,7 @@ Niceness affects normal scheduling competition rather than every scheduling clas
 
 `kill` sends a signal to a process ID, and `pkill` selects processes by a name or pattern. Both commands send `SIGTERM` by default. `SIGTERM` requests an orderly exit and lets a program handle cleanup. If a process cannot or will not exit, `SIGKILL` forces termination:
 
-```bash
+```shell
 kill 12345
 pkill -x sleep
 kill -KILL 12345
@@ -234,7 +234,7 @@ kill -KILL 12345
 ### TuneD profiles
 TuneD applies coordinated settings for workloads such as virtual guests, virtual hosts, low-latency services, high-throughput servers, desktops, and power-saving systems. Profiles provide a tested starting point, but they do not replace workload measurement.
 
-```bash
+```shell
 tuned-adm active
 tuned-adm recommend
 tuned-adm list
@@ -270,7 +270,7 @@ No single traditional file contains every event. Rsyslog rules can exclude facil
 
 The `tail` command supports quick text-log review:
 
-```bash
+```shell
 sudo tail -n 50 /var/log/messages
 sudo tail -n 0 -f /var/log/messages
 ```
@@ -289,7 +289,7 @@ Storage=persistent
 
 After creating the directory and file, the administrator applies the setting and flushes eligible runtime records:
 
-```bash
+```shell
 sudo systemctl restart systemd-journald
 sudo journalctl --flush
 sudo journalctl --list-boots
@@ -309,7 +309,7 @@ The selector `.warning` includes warning and more severe priorities. An equality
 
 After saving a rule as `/etc/rsyslog.d/myapp.conf`, the administrator validates the complete configuration before restarting the service:
 
-```bash
+```shell
 sudo rsyslogd -N 1
 sudo systemctl restart rsyslog.service
 logger -p local1.warning "Rsyslog test message"
@@ -346,7 +346,7 @@ The `postrotate` action asks Rsyslog to reopen its files after rotation. `copytr
 
 An administrator can check policy parsing without changing files, then force a test when appropriate:
 
-```bash
+```shell
 sudo logrotate -d /etc/logrotate.conf
 sudo logrotate -f /etc/logrotate.conf
 ```
@@ -359,7 +359,7 @@ OpenSSH encrypts remote login and file-transfer traffic. `scp` copies a file thr
 
 An administrator should protect a private key with a passphrase and use `ssh-agent` when repeated entry becomes inconvenient. `ssh-copy-id` installs the public key with fewer ownership and formatting errors than manual copying:
 
-```bash
+```shell
 ssh-keygen
 ssh-copy-id bob@server.example.com
 ssh -o PreferredAuthentications=publickey bob@server.example.com

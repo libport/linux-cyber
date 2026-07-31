@@ -1,29 +1,49 @@
 # Installing Ansible
-## Ansible lab design
-An Ansible environment uses one control node and at least two managed nodes. The control node runs Ansible. Managed nodes do not need an agent. Linux hosts usually need SSH access and a compatible Python interpreter. A small lab works well with three virtual machines, fixed hostnames, fixed IP addresses, and local name resolution through DNS or `/etc/hosts`. Separating the control node from the managed hosts reduces accidental changes during early practice. In production, teams often automate the control node as well.
-## Controller requirements
-The control node needs Python, an SSH client, and access to a supported package source. Current Ansible packaging separates the minimal runtime, ansible-core, from the larger community bundle, ansible. The chosen package should match the lab goal. A certification lab may need a fixed version, while a general environment should use a maintained release on a supported platform.
+## Environment and versions
+An Ansible environment contains a control node, an inventory, and managed nodes. The control node runs commands and playbooks. Managed nodes receive work through a suitable connection, but they do not require an Ansible agent.
 
-RHEL remains a valid base for a lab. Red Hat still provides no-cost developer access for individual use. CentOS Linux 8 does not remain a sound choice because it reached end of life in December 2021 and no longer receives updates. A current community alternative is CentOS Stream or another supported Enterprise Linux derivative.
+RHEL 10 provides Python 3.12 as its default implementation and includes `ansible-core` 2.16. This RHEL package supports the management of RHEL 9 and RHEL 10 nodes. A RHEL subscription supports `ansible-core` for Red Hat-provided automation content, including RHEL system roles. Red Hat supports broader enterprise automation through Red Hat Ansible Automation Platform.
 
-On RHEL-like systems, dnf is the standard package manager. A maintained installation usually starts with distribution packages such as ansible-core, or with a user-scoped Python installation through pip or pipx. Changing the system-wide python command is unnecessary in most cases. The safer approach is to call Python explicitly, such as python3 -m pip.
-## Managed host preparation
-Managed Linux hosts need SSH access, a compatible Python interpreter, and a user account that allows interactive shell access. They do not need the Ansible package itself. Network devices and Windows hosts follow different connection models, so a Linux-only lab can ignore those details. Basic connectivity checks should confirm name resolution, SSH reachability, and firewall rules that allow SSH.
-## Dedicated automation account
-A dedicated ansible account keeps automation predictable. That account needs two capabilities on each managed node:
-- key-based SSH login from the control node
-- privilege escalation for tasks that need root access
+The former RHEL 8 Ansible repository, CentOS 8 EPEL procedure, Python 2 discussion, `yum install ansible` command, and fixed Ansible 2.x guidance no longer apply. Hardware requirements depend on inventory size, parallelism, collections, and workload. The former one CPU, 1 GB of RAM, and 20 GB of disk specification described a small lab, not a product requirement.
+## Installing the control node
+A registered RHEL 10 host can install the supported RHEL system roles and their runtime with:
 
-SSH keys remove repeated password prompts and make batch automation practical. A lab can use a key without a passphrase for speed. A production environment usually protects the private key with a passphrase or uses a managed secret store.
+```shell
+sudo dnf install rhel-system-roles
+python3 --version
+ansible --version
+ansible-galaxy collection list
+```
 
-Privilege escalation normally uses `sudo`. Drop-in files under `/etc/sudoers.d` are cleaner than editing `/etc/sudoers` directly. Password-less `sudo` is convenient in a lab, but a production system should apply tighter controls and restrict escalation to the commands or roles that need it.
-## Minimal setup sequence
-- Build three virtual machines with stable hostnames and addresses.
-- Create the ansible user on the control node and managed nodes.
-- Confirm SSH service availability and Python compatibility on each managed host.
-- Install ansible-core or ansible on the control node from a supported source.
-- Generate an SSH key pair on the control node and copy the public key to each managed host.
-- Configure sudo access for the ansible user on the managed hosts.
-- Test the setup with direct SSH access and a simple Ansible command.
-## Outcome
-A straightforward Ansible lab keeps the controller simple, keeps managed hosts agentless, and relies on SSH, Python compatibility, and controlled privilege escalation. The core design still holds, but the platform and packaging choices must reflect current supported releases.
+The package installs `ansible-core` as a dependency and places the `redhat.rhel_system_roles` collection under `/usr/share/ansible/collections/ansible_collections/redhat/rhel_system_roles/`. It does not require the obsolete `ansible-2-for-rhel-8-x86_64-rpms` repository.
+
+Administrators can use `pipx` for an isolated upstream community installation of `ansible` or `ansible-core`. They should not run `pip` as root against the RHEL system Python because this can replace supported libraries. A virtual environment offers another isolated option. RHEL 10 already maps the unversioned `python` command to Python 3.12, so the old `alternatives --set python` step is unnecessary.
+
+Ansible Automation Platform runs automation in containerised execution environments and manages jobs through automation controller. These names replace the former Ansible Engine and Ansible Tower terminology.
+
+A project-level `ansible.cfg` can define the default inventory, remote account, connection options, and privilege-escalation behaviour. Teams should keep configuration and inventory under version control, exclude secrets, and use fully qualified collection names to avoid ambiguity. Installing `ansible-core` alone does not install every community collection. Collections and roles can require extra Python libraries or system packages, so teams should validate each automation dependency before deployment.
+## Preparing managed nodes
+Each managed RHEL node needs:
+- Network reachability from the control node
+- A resolvable inventory name or an explicit address
+- A running SSH service and a firewall rule for the configured SSH port
+- A login account with an interactive POSIX shell
+- Python for standard Python-based modules
+
+RHEL 10 normally provides Python 3.12. Administrators can install it with `dnf install python3` when an image omits it. The `raw` module can bootstrap a host without Python. Network appliances often use device APIs or connection plug-ins and do not need Python. Windows nodes use PSRP, WinRM, or supported SSH configurations, along with Windows-specific PowerShell modules.
+
+SSH does not always use TCP port 22, so the firewall must allow the actual configured port. Installation profiles and cloud images can also disable `sshd` or omit packages, so administrators should verify services instead of assuming their state.
+## Accounts, keys, and privilege escalation
+A dedicated automation account improves auditability, but Ansible does not require the username `ansible`. Direct root login is unnecessary and increases risk.
+
+Key-based SSH authentication suits unattended automation. `ssh-keygen` creates a key pair on the control node, and `ssh-copy-id` installs only the public key on a managed node. Administrators must protect the private key on the control node. A passphrase and `ssh-agent` strengthen key security without prompting for every connection.
+
+SSH password authentication remains possible. The RHEL 10 `ansible-core` package currently omits `sshpass` as a dependency, so password-based SSH requires that additional package. Key-based authentication or centrally managed credentials usually provide a stronger operational design.
+
+Ansible uses `become` for tasks that need elevated privileges. The remote account needs only the permissions required by those tasks, and the control node needs local `sudo` access only for local privileged work. Administrators should edit drop-in policies with `visudo -f /etc/sudoers.d/<account>`. A password prompt can work with `--ask-become-pass`, while automation controller can manage credentials centrally. `NOPASSWD: ALL` grants broad root access and should not serve as the default.
+## Verification sequence
+1. Administrators install and verify the control-node packages.
+2. They add managed hosts to an INI or YAML inventory.
+3. They confirm name resolution, host keys, SSH authentication, and privilege escalation.
+4. They run `ansible-inventory --graph` and `ansible all -m ping`.
+5. They test a playbook in check mode, where its modules support it, before applying changes.

@@ -9,7 +9,7 @@ Storage administration affects availability and data integrity. Administrators s
 ### Identifying devices and file systems
 Linux represents disks, partitions, LVM logical volumes, and device-mapper targets as block devices. A mounted file system attaches one of these devices to a directory in the unified directory tree. The following commands provide complementary views:
 
-```bash
+```shell
 lsblk --fs
 blkid
 findmnt
@@ -19,7 +19,7 @@ findmnt
 
 XFS and ext4 maintain metadata that describes their geometry, features, labels, identifiers, and state. The relevant inspection commands include:
 
-```bash
+```shell
 xfs_info /mount-point
 xfs_admin -l /dev/sda1
 xfs_admin -u /dev/sda1
@@ -32,7 +32,7 @@ In `xfs_info` output, `isize` identifies the size of each on-disk inode record. 
 
 Labels provide readable descriptions, while UUIDs provide stronger uniqueness. A label can indicate a purpose such as `SALES_DATA`, but duplicate labels can cause ambiguity. Changing a UUID or label can invalidate `/etc/fstab`, boot-loader, backup, or monitoring configuration that refers to the old value. RHEL requires an XFS file system to be unmounted before `xfs_admin` changes these attributes. After a change, `udevadm settle` allows device metadata updates to complete.
 
-```bash
+```shell
 umount /boot
 xfs_admin -L BOOT_RHEL8 /dev/sda1
 udevadm settle
@@ -46,7 +46,7 @@ XFS labels contain at most 12 characters. Ext file-system labels contain at most
 ### Creating XFS and ext4 file systems
 `mkfs` dispatches to a file-system-specific formatter. The specialised commands make the intended type explicit:
 
-```bash
+```shell
 mkfs.xfs -L SALES_DATA /dev/sdb1
 mkfs.ext4 -L SALES_DATA /dev/sdb1
 ```
@@ -63,7 +63,7 @@ A mount-point directory belongs to its parent file system until another file sys
 
 An inaccessible underlying directory prevents users from writing into the empty mount point when the intended file system is offline. Without that protection, applications can write data into the parent file system, fill the wrong volume, and hide the misplaced files after the intended mount returns.
 
-```bash
+```shell
 mkdir -p /data/sales
 chown root:root /data/sales
 chmod 0700 /data/sales
@@ -85,7 +85,7 @@ UUID=11111111-2222-3333-4444-555555555555 /data/sales ext4 defaults 0 2
 
 After editing `/etc/fstab`, the administrator should make systemd regenerate its mount units, test the entry, and verify the result:
 
-```bash
+```shell
 systemctl daemon-reload
 mount /data/sales
 findmnt /data/sales
@@ -97,7 +97,7 @@ Boot-critical entries require extra care. A typing error, an unavailable device,
 
 The administrator should also confirm that the mounted device matches the intended UUID and that no files remain hidden beneath the mount point:
 
-```bash
+```shell
 findmnt --output SOURCE,TARGET,FSTYPE,OPTIONS /data/sales
 umount /data/sales
 ls -la /data/sales
@@ -106,7 +106,7 @@ mount /data/sales
 ### Extending LVM storage and its file system
 LVM separates physical volumes, volume groups, and logical volumes. `vgs` displays volume-group information. It does not scan for volume groups, which is the role of `vgscan`. Before assigning a new disk, the administrator must confirm that the selected device contains no required data and uses a compatible logical block size.
 
-```bash
+```shell
 pvcreate /dev/sdc
 vgextend rhel_rhel8 /dev/sdc
 vgs rhel_rhel8
@@ -114,7 +114,7 @@ vgs rhel_rhel8
 
 `lvextend` increases a logical volume. The lower-case `-r`, or `--resizefs`, also invokes the appropriate file-system growth tool. The plus sign in `+100%FREE` means to add all currently free extents. Omitting it can express a different target.
 
-```bash
+```shell
 lvextend --resizefs --extents +100%FREE /dev/rhel_rhel8/root
 ```
 
@@ -134,7 +134,7 @@ The sticky bit does not mean that each user can delete only files that the user 
 ### Establishing a shared directory
 A collaborative directory needs a group, appropriate membership, inherited group ownership, and a suitable `umask`. The following pattern gives the `sales` group full directory access, removes access for others, applies set-group-ID, and applies the sticky bit:
 
-```bash
+```shell
 groupadd sales
 gpasswd --add analyst sales
 
@@ -148,7 +148,7 @@ An existing login session does not automatically gain a newly assigned supplemen
 
 A restrictive `umask` keeps new files private from users outside the collaboration group:
 
-```bash
+```shell
 umask 0007
 touch /data/sales/report.txt
 ls -l /data/sales/report.txt
@@ -164,7 +164,7 @@ A short test with two non-privileged accounts exposes mistakes that a root-only 
 ### Finding special permissions
 GNU `find` distinguishes between any requested bit and all requested bits:
 
-```bash
+```shell
 find /data -type d -perm /3000
 find /data -type d -perm -3000
 find /data -type d -perm -1000 -perm -0002
@@ -176,7 +176,7 @@ NFS allows a client to mount a server directory within its local directory tree.
 ### Configuring an NFSv4-only server
 The `nfs-utils` package supplies server and client tools:
 
-```bash
+```shell
 dnf install nfs-utils
 ```
 
@@ -194,7 +194,7 @@ When individual NFSv4 minor versions appear, the configuration should not also s
 
 A complete NFSv4-only configuration also disables NFSv3-related services:
 
-```bash
+```shell
 systemctl mask --now rpc-statd.service rpcbind.service rpcbind.socket
 ```
 
@@ -210,7 +210,7 @@ Exports can reside in `/etc/exports` or in files ending with `.exports` under `/
 
 The server can load, display, and expose the configuration with:
 
-```bash
+```shell
 exportfs -rav
 exportfs -v
 firewall-cmd --permanent --add-service=nfs
@@ -225,7 +225,7 @@ An IP-based export rule limits eligible client addresses but does not authentica
 
 `exportfs -rav` reports parsing and export errors when it reloads the table. `exportfs -v` confirms the effective options. The server should also verify that the intended directory is a mounted file system rather than an empty underlying mount point:
 
-```bash
+```shell
 findmnt --target /data/sales
 showmount --exports localhost
 ```
@@ -234,7 +234,7 @@ showmount --exports localhost
 ### Mounting from a client
 The client installs `nfs-utils`, creates a mount point, mounts the export, and verifies the negotiated options:
 
-```bash
+```shell
 dnf install nfs-utils
 mkdir -p /mnt/sales
 mount -t nfs4 server.example.com:/data/sales /mnt/sales
@@ -253,7 +253,7 @@ The `_netdev` option marks the mount as network-dependent. A hard mount preserve
 ### Mounting on demand with autofs
 `autofs` creates mounts when a process accesses a configured path and removes idle mounts later. This approach avoids maintaining many inactive NFS mounts.
 
-```bash
+```shell
 dnf install autofs
 ```
 
@@ -271,7 +271,7 @@ sales -fstype=nfs4,rw,hard server.example.com:/data/sales
 
 The resulting path is `/data/sales`. The `hard` behaviour allows NFS operations to retry when the server becomes temporarily unavailable. A `soft` mount does not place a slow mount into the background. It returns an I/O error after retransmission limits expire and can expose applications to partial operations or data corruption. It therefore requires a specific application-level justification.
 
-```bash
+```shell
 systemctl enable --now autofs
 ls /data/sales
 ```
@@ -282,7 +282,7 @@ SELinux is a mandatory access-control system, not a mandatory access-control lis
 
 RHEL 8 supplies service-specific SELinux documentation in the `selinux-policy-doc` package:
 
-```bash
+```shell
 dnf install selinux-policy-doc
 man -k _selinux
 man nfsd_selinux
@@ -298,14 +298,14 @@ These examples use the standalone `vdo` service and command set available in RHE
 ### Creating and mounting a VDO volume
 The packages provide the management tools and kernel module:
 
-```bash
+```shell
 dnf install vdo kmod-kvdo
 systemctl enable --now vdo
 ```
 
 The backing device should use a persistent path and support later growth. The logical size can exceed physical capacity because VDO expects deduplication and compression to reduce physical use:
 
-```bash
+```shell
 vdo create \
   --name=vdo1 \
   --device=/dev/disk/by-id/example-device \
@@ -318,7 +318,7 @@ VDO reserves physical space for metadata, including its UDS index and at least o
 
 The file-system formatter should suppress discard during initial creation because a new VDO volume contains no allocated blocks to release:
 
-```bash
+```shell
 mkfs.xfs -K /dev/mapper/vdo1
 mkdir -p /data/vdo
 mount /dev/mapper/vdo1 /data/vdo
@@ -336,7 +336,7 @@ A network-dependent backing device also needs `_netdev`. The mounted file system
 ### Monitoring capacity and reduction
 `df` reports logical file-system capacity. It cannot show how close the VDO backing store is to physical exhaustion. `vdostats` reports physical use, available capacity, and space saving:
 
-```bash
+```shell
 df -h /data/vdo
 vdostats --human-readable
 vdo status --name=vdo1
@@ -348,7 +348,7 @@ Thin provisioning creates a critical failure mode. Applications can see free log
 
 Compression and deduplication are enabled by default on a newly created standalone VDO volume. Diagnostic testing can toggle them independently:
 
-```bash
+```shell
 vdo disableDeduplication --name=vdo1
 vdo enableDeduplication --name=vdo1
 vdo disableCompression --name=vdo1
@@ -359,13 +359,13 @@ Changing these settings affects new writes. It does not immediately rewrite ever
 
 Deleting files does not allow VDO to reclaim physical blocks until the file system issues discard requests. Periodic trimming provides a controlled approach:
 
-```bash
+```shell
 systemctl enable --now fstrim.timer
 ```
 ### Growing VDO
 Logical growth changes the size presented to the upper layer:
 
-```bash
+```shell
 vdo growLogical --name=vdo1 --vdoLogicalSize=40G
 xfs_growfs /data/vdo
 ```
@@ -374,7 +374,7 @@ xfs_growfs /data/vdo
 
 Physical growth follows a different order. The administrator first enlarges the underlying partition, logical volume, or other backing device, then informs VDO:
 
-```bash
+```shell
 vdo growPhysical --name=vdo1
 ```
 
@@ -386,14 +386,14 @@ Red Hat classifies Stratis as a Technology Preview in its RHEL 8 documentation. 
 ### Creating a pool and file system
 The daemon and command-line client install separately:
 
-```bash
+```shell
 dnf install stratisd stratis-cli
 systemctl enable --now stratisd
 ```
 
 A Stratis data device must be unused, unmounted, free of required data, and at least 1 GB. Existing file-system, RAID, or partition signatures can prevent use. `wipefs --all` erases those signatures and belongs only on a verified disposable device.
 
-```bash
+```shell
 wipefs --all /dev/sdd
 stratis pool create pool1 /dev/sdd
 stratis pool list
@@ -401,7 +401,7 @@ stratis pool list
 
 Current RHEL 8 syntax can create a named, thinly provisioned XFS file system with an explicit size:
 
-```bash
+```shell
 stratis filesystem create --size 10GiB pool1 fs1
 stratis filesystem list pool1
 ```
@@ -412,7 +412,7 @@ The pool aggregates one or more data devices and has a fixed physical total unti
 
 Stratis publishes stable device links under `/dev/stratis/`:
 
-```bash
+```shell
 mkdir -p /data/stratis
 mount /dev/stratis/pool1/fs1 /data/stratis
 findmnt /data/stratis
@@ -430,7 +430,7 @@ Stratis command syntax and features changed across RHEL 8 minor releases. The in
 
 Additional verified devices can extend pool capacity:
 
-```bash
+```shell
 stratis pool add-data pool1 /dev/sde
 stratis pool list
 ```
@@ -439,7 +439,7 @@ This action expands the pool but does not replace monitoring. Thinly provisioned
 ### Snapshots
 A Stratis snapshot is a first-class, read-write Stratis file system created from another file system at a point in time:
 
-```bash
+```shell
 stratis filesystem snapshot pool1 fs1 snap1
 mkdir -p /backup
 mount /dev/stratis/pool1/snap1 /backup
@@ -455,7 +455,7 @@ A snapshot does not replace an independent backup. Origin and snapshot normally 
 
 The administrator must unmount a snapshot before destroying it:
 
-```bash
+```shell
 umount /backup
 stratis filesystem destroy pool1 snap1
 ```

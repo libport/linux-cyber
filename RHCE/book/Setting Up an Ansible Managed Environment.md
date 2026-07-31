@@ -1,80 +1,57 @@
 # Setting Up an Ansible Managed Environment
-Ansible scales best when each project keeps its own playbooks, variables, inventory, and configuration in a self-contained directory. Small environments can share one system-wide configuration, but larger environments usually benefit from separate project directories because teams can hand over, test, and version work more cleanly.
+## Project organisation
+RHEL 10 includes `ansible-core` 2.16 for supported RHEL automation content. A project directory keeps related automation together and gives each workload or environment its own defaults. Teams should protect the directory with appropriate permissions and manage its non-secret content in version control.
 
-Common locations for configuration are:
-- a `project` directory for project-specific settings
-- a user `home` directory for user-specific settings
-- `/etc/ansible` for shared system-wide settings
+| Component | Purpose |
+| --- | --- |
+| `ansible.cfg` | Project-level defaults |
+| Inventory sources | Managed hosts, groups, and connection data |
+| `group_vars/` and `host_vars/` | Group-specific and host-specific variables |
+| Playbooks and roles | Automation logic |
+| Requirements files | Collection and role dependencies |
+
+This layout supports review, testing, reuse, and delegation. An organisation can separate production, test, regional, or application inventories while sharing roles and collections through controlled dependencies.
 ## Static inventory
-Inventory defines the hosts Ansible manages, groups related hosts, and can also store variables. Modern practice usually keeps variables in YAML inventory, `host_vars`, or `group_vars` because that is clearer than packing complex values into INI files. Inventory can use hostnames, IP addresses, or aliases with connection variables such as ansible_host.
+Ansible builds an in-memory inventory from one or more sources. The built-in INI and YAML inventory plug-ins accept hostnames, fully qualified domain names, IP addresses, aliases, groups, ranges, and parent-child group relationships. A host can belong to several functional, regional, and lifecycle groups.
 
-A simple INI inventory can list hostnames, IP addresses, ranges, groups, and child groups:
+Ansible always creates the `all` and `ungrouped` groups. `all` contains every explicit inventory host, while `ungrouped` contains hosts outside other groups. When Ansible parses no inventory, it warns that only an implicit localhost is available. Group patterns cannot target that implicit host.
 
-```ini
-ansible1
-ansible2
+Host and group variables in inventory remain supported. Separate files under `host_vars/` and `group_vars/` usually provide clearer policy, richer YAML structures, and easier maintenance. Teams must not store unencrypted passwords, tokens, or private keys in inventory or source control.
 
-[web]
-web1
-web2
+Ansible selects inventory through the `-i` option, the `inventory` configuration setting, or the default `/etc/ansible/hosts` path. It does not automatically select a file named `inventory` from the current directory. These commands inspect an explicit source:
 
-[db]
-db1
-db2
-
-[servers:children]
-web
-db
-```
-
-Useful group patterns include:
-- functional groups such as `web` or `db`
-- regional groups such as australia or europe
-- stage groups such as `dev`, `test`, or `prod`
-
-Ansible always provides the all and ungrouped groups. It also supports an implicit localhost when needed.
-## Dynamic inventory
-Dynamic inventory suits environments where hosts change often, such as cloud platforms. Inventory plugins are the preferred approach. Legacy scripts still work through the built-in script inventory plugin, but plugins integrate better with current `ansible-core` behaviour.
-
-A minimal inventory script must be executable, return JSON, and respond to `--list`. It should also handle `--host`, or provide `_meta` to avoid per-host lookups.
-
-```python
-#!/usr/bin/env python3
-import json, sys
-
-data = {"all": {"hosts": ["web1", "db1"]}, "_meta": {"hostvars": {}}}
-
-if sys.argv[1:] == ["--list"]:
-    print(json.dumps(data))
-elif len(sys.argv) == 3 and sys.argv[1] == "--host":
-    print(json.dumps({}))
-else:
-    raise SystemExit("use --list or --host <name>")
-```
-
-Ansible can also load multiple inventory sources from a directory, which helps combine static files and dynamic sources in one environment.
-## ansible.cfg essentials
-The `ansible.cfg` file sets default connection and privilege-escalation behaviour. A project can keep a local `ansible.cfg`, or rely on `~/.ansible.cfg` or `/etc/ansible/ansible.cfg`.
-
-```ini
-[defaults]
-remote_user = ansible
-inventory = inventory
-host_key_checking = false
-
-[privilege_escalation]
-become = True
-become_method = sudo
-become_user = root
-become_ask_pass = False
-```
-
-Key settings include `remote_user`, `inventory`, `host_key_checking`, and the `become` options. Precedence matters. Configuration settings sit below command-line options, playbook keywords, and variables, so the most specific setting wins.
-## Core commands
-```bash
+```shell
 ansible -i inventory all --list-hosts
 ansible-inventory -i inventory --graph
 ansible-inventory -i inventory --list
 ```
 
-These commands verify which hosts Ansible sees and how groups resolve. Setting inventory in `ansible.cfg` removes the need to pass `-i` for every command.
+Repeated `-i` options combine sources. An inventory directory can also contain static files, executable scripts, plug-in configuration files, `group_vars/`, and `host_vars/`, subject to configured ignore rules. Ansible loads sources in the supplied order, and the last definition wins when the same variable appears more than once.
+## Dynamic inventory
+Dynamic inventory discovers hosts from cloud platforms, virtualisation systems, directories, and other external services. Inventory plug-ins generally suit dynamic inventory better than scripts because they integrate configuration, caching, variable composition, and grouping with `ansible-core`. Collections distribute provider-specific plug-ins, which often use YAML configuration sources and require additional libraries.
+
+Legacy inventory scripts still work. A script can use any language, not only Python, but it must run as an executable, accept `--list` and `--host <hostname>`, and emit valid JSON. Including host variables under the `_meta` key avoids a separate script call for every host. Teams should use maintained plug-ins instead of unreviewed scripts found through general web searches.
+## Configuration and precedence
+Ansible searches for configuration in this order:
+
+```text
+ANSIBLE_CONFIG
+./ansible.cfg
+~/.ansible.cfg
+/etc/ansible/ansible.cfg
+```
+
+It loads the first file found and ignores the others. A home-level configuration file therefore uses the hidden name `~/.ansible.cfg`. Ansible refuses to load `./ansible.cfg` automatically from a world-writable directory because another user could inject unsafe settings.
+
+Common settings include `inventory`, `remote_user`, connection options, privilege-escalation behaviour, and plug-in paths. `remote_user` identifies the login account, while `become_user` identifies the account used after escalation. Without `remote_user`, SSH normally uses the current control-node account.
+
+SSH host-key checking remains enabled by default and protects against spoofing and man-in-the-middle attacks. Administrators should manage trusted entries in `known_hosts` instead of setting `host_key_checking = false`. Secrets belong in Ansible Vault or managed platform credentials, not `ansible.cfg`.
+
+From lowest to highest, the main precedence categories are configuration settings, command-line options, playbook keywords, variables, and direct assignment. Environment variables override corresponding `ansible.cfg` entries, and extra variables have high variable precedence. Ansible does not apply a universal "most specific setting wins" rule.
+
+The following commands generate and inspect configuration:
+
+```shell
+ansible-config init --disabled > ansible.cfg
+ansible-config dump --only-changed
+```
