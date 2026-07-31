@@ -1,186 +1,406 @@
 # *Red Hat Certified Specialist in Containers* Course Notes
+*v1.0 stable release*
+
 These notes cover material from Pluralsight's 2 hour, self-paced [Red Hat Certified Specialist in Containers](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-containers-ex188) course. They cover how to to create, configure, and manage containerized services using Red Hat OpenShift and other Red Hat technologies.
-## Implement and Manage Images with Podman
-Podman manages Open Container Initiative images and containers without a central daemon. It can run rootless, which lets an unprivileged user build, pull and run containers with a smaller host security exposure than a root-owned runtime. Image management with Podman relies on four connected ideas: images, registries, Containerfiles and rootless execution.
-### Images and Registries
-A container image is a packaged filesystem and configuration set that contains the code, runtime, tools, libraries and settings needed to run software. Images use stacked layers. Each instruction in a build normally creates a new layer, and unchanged layers can be cached, reused and shared across images. This design reduces storage use, speeds builds and allows image changes to be traced or rolled back.
+## Container images and registries
+A container image is an immutable OCI image that combines a root filesystem, configuration, and metadata. Podman adds a writable layer when it creates a container from an image. Image builders record filesystem changes in read-only layers, and registries can store and transfer shared layers once. Build caches can reuse unchanged layers, which reduces build time, storage, and network traffic.
 
-Registries store and distribute images. Public registries make images available to anyone, while private registries restrict who can push and pull content. Tags identify image versions inside a registry. Access controls, tagging and continuous integration or continuous delivery workflows let teams publish tested images and deploy known versions.
+Each layer records a filesystem difference from its parent. Layers are not independent restore points and do not replace source control. An operator rolls back by running a known earlier image or rebuilding from controlled source. Containers share the host kernel, so an image must support the target operating-system architecture even though it carries its own user-space files and libraries.
 
-Podman searches registries configured in `registries.conf` when an image name does not include a registry domain. The system file normally lives at `/etc/containers/registries.conf`, and non-root users can use `$HOME/.config/containers/registries.conf`. The `unqualified-search-registries` setting controls default search locations. Individual registry blocks can define a prefix, location, blocking and insecure transport settings.
+An image digest identifies its content. A tag such as `1.4.0` or `latest` is a mutable name that can point to another digest later. Tags organise releases, but they do not provide version control. Production deployments should use meaningful release tags and, when exact identity is required, pin the verified digest.
 
-Common registry and image commands include:
-- `podman login registry.example.com` authenticates to a registry.
-- `podman info` shows Podman configuration, including registry settings.
-- `podman search httpd` searches configured registries.
-- `podman pull registry/image:tag` downloads an image.
-- `podman push registry/image:tag` uploads an image when the account has permission.
-- `podman images` lists local images.
-- `podman inspect image` shows local image metadata.
-- `skopeo inspect docker://registry/image:tag` inspects a remote image without pulling it.
-- `podman rmi image` removes a local image.
-- `podman image tree image` shows image layers.
-### Tagging, Saving and Container State
-Tags give human-readable names to image variants. They simplify updates, rollbacks and environment separation. Production deployments should use explicit tags, such as semantic versions or release identifiers, rather than depending on `latest`. Immutable release tags improve traceability because the same tag always represents the same build.
+A registry stores image manifests, configuration objects, layers, signatures, and related artefacts. A multi-architecture manifest can direct each host to an image built for its platform. Public and private describe access policies rather than different image formats. Registry authentication, repository permissions, TLS, and signature policy control who can distribute and retrieve content.
 
-Useful tagging and pruning commands include:
-- `podman image tag old-image:tag new-image:tag` adds another name or tag to an image.
-- `podman image prune` removes dangling images.
-- `podman image prune -a` removes unused images that no container uses.
+RHEL 10 supplies Podman, Buildah, Skopeo, CRIU, and supporting libraries through the `container-tools` meta-package:
 
-Image backup and container-state capture solve different problems. `podman save -o image.tar image:tag` saves an image and its parent layers into an archive. `podman load -i image.tar` restores that archive into local image storage. This suits distribution, offline transfer and image backup.
-
-`podman commit container new-image:tag` creates an image from the current filesystem state of a container. It preserves changes made after the container started, such as edited files or installed packages. The `--change` option can adjust selected image metadata, including `CMD`, `ENTRYPOINT`, `ENV`, `EXPOSE`, `LABEL`, `USER`, `VOLUME` and `WORKDIR`. Commit is useful for preserving a container state, although reproducible builds should still prefer Containerfiles.
-### Building Images with Containerfiles
-A Containerfile is a build recipe. Podman reads its instructions, applies them on top of a base image and produces a new image. Podman can also build from Dockerfile-compatible files. The base image determines the Linux distribution, package manager, filesystem layout, preinstalled runtime and support profile.
-
-The main build command is:
-
-```text
-podman build -f Containerfile -t localhost/myimage:1.0 .
+```shell
+dnf install container-tools
+podman info
 ```
 
-Core Containerfile instructions include:
-- `FROM` selects the base image.
-- `WORKDIR` sets the working directory for following instructions.
-- `COPY` copies local files from the build context into the image.
-- `ADD` can copy local files, fetch URLs and unpack archives, so `COPY` is clearer for ordinary local file copies.
-- `LABEL` adds key-value metadata.
-- `RUN` executes a command during the build and records the result in a new layer.
-- `USER` sets the user for later instructions and the default runtime user.
-- `EXPOSE` documents a port used by the application, but it does not publish that port on the host.
-- `ENV` sets environment variables that persist in the image.
-- `ARG` defines build-time variables. Values passed with `--build-arg` override defaults but do not automatically persist unless copied into `ENV` or files.
-- `VOLUME` marks a path for external storage.
-- `ENTRYPOINT` defines the executable that runs when the container starts.
-- `CMD` supplies default arguments or a default command, and users can override it more easily than `ENTRYPOINT`.
+Red Hat Universal Base Image 10 provides redistributable micro, minimal, standard, and init variants. `registry.redhat.io` requires authentication, while `registry.access.redhat.com` provides unauthenticated access to suitable images. Fully qualified image references avoid ambiguous short-name resolution.
 
-A simple Apache image can start from a Red Hat Universal Base Image, install `httpd`, copy `index.html` into `/var/www/html`, run as the `apache` user, expose port 8080, set `/usr/sbin/httpd` as the entrypoint and pass `-DFOREGROUND` through `CMD`.
-### Build Arguments, Volumes and Multi-stage Builds
-Build arguments make one Containerfile reusable. For example, `ARG buildname` can set a username during the build. A command such as `podman build --build-arg buildname=alex -t aleximage .` creates an image with a different build value from the default. Because `ARG` is build-time only, runtime settings should use `ENV` when the variable must remain visible after the image is built.
+The standard UBI includes DNF and common utilities. UBI minimal uses `microdnf`, UBI micro omits a package manager, and UBI init supports applications that require `systemd`. Image authors should select the smallest supported variant that supplies the required runtime. They should update the base regularly because copying an old base into a new image does not add later security fixes.
 
-Volumes persist data outside a container filesystem. A `VOLUME /var/www/html` instruction tells Podman to create external storage for that path. Volumes created this way are anonymous unless a named volume or bind mount is supplied at runtime. Administrators can inspect them with `podman volume ls` and `podman volume inspect volume-name`.
+```shell
+podman login registry.redhat.io
+podman pull registry.redhat.io/ubi10/ubi
+podman search registry.access.redhat.com/ubi10
+```
 
-Multi-stage builds reduce final image size and limit runtime dependencies. A first stage can compile or prepare content, while a later stage copies only the needed artefacts into a smaller runtime image. Each `FROM` starts a new stage, and `COPY --from=builder` copies files from a named stage. This pattern keeps compilers, package caches and build tools out of the deployed image.
+Podman reads system-wide registry settings from `/etc/containers/registries.conf`. A rootless user can override them in `$HOME/.config/containers/registries.conf`. Administrators should restrict unqualified searches to trusted registries and keep short-name enforcement enabled.
 
-A two-stage web build can create `index.html` in a builder stage, then copy it into a prebuilt Apache runtime image. The final image contains the served content and web server, not the intermediate build environment.
-### Rootless Podman and Security
-Rootless Podman runs the container runtime and container processes without host root privileges. The root user inside the container maps to an unprivileged user on the host. This reduces risk if an application escapes the container, although it does not remove the need for careful image selection, file permissions and network controls.
+```toml
+unqualified-search-registries = [
+  "registry.access.redhat.com",
+  "registry.redhat.io"
+]
+short-name-mode = "enforcing"
 
-Rootless operation uses Linux user namespaces and subordinate ID ranges. Podman reads user mappings from `/etc/subuid` and group mappings from `/etc/subgid`. A normal user may appear as UID 0 inside the container while mapping to that user's UID on the host. Other container IDs map into the subordinate range. After manual mapping changes, `podman system migrate` refreshes Podman's stored state.
+[[registry]]
+location = "registry.redhat.io"
+blocked = false
+insecure = false
+```
 
-Useful commands include:
-- `cat /etc/subuid` and `cat /etc/subgid` show configured ranges.
-- `usermod --add-subuids start-end username` adds subordinate user IDs.
-- `usermod --add-subgids start-end username` adds subordinate group IDs.
-- `podman unshare command` runs a command in Podman's user namespace.
-- `podman unshare chown uid:gid path` fixes ownership for a bind-mounted host directory.
+The `insecure` setting permits connections without valid TLS protection and should remain `false` for remote registries. The `policy.json` trust policy can require image signature verification.
 
-Rootless containers have limits. Some applications expect real root privileges. Privileged ports such as 80 and 443 are unavailable by default to unprivileged users unless the host allows lower unprivileged ports. Rootless networking commonly uses `slirp4netns` or `pasta`, and rootless storage may use `fuse-overlayfs` where native overlay support is unsuitable.
+`podman login` stores registry credentials in an authentication file for later pulls and pushes. Administrators should protect that file, avoid credentials on command lines, and use scoped service accounts in automation. `podman search` discovers repositories, while `podman info` displays the active registry and storage configuration. Search results do not establish image trust, so operators should confirm the publisher, supported architecture, digest, signature, and update status before deployment.
+## Image management
+Podman manages local images, while Skopeo can inspect remote images without pulling them.
 
-Host directory mounts need explicit security care. The process inside the container accesses the mounted path as the container user mapped onto the host. Permissions must match that mapping. On SELinux systems, unlabeled host paths may block container reads and writes. The `:z` mount option applies a shared container label, while `:Z` applies a private label for one container. Relabel only application data paths, not broad system directories.
+| Operation | Command |
+| --- | --- |
+| List local images | `podman images` |
+| Pull an image | `podman pull registry.redhat.io/ubi10/ubi` |
+| Inspect a local image | `podman inspect IMAGE` |
+| Inspect a remote image | `skopeo inspect docker://REGISTRY/IMAGE:TAG` |
+| Display image layers | `podman image tree IMAGE` |
+| Add a name or tag | `podman tag SOURCE TARGET:TAG` |
+| Push an image | `podman push TARGET:TAG` |
+| Remove an image | `podman rmi IMAGE` |
 
-Bind-mounted data remains on the host after a container is removed. Administrators must clean unused files, back up important data and avoid mounting sensitive host paths into containers. Combining rootless execution, correct ID mapping, selective SELinux labelling and explicit image tags gives Podman a reproducible and safer workflow for building and managing container images.
-### Practical Podman Workflows
-A typical image-management workflow starts with registry configuration and authentication. The operator sets the default search registries, logs in where required, searches for a suitable base image, pulls it locally, inspects its metadata and checks its layers. The operator then tags the image with a meaningful local name before pushing it to an authorised registry or using it as a base for a new build.
+`podman tag` adds another reference to the same local image. A push succeeds only when the destination repository exists and the authenticated account has permission to write to it. `podman image prune` removes dangling images. Adding `-a` removes every image unused by a container, so administrators should review its effect before confirming.
 
-A reliable build workflow keeps source files in a clean build context. The Containerfile should copy only required files, install packages in as few clear steps as practical, remove package caches where appropriate and run the service as a non-root user. Image names should include a registry, repository and explicit tag when the image will leave a local workstation.
+A controlled release flow pulls a fully qualified base, inspects its metadata, builds and tests the application image, assigns a release tag, and pushes it to an authorised repository. Deployment records should retain the resulting digest. Reassigning a tag does not modify existing local image content, but a later pull can resolve that tag to new content.
 
-A state-preservation workflow treats `commit` as a capture tool rather than a substitute for source-controlled builds. After a container changes, `podman commit` can preserve the result as a new image, and `podman save` can export that image to a tar archive. The operator can later use `podman load`, create a new container from the restored image and confirm that the expected files, labels and runtime settings remain present.
+`podman inspect` reports local image configuration, including the user, command, entry point, labels, environment, ports, size, and architecture. `skopeo inspect` queries equivalent remote metadata before download. Neither command proves that an image is safe. Signature verification, vulnerability assessment, provenance checks, and application testing address different risks.
 
-A rootless web-service workflow needs both ownership and labelling. The host content directory should map to the user or group used inside the container. On SELinux hosts, the bind mount should use an appropriate label suffix, normally `:Z` for a private mount or `:z` for shared content. The service should listen on an unprivileged container port, such as 8080, and publish that port explicitly with `-p host-port:container-port`.
-## Managing Containerized Applications with Podman
-Podman manages Open Container Initiative containers and images without a central daemon. It can run containers as an ordinary user, work with Docker-compatible images and Containerfiles, group containers into pods, and integrate with systemd. These features make it useful for administrators, DevOps engineers, and developers who need portable application environments with a smaller administrative and security footprint than traditional virtual machines.
+`podman save` writes an image, its layers, its history, and its tags to an archive. `podman load` restores that image. OCI archives suit OCI workflows, while Docker archives support Docker-compatible tools.
 
-Containers package an application with its dependencies while sharing the host operating system kernel. Virtual machines run complete guest operating systems on a hypervisor, which gives strong isolation but adds resource overhead and slower startup. Containers isolate processes, filesystems, users, and networks through Linux kernel features, so many application instances can run efficiently on one host. Images that follow the Open Container Initiative specification can usually move between compatible engines, which improves portability across development, test, and production environments. Podman also supports pods, which group related containers so they can share selected resources. That model resembles Kubernetes pods and helps small services run together as one logical unit before they move into a larger orchestration platform.
-### Core Podman Workflow
-A basic Podman workflow starts with installing the container tooling on a Red Hat Enterprise Linux host, authenticating to a registry when required, pulling an image, creating a container, checking its state, and removing temporary resources when finished. On Red Hat Enterprise Linux 9, the `container-tools` package group provides Podman, Buildah, Skopeo, and related tools.
+```shell
+podman save --format oci-archive \
+    -o site-image.tar localhost/site:1.0
+podman load -i site-image.tar
+```
 
-Test containers, unused images, temporary volumes, and throwaway networks should be removed after each exercise so later work starts from a known state. That habit prevents confusing results when names, ports, mounts, or stale data collide.
+`podman commit CONTAINER IMAGE` creates an image from changes in a container's writable filesystem and configuration. It does not capture live processes or memory, and it excludes mounted volume content by default. Containerfiles remain the preferred source for repeatable builds.
 
-Common lifecycle commands include:
-- `podman version` or `podman -v` to show the installed version.
-- `podman login` to authenticate to a registry.
-- `podman search` and `podman pull` to find and download images.
-- `podman images` to list local images.
-- `podman run` to create and start a container.
-- `podman run --name NAME -d IMAGE` to create a named background container.
-- `podman ps` to list running containers.
-- `podman ps -a` to list running and exited containers.
-- `podman stop`, `podman start`, and `podman restart` to control existing containers.
-- `podman rm` to remove stopped containers.
-- `podman rm -f` to force removal of a running or stopped container.
-- `podman rmi` to remove an image.
-### Logs, Events, Inspection, and Configuration
-Operational work depends on visibility. `podman logs CONTAINER` reads a container's standard output and error streams, which helps diagnose failed startups, application faults, and runtime behaviour. Log options can limit output, add timestamps, or follow new log entries as they appear. `podman events` reports Podman-level activity such as container creation, starts, stops, removals, image pulls, volume changes, and pod activity. Administrators use events for debugging, audit trails, and automation triggers.
+`podman export` serves a different purpose. It flattens a container filesystem into a tar archive without image history, tags, or layered metadata, and `podman import` creates a new image from that archive. Neither image archives nor exported filesystems replace backups of databases, named volumes, bind mounts, registry metadata, or deployment configuration.
 
-`podman inspect` exposes detailed JSON data about containers and images. It shows configuration, state, process entry point, user, mounts, networking, environment variables, labels, and image metadata. Related commands inspect other resources, such as `podman network inspect NETWORK` and `podman volume inspect VOLUME`. Filtering the JSON with tools such as `jq` makes inspection more useful, especially when only one field matters, such as a container IP address or image user. Inspection should confirm assumptions before a command changes state, because many failures come from incorrect names, ports, users, mounts, and network attachments rather than from Podman itself.
+A live-state migration can use `podman container checkpoint` and `podman container restore` when the host, runtime, CRIU, kernel, and workload support checkpointing. Persistent application data still requires an independent backup policy.
 
-Environment variables configure containers at runtime without rebuilding images. They suit values such as database names, usernames, feature flags, and non-secret runtime settings. A command such as `podman run -e MYSQL_USER=app -e MYSQL_DATABASE=store IMAGE` passes values into the container process. Sensitive values need stronger handling through secrets rather than plain command-line arguments or image layers.
-### Running Databases in Containers
-Database images often require explicit runtime configuration. A MariaDB or PostgreSQL container may exit immediately when required variables are missing. The fastest diagnosis usually comes from `podman ps -a` followed by `podman logs CONTAINER`. The image documentation or `podman inspect IMAGE` can then confirm required variables, exposed ports, default user, entry point, and expected storage paths.
+```shell
+podman container checkpoint \
+    --export web-checkpoint.tar.zst web
+podman container restore \
+    --import web-checkpoint.tar.zst
+```
+## Building images with Containerfiles
+`podman build` uses Buildah libraries to process a `Containerfile` or `Dockerfile` and a build context. Each filesystem-changing instruction can create a layer. Instruction order therefore affects cache reuse and image size.
 
-A corrected database run should set the required variables, assign a stable name, and attach persistent storage. It should also avoid hard-coded production credentials in shell history. Example values in demonstrations must remain examples only. Production deployments should use secrets, restricted permissions, and managed rotation.
-### Container Networking and Exposed Services
-Podman gives each container an isolated network namespace unless the command specifies another mode. A container on a bridge network receives its own interfaces, routing, and IP configuration. Containers on the same DNS-enabled network can reach each other by container name, which suits small multi-service stacks and local development environments.
+The build context limits the files available to `COPY` and `ADD`. A small context improves performance and reduces accidental disclosure. Stable inputs, such as package manifests, should appear before frequently changing application files when that order allows useful cache reuse. Every rebuild should still obtain required security updates under the organisation's release policy.
 
-Network management centres on a few commands:
-- `podman network create NAME` creates a user-defined network.
-- `podman network ls` lists networks.
-- `podman network inspect NAME` shows driver, subnet, gateway, DNS status, and attached containers.
-- `podman network connect NAME CONTAINER` attaches a container to a network.
-- `podman network disconnect NAME CONTAINER` removes that attachment.
-- `podman network rm NAME` removes a network.
-- `podman network prune` removes unused networks.
+Core instructions have distinct roles:
+- `FROM` starts a build stage from a base image.
+- `WORKDIR` sets the directory for later instructions.
+- `COPY` transfers local build-context content into the image.
+- `ADD` also supports remote content and automatic archive extraction, so explicit `COPY` operations are easier to audit.
+- `RUN` executes a build-time command and records its filesystem changes.
+- `ARG` supplies a build-time value without adding it to the final runtime environment.
+- `ENV` records a runtime environment variable in the image configuration.
+- `LABEL` records searchable metadata.
+- `USER` selects the default runtime user. A non-root user reduces risk.
+- `EXPOSE` documents a container port but does not publish it on the host.
+- `VOLUME` declares an image mount point. A named volume or bind mount controls persistent storage at run time.
+- `ENTRYPOINT` selects the main executable, while `CMD` supplies its default arguments or provides the default command when no entry point exists.
 
-A private container service becomes reachable from the host through port mapping. The `-p HOST_PORT:CONTAINER_PORT` option maps traffic from the host to the container during creation. For example, `podman run -d --name web -p 8080:8080 IMAGE` sends host traffic on port 8080 to the container's port 8080. Host firewall rules must also allow external clients when access should extend beyond localhost. `podman port CONTAINER` or `podman port -a` confirms active mappings.
-### Persistent Storage
-Containers have an ephemeral writable layer by default. Podman keeps changes made in that layer while the container exists, then removes them with the container. That behaviour suits caches, temporary files, and disposable test data. It does not suit databases, uploads, or application content that must survive replacement.
+Build arguments and environment variables must not carry passwords, tokens, or private keys. Podman build secrets provide temporary access without recording secret values in the image.
 
-Persistent storage uses bind mounts or volumes. A bind mount maps a specific host path into the container. It gives the container direct access to host files, so host ownership, permissions, and SELinux labels matter. On SELinux-enabled hosts, `:Z` can relabel a private bind mount for container use, while `:z` suits shared mounts.
+The JSON form of `ENTRYPOINT` and `CMD` passes arguments directly without an implicit shell and handles signals more reliably. Runtime arguments normally replace `CMD`, while `podman run --entrypoint` can replace the configured entry point. The operator remains responsible for publishing ports with `-p` and attaching storage with `--mount` or `-v`.
 
-A Podman volume is a named storage resource managed by Podman. Administrators create it with `podman volume create VOLUME`, inspect it with `podman volume inspect VOLUME`, mount it with `--volume VOLUME:/path/in/container`, and remove it with `podman volume rm VOLUME`. The correct removal command is `podman volume rm`, not `podman rm`. Volumes can also be exported and imported as archives with `podman volume export` and `podman volume import`, which helps with migration and backup workflows. Bind mounts are useful when a container must read or write a known host directory. Volumes suit application data that Podman should manage and isolate from normal host paths.
+A multi-stage build uses more than one `FROM` instruction. The final stage copies only required artefacts from a named builder stage, which excludes compilers, source files, and other build dependencies from the runtime image.
 
-Persistent storage improves:
-- Durability, because data survives container deletion.
-- Performance for write-heavy workloads, because data avoids the container copy-on-write layer.
-- Sharing, because multiple containers can read or write a mounted dataset when permissions allow it.
-### Secrets
-Podman secrets store sensitive values outside image layers and normal command text. They suit passwords, tokens, certificates, SSH keys, and other credentials that should not appear in source code, image metadata, or routine logs. Secrets reduce exposure, simplify credential reuse across environments, and support rotation through a central Podman interface.
+```dockerfile
+FROM registry.access.redhat.com/ubi10/ubi:latest AS builder
+ARG PAGE_TITLE="RHEL 10"
+RUN mkdir -p /output && \
+    printf '<h1>%s</h1>\n' "$PAGE_TITLE" > /output/index.html
 
-The core commands are:
-- `podman secret create NAME FILE` to create a secret from a file.
-- `podman secret ls` to list secrets.
-- `podman secret inspect NAME` to inspect metadata.
-- `podman secret rm NAME` to remove a secret.
+FROM registry.access.redhat.com/ubi10/httpd-24:latest
+COPY --from=builder /output/index.html /var/www/html/index.html
+USER 1001
+EXPOSE 8080
+```
 
-A container can receive a secret as an environment variable with syntax such as `--secret dbpass,type=env,target=MYSQL_PASSWORD`. It can also receive a secret as a mounted file. Linux containers mount file secrets under `/run/secrets/TARGET` unless the command specifies another target. Only containers that need a secret should receive it. Administrators should rotate secrets regularly and monitor access patterns. Secrets protect the delivery of sensitive data, but they do not remove the need for least privilege, short-lived credentials where possible, and careful control of shell history, backups, and diagnostic output.
-### Multi-container Applications with Compose
-Multi-container applications usually contain several services, networks, volumes, and dependencies. Compose files place that structure in YAML so the application can start and stop as one stack. Podman can run Compose workloads through an external Compose provider, such as Docker Compose or `podman-compose`. `podman-compose up -d` or `podman compose up -d` creates the declared services in detached mode when the relevant provider is installed. The matching `down` command tears the stack down.
+Podman builds from the current directory and tags the result locally. The runtime publishes host port 8080 to the image's port 8080.
 
-A typical Compose file defines:
-- Services such as a database and an administration UI.
-- Images or build instructions for each service.
-- Environment variables needed by each service.
-- Named volumes for persistent data.
-- User-defined networks for service communication.
-- Port mappings for host access.
-- Dependencies with `depends_on` when startup order matters.
+```shell
+podman build --build-arg PAGE_TITLE="RHEL 10" \
+    -t localhost/site:1.0 .
+podman run --rm -d --name site \
+    -p 8080:8080 localhost/site:1.0
+curl http://localhost:8080/
+```
 
-For example, a PostgreSQL service can expose port 5432, mount a named volume under its data directory, and join a shared application network. A pgAdmin service can expose a web UI on a host port, use its own login variables, join the same network, and depend on the database service. The UI can then connect to the database by service name on the shared network.
-### Troubleshooting Containers
-Effective troubleshooting starts with state, then moves to evidence. `podman ps -a` shows whether a container is running, exited, or restarting. `podman logs` reveals application errors and missing configuration. `podman inspect` confirms image expectations, runtime configuration, mounts, users, and network attachments.
+Small, secure images use a trusted UBI 10 base, copy only required files, run as a non-root user, and remove package-manager caches in the same `RUN` instruction that installs packages. A `.containerignore` file keeps unrelated or sensitive content out of the build context. Verified digests fix base-image identity. The RHEL 10 build options `--source-date-epoch` and `--rewrite-timestamp` can reduce timestamp variation in reproducible build workflows.
 
-Database startup failures commonly come from missing variables, incorrect mount paths, file ownership, or SELinux labelling. If a database image runs as user 27 and a mounted host directory belongs only to a normal user, the container may fail with permission errors. `podman unshare chown -R 27:27 PATH` can adjust ownership inside the rootless user namespace, and `:Z` can apply an SELinux label that permits private container access.
+Image authors should also record useful OCI labels, define a health check when the application supports one, and keep data outside the writable container layer. Scanners can identify known vulnerable packages, but maintainers must rebuild and redeploy the image to apply fixes.
+## Rootless Podman
+Rootless Podman runs the engine and containers as a regular host user. A process with UID 0 inside the container maps to an unprivileged host ID rather than host root. The files `/etc/subuid` and `/etc/subgid` allocate subordinate UID and GID ranges. After an administrator changes those files, `podman system migrate` applies the new mappings.
 
-Network failures often come from two causes. Containers may sit on different networks, or the shared network may not provide name resolution. `podman inspect CONTAINER` and `podman network inspect NETWORK` reveal both problems. The fix may require disconnecting containers from the wrong network, creating a DNS-enabled network, connecting both containers to it, and testing from inside the client with `podman exec -it CONTAINER /bin/bash` followed by a tool such as `curl`.
+The invoking user's host UID normally maps to root inside the rootless user namespace, while other container IDs map into subordinate ranges. Numeric ownership displayed from the host can therefore differ from ownership displayed inside the container. `podman unshare` runs a command in the same user-namespace mapping and allows administrators to diagnose that difference.
 
-`podman cp` helps move files into or out of containers during diagnosis. `podman port` verifies published ports. Host firewall rules, local SELinux policy, and application listen addresses can also block access even when the container itself is healthy. A repeatable troubleshooting process changes one variable at a time, validates the result, and records the final command so the fix can be reproduced safely.
-### Running Containers as Services
-Long-running containers need predictable lifecycle management. systemd can start containers at boot, restart failed workloads, apply resource controls, centralise logs, and align container administration with other Linux services. This approach suits web servers, databases, and local infrastructure services that must survive user sessions and host restarts. Logs can then be read through normal systemd tooling, such as `journalctl`, which places container service messages beside other host events.
+Rootless storage normally resides in `$HOME/.local/share/containers/storage`, separate from root's storage in `/var/lib/containers/storage`. RHEL 10 uses `pasta` as the default rootless network mode. `slirp4netns` remains available as an alternative. A rootless process cannot normally publish host ports below 1024, so applications should publish to an unprivileged host port such as 8080.
 
-Modern Podman deployments should prefer Quadlet for new systemd integration. Quadlet uses declarative files, such as `.container`, `.volume`, and `.network`, which the Podman systemd generator converts into normal service units at boot or during `systemctl daemon-reload`. Rootless Quadlet files can live under `~/.config/containers/systemd/`. System-wide Quadlet files commonly live under `/etc/containers/systemd/`.
+Rootless operation limits the effect of a container escape because the engine lacks host-root authority. It does not remove application vulnerabilities or justify running the workload as container root. Images should still select a non-root `USER`, drop unneeded capabilities, avoid privileged mode, and expose the fewest host resources.
 
-Older workflows may use `podman generate systemd --files --new --name CONTAINER` to create a service unit from an existing container. That command is now deprecated, but it still explains many existing systems. Generated root units belong under `/etc/systemd/system`, while generated user units belong under `$HOME/.config/systemd/user`. The path `/etc/system/systemd` is incorrect.
+Bind mounts need correct Unix ownership and SELinux labels. `podman unshare chown` changes ownership using IDs from Podman's user namespace. The `:Z` mount option applies a private container label, while `:z` applies a shared label for content used by several containers.
 
-For user services, `systemctl --user daemon-reload`, `systemctl --user start SERVICE`, and `systemctl --user enable SERVICE` manage the unit. `loginctl enable-linger USER` allows user services to start at boot and keep running after logout. For system services, root uses `systemctl daemon-reload`, `systemctl start SERVICE`, and `systemctl enable SERVICE`.
+```shell
+mkdir -p content
+podman unshare chown -R 1001:0 content
+podman run --rm -d --name web \
+    -p 8080:8080 \
+    -v ./content:/var/www/html:Z \
+    registry.access.redhat.com/ubi10/httpd-24
+```
+
+The `:U` mount option can adjust bind-mount ownership automatically, but it recursively changes the host files and can be slow. Host directories also weaken filesystem isolation. Administrators should expose only required paths, grant the least access, retain SELinux enforcement, and manage backup and deletion separately from the container lifecycle.
+## Containers and Podman
+A container packages an application with its runtime, libraries, and configuration. Linux namespaces isolate processes, networks, mounts, and other resources, while control groups govern resource use. Containers share the host kernel, unlike virtual machines, which run separate guest kernels through a hypervisor. This design gives containers a smaller footprint and faster startup, but it does not make them equivalent to virtual machines or remove the need for layered security.
+
+Podman manages OCI containers and images without a permanent central daemon. It supports rootless operation, pods, registries, Buildah, Skopeo, and systemd integration. Rootless containers reduce host privileges, but they do not remove every security risk. Podman accepts many Docker-style commands and image formats, although complete command and orchestration compatibility does not exist.
+
+Rootful and rootless Podman maintain separate container storage and configuration. A container created with `sudo podman` does not appear in an unprivileged user's `podman ps` output. An administrator should choose the operating identity before creating images, containers, networks, volumes, and secrets, then use that identity consistently.
+
+RHEL 10 supplies Podman through the `container-tools` meta-package:
+
+```shell
+sudo dnf install container-tools
+podman info
+podman version
+```
+
+Fully qualified image names identify the registry and repository explicitly. Public content from `registry.access.redhat.com` does not require authentication. Protected content from `registry.redhat.io` requires a Red Hat registry login.
+
+```shell
+podman login registry.redhat.io
+podman pull registry.access.redhat.com/ubi10/ubi
+podman run --name release-check --rm \
+  registry.access.redhat.com/ubi10/ubi cat /etc/redhat-release
+```
+
+An image contains read-only layers and metadata. A running container adds a writable layer. Stopping and restarting that container retains the layer, but removing the container discards it. Volumes or bind mounts must hold data that must outlive the container.
+
+| Task | Command |
+|---|---|
+| Search a registry | `podman search registry.access.redhat.com/ubi10` |
+| List local images | `podman images` |
+| Create and start a container | `podman run [options] IMAGE [command]` |
+| List running or all containers | `podman ps` or `podman ps -a` |
+| Stop or restart a container | `podman stop NAME` or `podman restart NAME` |
+| Start an existing container | `podman start NAME` |
+| Remove a container | `podman rm NAME` |
+| Remove an image | `podman rmi IMAGE` |
+
+`podman run --rm` removes a container after it exits. `podman rm -f` stops and removes a container, so an administrator should confirm the target and persistent storage first.
+
+Container creation should encode the complete runtime configuration. Recreating a container from a reviewed command, Quadlet, Kubernetes YAML file, or Compose file gives operations a repeatable deployment path. Interactive changes made with `podman exec` can help diagnosis, but they disappear when Podman replaces the container. Permanent application changes belong in a rebuilt image or mounted configuration.
+
+Least privilege applies to every deployment. An administrator should avoid `--privileged`, mount only required paths, publish only required ports, drop unneeded Linux capabilities, set resource limits, and prefer read-only mounts where the application does not write. Image provenance, update policy, and vulnerability management remain important because a container still executes software on the host kernel.
+## Observation and configuration
+Podman exposes container state through logs, events, inspection, process lists, and resource statistics:
+
+```shell
+podman ps -a
+podman logs --timestamps --tail 100 web
+podman logs --follow web
+podman events --since 1h
+podman inspect web
+podman top web
+podman stats --no-stream web
+```
+
+`podman logs` returns available output and exits unless `--follow` is present. It has no content-search option, so a shell tool can filter its output:
+
+```shell
+podman logs web 2>&1 | grep -i error
+```
+
+Events record lifecycle operations such as creation, startup, exit, removal, network changes, and volume changes. The default events logger commonly uses the system journal. Logs and events support diagnosis, but neither forms a tamper-resistant audit record by itself.
+
+Time filters narrow an investigation without inventing unsupported log options. `podman logs --since 30m --until 10m NAME` selects container output by time, while `podman events --filter container=NAME` limits the event stream. A central log platform should collect, protect, retain, and correlate records when operational or compliance requirements exceed local journal retention.
+
+`podman inspect` returns structured JSON for containers, images, networks, and volumes. A format expression extracts a specific value:
+
+```shell
+podman inspect --format '{{.State.Status}}' web
+podman inspect --format '{{.Config.User}}' web
+podman network inspect appnet
+podman volume inspect app-data
+```
+
+Environment variables suit non-sensitive configuration such as feature flags, service names, and ports. Values supplied with `--env`, an environment file, or a Compose file can appear in inspection output, shell history, process environments, or source control. Credentials belong in Podman secrets or an external secret manager.
+
+RHEL 10 provides MariaDB 10.11 as `registry.redhat.io/rhel10/mariadb-1011`. This image uses `MARIADB_ROOT_PASSWORD` for the root password. A Podman secret can supply that variable without placing the value on the command line:
+
+```shell
+umask 077
+read -r -s DB_PASSWORD
+printf '%s' "$DB_PASSWORD" | podman secret create mariadb-root -
+unset DB_PASSWORD
+podman volume create mariadb-data
+podman run -d --name mariadb \
+  --secret mariadb-root,type=env,target=MARIADB_ROOT_PASSWORD \
+  --volume mariadb-data:/var/lib/mysql \
+  registry.redhat.io/rhel10/mariadb-1011
+```
+
+An application that accepts a credential file should receive the secret as a mounted file instead of an environment variable.
+## Networking and application exposure
+Each container receives its own network namespace unless another mode is selected. RHEL 10 uses `pasta` as the default rootless network mode. Rootful Podman uses a bridge by default. A user-defined bridge network provides an isolated application network, and Aardvark DNS resolves container names when DNS remains enabled.
+
+A Podman pod groups related containers and gives them a shared network namespace. Containers in the pod normally communicate through `localhost`, and the pod publishes ports for the group. Pods suit tightly coupled processes, while separate containers on user-defined networks provide stronger network separation and independent addressing. Neither model supplies cluster scheduling or high availability across hosts.
+
+```shell
+podman network create appnet
+podman run -d --name web --network appnet \
+  -p 127.0.0.1:8080:8080 \
+  registry.access.redhat.com/ubi10/httpd-24
+podman run --rm --network appnet \
+  registry.access.redhat.com/ubi10/ubi \
+  curl -s http://web:8080/
+podman port web
+```
+
+Containers on the same DNS-enabled network address one another by name and use the destination container's internal port. Published host ports do not control container-to-container traffic. `127.0.0.1:8080:8080` limits host access to the local system. Omitting the host address binds the port on all host addresses by default. Remote access also requires an appropriate `firewalld` rule.
+
+Podman can attach or detach a running container:
+
+```shell
+podman network connect appnet client
+podman network disconnect appnet client
+```
+
+`podman network inspect appnet` reveals subnets, gateways, attached containers, and DNS status. A network created with `--disable-dns` cannot resolve container names. Podman must recreate the network to change that property.
+## Persistent storage
+Podman supports named volumes and bind mounts:
+
+| Storage | Management | Best use |
+|---|---|---|
+| Container writable layer | Podman removes it with the container | Caches and disposable state |
+| Named volume | Podman creates, inspects, exports, imports, and removes it | Application data with minimal host coupling |
+| Bind mount | The administrator manages the host path | Selected host content, configuration, and controlled file exchange |
+
+Podman's graph root and execution mode determine a named volume's host path, so automation should use volume names rather than a hard-coded storage directory.
+
+```shell
+podman volume create app-data
+podman volume ls
+podman volume inspect app-data
+podman run -d --name app \
+  --volume app-data:/var/lib/app \
+  IMAGE
+```
+
+A bind mount requires suitable host ownership, permissions, and SELinux labels. The `:Z` option applies a private container label. The `:z` option applies a shared label for content used by multiple containers. `:U` recursively changes host ownership to match the container's user namespace, so it needs careful review before use.
+
+```shell
+mkdir -p "$HOME/web-content"
+podman run -d --name web \
+  -p 127.0.0.1:8080:8080 \
+  -v "$HOME/web-content:/var/www/html:Z" \
+  registry.access.redhat.com/ubi10/httpd-24
+```
+
+For rootless containers, `podman unshare` helps examine or change ownership as it appears inside the user namespace:
+
+```shell
+podman unshare stat "$HOME/web-content"
+podman unshare chown -R CONTAINER_UID:CONTAINER_GID "$HOME/web-content"
+```
+
+A consistent backup requires the application to flush or stop writes before export. Podman can then move a named volume through a tar archive:
+
+```shell
+podman stop mariadb
+podman volume export mariadb-data -o mariadb-data.tar
+podman volume create mariadb-restored
+podman volume import mariadb-restored mariadb-data.tar
+```
+
+`podman volume rm VOLUME` removes a volume. Podman refuses to remove an in-use volume unless forced, and forced removal can destroy application data.
+
+Mount availability alone does not guarantee safe concurrent access. Applications that share a volume must coordinate locking, transactions, ownership, and file formats. Backups should include restoration tests, encryption, retention, and off-host copies. A volume export captures files, but it does not validate database consistency or restore the container's image, network, secrets, and runtime settings.
+## Secrets
+Podman stores secrets separately from images and does not include them in image commits or exports. A secret can enter a container as a file under `/run/secrets/NAME` or as an environment variable when an application requires that interface.
+
+```shell
+podman secret create app-token token.txt
+podman secret ls
+podman secret inspect app-token
+podman run --secret app-token IMAGE
+podman secret rm app-token
+```
+
+`podman secret inspect` displays metadata, not the secret value. Access should follow least privilege, protected source files should have restrictive permissions, and operators should avoid credentials in images, command arguments, logs, environment files, and Compose files.
+
+`podman secret create --replace` changes the stored secret, but existing containers keep the value supplied when Podman created them. Rotation therefore requires replacement of each dependent container. Podman secrets provide local host storage, not distributed secret management, policy enforcement, or automatic rotation across several systems.
+## Multi-container applications
+A multi-container application normally defines services, images, networks, volumes, configuration, secrets, dependencies, and published ports as one deployment. Shared user-defined networks support service discovery, while separate networks can limit communication between tiers.
+
+Only entry-point services should publish host ports. Database and back-end services can remain on internal application networks and accept traffic from authorised peers by container name. Distinct networks can separate front-end, application, and data tiers. Resource limits and health checks should apply per service because one unhealthy or memory-intensive container can otherwise degrade the complete application.
+
+Upstream Podman provides `podman compose` as a wrapper around an external provider such as `docker-compose` or `podman-compose`. RHEL 10 does not ship or support `podman-compose`. An organisation that installs an external provider should validate its Compose features and support policy before use:
+
+```shell
+podman compose -f compose.yaml config
+podman compose -f compose.yaml up -d
+podman compose -f compose.yaml ps
+podman compose -f compose.yaml logs
+podman compose -f compose.yaml down
+```
+
+Compose `depends_on` controls creation and startup order. It does not prove that a database or other dependency is ready to accept requests. Health checks, retry logic, and failure handling must enforce readiness. Persistent data belongs in declared volumes, and credentials belong in supported secret facilities.
+
+RHEL-supported alternatives include Kubernetes YAML with `podman kube play` and Quadlet units. Quadlet can define containers, pods, networks, volumes, images, builds, and Kubernetes workloads under systemd.
+## Troubleshooting
+Effective diagnosis follows the failure from container state to the application and then to its dependencies:
+1. `podman ps -a` identifies creation, startup, exit, and health states.
+2. `podman logs NAME` and `journalctl` expose application and service errors.
+3. `podman inspect NAME` verifies the image, command, user, environment, mounts, ports, networks, and exit code.
+4. `podman exec -it NAME COMMAND` tests the running container from inside its namespaces.
+5. `podman port NAME` and `podman network inspect NETWORK` verify publication, membership, and DNS.
+6. `ls -Zd PATH`, `podman unshare stat PATH`, and image inspection reveal SELinux, permission, and ownership faults.
+7. The administrator changes one cause, recreates the container when configuration changed, and repeats the original test.
+
+A database that reports `permission denied` on a bind mount commonly lacks either the required ownership or an SELinux container label. The correction should set the image's required UID and GID, and use `:Z` or `:z` as appropriate. Disabling SELinux or granting world-writable permissions conceals the cause and weakens the host.
+
+A failed name lookup commonly indicates that the containers use different networks, the network has DNS disabled, or the client uses the wrong service name. A successful name lookup followed by a refused connection points instead to the application state, listening address, or internal port. Host port publication and firewall rules become relevant only when traffic crosses the host boundary.
+## Containers as systemd services
+RHEL 10 uses Quadlet for new systemd-managed containers. `podman generate systemd` is deprecated. Quadlet source files describe the desired container, and a systemd generator creates transient `.service` units.
+
+A rootless administrator stores `web.container` in `~/.config/containers/systemd/`:
+
+```ini
+[Unit]
+Description=UBI 10 HTTP service
+
+[Container]
+ContainerName=web
+Image=registry.access.redhat.com/ubi10/httpd-24
+PublishPort=127.0.0.1:8080:8080
+Volume=%h/web-content:/var/www/html:Z
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target
+```
+
+Systemd generates `web.service` after a reload:
+
+```shell
+systemctl --user daemon-reload
+systemctl --user start web.service
+systemctl --user status web.service
+journalctl --user-unit web.service
+sudo loginctl enable-linger "$USER"
+```
+
+Lingering allows the user's service manager to start at boot and continue after logout. A root-managed Quadlet belongs in `/etc/containers/systemd/`, uses ordinary `systemctl` commands, and normally specifies `WantedBy=multi-user.target`.
+
+Generated Quadlet services are transient, so `systemctl enable web.service` does not provide boot persistence. The `[Install]` section in the Quadlet source supplies that relationship when the generator runs. Systemd then manages startup order, restart policy, resource controls, status, and journal integration.
