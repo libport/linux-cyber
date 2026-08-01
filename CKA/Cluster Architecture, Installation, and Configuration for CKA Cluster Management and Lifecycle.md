@@ -1,4 +1,6 @@
 # Kubernetes Cluster Management and Lifecycle with kubeadm
+> [!NOTE]
+> This guide explains the full lifecycle of a self-managed Kubernetes cluster with `kubeadm`, from deployment planning and node preparation through installation, networking, validation, maintenance, and upgrades.
 ## Choose the deployment model
 An organisation can run Kubernetes as a managed cloud service, on cloud virtual machines, or on premises. A managed service transfers much of the control-plane operation, patching, and infrastructure maintenance to the provider. A self-managed cluster offers greater control but makes the organisation responsible for the operating system, container runtime, Kubernetes components, networking, upgrades, security, and recovery.
 

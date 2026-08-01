@@ -1,4 +1,6 @@
 # Maintaining, Monitoring, and Troubleshooting Kubernetes
+> [!NOTE]
+> This guide covers reliable Kubernetes operations through Helm release management, availability planning, safe upgrades, observability, reliability objectives, chaos testing, and evidence-led troubleshooting.
 ## Helm release management
 Helm packages related Kubernetes resources as a chart. `Chart.yaml` defines chart metadata, including the chart version and optional application version. `values.yaml` supplies defaults, additional values files override them, and files under `templates/` generate Kubernetes manifests. Helm renders those templates and submits the resulting resources to the API server. It does not rewrite the chart's source YAML.
 

@@ -1,4 +1,6 @@
 # Certified Kubernetes Administrator: Using kubeadm to Install a Basic Cluster
+> [!NOTE]
+> This guide explains how to build a basic Kubernetes cluster with `kubeadm`, covering host preparation, control-plane bootstrapping, networking, worker-node joining, verification, and production-readiness considerations.
 ## Installing Kubernetes with kubeadm
 `kubeadm` provides a practical path for creating a basic Kubernetes cluster on Linux hosts. It does not design the wider platform, provision infrastructure, configure production high availability, or operate workloads. It bootstraps the control plane, creates the join process for other nodes, and leaves administrators to choose the infrastructure, container runtime, network add-on, security model, and upgrade process.
 

@@ -1,4 +1,6 @@
 # Managing Kubernetes Controllers and Deployments
+> [!NOTE]
+> This guide explains how Kubernetes controllers reconcile desired state and how to configure, update, troubleshoot, and safely operate Deployments, ReplicaSets, DaemonSets, Jobs, CronJobs, and StatefulSets.
 ## Reconciliation and controller architecture
 Kubernetes uses declarative configuration. An object records a desired state in the API, while one or more controllers compare that state with the cluster's observed state and act to reduce the difference. Each controller runs a reconciliation loop. The loop watches relevant objects, evaluates their current condition, and submits changes through the API server. Reconciliation continues after the first successful action, so the cluster can respond to later failures, configuration changes, and scaling requests.
 

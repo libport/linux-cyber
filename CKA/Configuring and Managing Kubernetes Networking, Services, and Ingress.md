@@ -1,4 +1,6 @@
 # Configuring and Managing Kubernetes Networking, Services, and Ingress
+> [!NOTE]
+> This guide explains Kubernetes networking end to end, covering Pod connectivity and CNI, DNS and Service discovery, Service traffic, Ingress and Gateway routing, TLS, configuration, and troubleshooting.
 ## Purpose and prerequisites
 Kubernetes networking gives containerised applications a predictable way to communicate across nodes, services, and external entry points. Administrators and developers use it to deploy workloads that keep stable access patterns while Pods start, stop, scale, and move across the cluster.
 

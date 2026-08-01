@@ -1,4 +1,7 @@
 # Kubernetes Persistent Storage and Pod Scheduling
+> [!NOTE]
+> This guide explains how Kubernetes storage and scheduling work together, covering persistent volumes, dynamic provisioning, resource-based placement, affinity, taints, topology constraints, disruption budgets, and troubleshooting.
+
 Kubernetes separates application state from Pod lifecycles and assigns new Pods to suitable nodes. Storage topology, resource requests, placement rules, and disruption controls must work together. A valid storage request can still leave a Pod pending when no node satisfies every scheduling constraint.
 ## Persistent storage
 A container's writable layer is ephemeral and can disappear when Kubernetes replaces the container or Pod. An `emptyDir` volume survives a container crash but disappears when the Pod leaves its node. Applications that require durable state use a storage service designed for the required failure, recovery, and consistency model.

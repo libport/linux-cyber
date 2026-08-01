@@ -1,4 +1,6 @@
 # Certified Kubernetes Administrator: Performing Cluster Version Upgrades
+> [!NOTE]
+> This guide outlines a safe, sequential `kubeadm` upgrade process covering preparation, backups, node draining, control-plane and worker upgrades, version compatibility, and post-upgrade verification.
 ## Prepare the cluster
 Kubeadm upgrades a cluster in this order: the first control-plane node, each additional control-plane node, and then the worker nodes. An administrator must not skip a minor release. Before changing the cluster, the administrator should:
 - Read the target release notes, deprecations, version-skew policy, and CNI upgrade instructions.

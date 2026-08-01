@@ -1,4 +1,7 @@
 # Workloads and Scheduling for CKA
+> [!NOTE]
+> This guide covers Kubernetes workloads and scheduling, including controllers, rollouts and rollbacks, configuration, resource management, Pod placement, disruption controls, autoscaling, and operational verification.
+
 The CKA curriculum assigns 15% of the examination to workloads and scheduling. This domain covers application controllers, rolling updates and rollbacks, configuration, autoscaling, resource management, Pod placement, and disruption control.
 ## Workload controllers
 A Kubernetes controller continually compares actual state with desired state and acts to reconcile any difference. A standalone Pod may restart its containers on the same node, but no higher-level controller replaces the Pod after deletion or node loss. Most applications therefore use a workload controller.

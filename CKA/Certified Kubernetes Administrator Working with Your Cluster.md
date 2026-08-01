@@ -1,4 +1,6 @@
 # Certified Kubernetes Administrator: Working with Your Cluster
+> [!NOTE]
+> This guide shows administrators how to manage Kubernetes clusters with `kubectl`, covering secure access, resource discovery, troubleshooting, declarative workloads and Services, scaling, and cleanup.
 ## kubectl access and command structure
 `kubectl` communicates with the Kubernetes control plane through the API server. It creates, reads, updates, deletes, and troubleshoots API resources such as Pods, Deployments, Services, and Nodes. A kubeconfig file supplies cluster endpoints, credentials, contexts, and default namespaces. Before changing a cluster, an operator should confirm the active context and namespace.
 

@@ -1,4 +1,7 @@
 # Configuring and Managing Kubernetes Security
+> [!NOTE]
+> This guide presents a defence-in-depth approach to Kubernetes security, covering identity and RBAC, image supply chains, admission controls, workload hardening, network policies, secrets protection, auditing, and runtime detection.
+
 Kubernetes security depends on overlapping controls for identity, authorisation, software supply chains, workload configuration, network paths, secrets, and runtime activity. Each control reduces exposure or limits the effect of a compromised credential, image, or container.
 ## Secure cluster access
 ### Authentication and human access

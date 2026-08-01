@@ -1,4 +1,7 @@
 # Storage for CKA
+> [!NOTE]
+> This guide explains Kubernetes persistent storage, covering PVs, PVCs, StorageClasses, CSI drivers, access modes, provisioning, topology-aware binding, reclamation, expansion, and troubleshooting.
+
 Kubernetes separates storage consumption from storage implementation. Applications request capacity and access characteristics, while cluster components and storage drivers provision, attach, mount, resize, and reclaim the backing resource. This separation allows Pod replacement without tying application data to a container's writable layer.
 ## Storage lifecycles and resources
 A container's writable layer is ephemeral and unsuitable for durable application state. An `emptyDir` volume lets containers in one Pod share data and survives container crashes, but Kubernetes deletes it when the Pod leaves its node. Persistent storage uses a lifecycle independent of an individual Pod.

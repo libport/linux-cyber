@@ -1,4 +1,7 @@
 # Certified Kubernetes Administrator: Kubernetes Foundations
+> [!NOTE]
+> This guide explains Kubernetes administration fundamentals, from cluster architecture and declarative `kubectl` workflows to workloads, networking, security, and evidence-led troubleshooting.
+
 Kubernetes, often abbreviated to K8s, automates the deployment, scaling, and management of containerised applications. It uses a declarative model. An administrator submits a desired state, and Kubernetes controllers continually compare that state with the cluster's actual state and close any gap. This reconciliation process drives deployment, scaling, replacement, and recovery.
 
 A cluster contains a control plane and one or more worker nodes. The control plane stores cluster state and makes global decisions. Worker nodes run application workloads in Pods. Production clusters commonly distribute control plane components and workloads across several machines for resilience, while a compact three-node `kubeadm` cluster provides a useful learning environment.

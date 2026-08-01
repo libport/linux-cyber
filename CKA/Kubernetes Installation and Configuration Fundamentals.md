@@ -1,4 +1,6 @@
 # Kubernetes Installation and Configuration Fundamentals
+> [!NOTE]
+> This guide explains how to install and configure a self-managed Kubernetes cluster with `kubeadm`, covering planning, host preparation, control-plane bootstrap, networking, worker joins, validation, and ongoing operations.
 ## Deployment model
 Kubernetes can run on local development systems, cloud virtual machines, managed cloud services, on-premises virtual machines, or bare-metal servers. Desktop distributions suit learning and application development. Managed services shift much of the control plane and infrastructure operation to a provider, although the customer still manages workloads, access, policy, and the responsibilities defined by the service boundary.
 
