@@ -1,64 +1,67 @@
-# Configuring and Managing Kubernetes Storage and Scheduling
+# Kubernetes Persistent Storage and Pod Scheduling
+Kubernetes separates application state from Pod lifecycles and assigns new Pods to suitable nodes. Storage topology, resource requests, placement rules, and disruption controls must work together. A valid storage request can still leave a Pod pending when no node satisfies every scheduling constraint.
 ## Persistent storage
-Kubernetes treats containers as disposable. When a pod restarts, moves, or is replaced, data written to the container filesystem does not provide durable application state. Stateless front ends and APIs can usually recreate runtime state, but databases, upload services, log collectors, and batch jobs need storage that outlives pod lifecycle events.
+A container's writable layer is ephemeral and can disappear when Kubernetes replaces the container or Pod. An `emptyDir` volume survives a container crash but disappears when the Pod leaves its node. Applications that require durable state use a storage service designed for the required failure, recovery, and consistency model.
 
-PersistentVolumes (PVs) separate storage from compute. A PV represents cluster storage provisioned by an administrator or by a StorageClass. It can map to network storage, cloud disks, CSI drivers, local volumes, or a hostPath in a local test environment. A PersistentVolumeClaim (PVC) represents a workload's request for storage. The claim declares capacity, access mode, storage class, and optionally volume mode or selectors. Kubernetes binds a compatible PV to the PVC, and pods mount the claim as a volume.
+| Resource | Scope | Role |
+| --- | --- | --- |
+| PersistentVolume (PV) | Cluster | Represents provisioned storage and its capacity, class, access modes, topology, and reclaim policy |
+| PersistentVolumeClaim (PVC) | Namespace | Requests storage and gives a Pod a namespaced reference to mount |
+| StorageClass | Cluster | Defines a provisioner and implementation-specific storage policy |
 
-This abstraction gives platform teams control over storage back ends while developers request storage through a stable API. It also avoids tying application data to a single container image or pod instance.
+The control plane binds one PVC exclusively to one compatible PV. Matching considers the storage class, requested capacity, access modes, volume mode, and any selector. A PV may provide more capacity than the claim requests because Kubernetes does not split one PV among claims. A `Bound` PVC confirms selection or provisioning, not successful attachment or mounting.
 
-Important corrections for PVs and PVCs:
-- ReadWriteOnce means a volume can mount read-write on one node, not one pod. Multiple pods on the same node may access it, depending on the volume and application behaviour.
-- ReadWriteOncePod is the access mode that restricts read-write access to one pod across the cluster, when supported by CSI.
-- hostPath suits local learning and single-node testing. It binds data to a node and does not provide portable production storage.
-- For production, teams normally use CSI-backed storage, network filesystems, managed cloud disks, backup policies, and explicit reclaim policies.
+A Pod references the PVC under `spec.volumes` and mounts that Pod volume through `volumeMounts`. Data can survive Pod replacement while the claim and backing asset remain available. Persistence does not guarantee replication, backup, integrity, or cross-zone recovery.
 
-A basic validation pattern creates a PV, creates a matching PVC, mounts that PVC into a pod, writes a file under the mount path, deletes the pod, recreates it, and checks that the file remains available. This verifies persistence across pod replacement, but it does not prove resilience across node failure unless the storage backend supports that outcome.
-## StorageClasses and dynamic provisioning
-Manual PV creation becomes unreliable as teams add services. StorageClasses define reusable storage profiles. They set the provisioner, parameters, reclaim policy, and volume binding mode. A PVC refers to a StorageClass name, and Kubernetes provisions or selects storage according to that class.
+`ReadWriteOnce` permits a read-write mount from one node, not one Pod. Several Pods on that node may use the volume. `ReadWriteOncePod` constrains a supported CSI volume to one Pod across the cluster. Backend capabilities determine support for `ReadOnlyMany`, `ReadWriteMany`, and other modes.
 
-Dynamic provisioning needs a real provisioner, usually a CSI driver such as an AWS EBS CSI driver, a VMware vSphere CSI driver, or another storage vendor driver. The field `provisioner: kubernetes.io/no-provisioner` does not create storage dynamically. It identifies storage that Kubernetes cannot provision automatically, such as local volumes that require pre-created PVs. For local volumes, `WaitForFirstConsumer` is usually the safer binding mode because the scheduler can consider pod node constraints before binding a claim.
+`hostPath` exposes a directory on one node. It can demonstrate mounting in a controlled single-node environment, but it does not provide portable multi-node persistence and can expose sensitive host data. Production clusters normally use supported Container Storage Interface drivers, network storage, or topology-aware local PVs.
+### StorageClasses and binding
+Dynamic provisioning requires a functioning provisioner, commonly a CSI driver. The provisioner creates a backing asset and PV for a matching PVC. By contrast, `provisioner: kubernetes.io/no-provisioner` explicitly disables automatic provisioning and supports pre-created local PVs. A static PV does not become dynamically provisioned because a StorageClass names it.
 
-Reclaim policy controls what happens after a PVC releases a PV:
-- Delete removes the associated storage asset when the provisioner supports deletion.
-- Retain preserves the data for manual recovery or clean-up.
-- Development clusters often prefer Delete.
-- Production stateful systems often prefer Retain or explicit backup and deletion workflows.
-## Scheduling workloads deliberately
-The Kubernetes scheduler places new or unscheduled pods onto nodes. It first filters out nodes that cannot satisfy requirements, then scores feasible nodes and binds the pod to the highest-ranked option. It considers resource requests, node labels, affinity rules, taints, tolerations, volume topology, and policy constraints.
+Omitting `storageClassName` allows the default StorageClass to apply. Setting `storageClassName: ""` disables dynamic provisioning for the claim and restricts binding to a PV with no class. Naming a class requests that class.
 
-The scheduler does not continuously rebalance already-running pods by itself. It makes placement decisions when a pod needs scheduling. Rebalancing needs controllers, rollout actions, the descheduler, or operator intervention.
-## Taints, tolerations, and node isolation
-Taints let a node repel pods. Tolerations let selected pods schedule onto tainted nodes, but they do not force placement. A dedicated analytics node might receive `dedicated=analytics:NoSchedule`. Analytics pods can tolerate that taint. A `nodeSelector` or node affinity rule can then target nodes labelled `dedicated=analytics`.
+| Binding mode | Behaviour |
+| --- | --- |
+| `Immediate` | Binds or provisions when the PVC appears, before the scheduler knows the consuming Pod's placement |
+| `WaitForFirstConsumer` | Delays binding or provisioning until scheduling can account for node constraints and storage topology |
 
-This combination matters. The toleration grants permission, while the selector or affinity rule directs placement. Without a placement rule, the scheduler may choose any feasible node.
+`WaitForFirstConsumer` reduces the risk of selecting zone-bound storage that the Pod cannot use. A Pod should express placement through scheduler constraints rather than `spec.nodeName`, which bypasses the scheduler and can leave this type of claim pending.
 
-Taints and tolerations support:
-- Workload isolation for analytics, security scanning, GPUs, or production services.
-- Protection of specialised nodes from general workloads.
-- Cleaner multi-tenant clusters when combined with labels and policies.
-## Affinity, anti-affinity, and resources
-Node affinity attracts pods to nodes with matching labels. It can express hard requirements or preferences. A pod can require `role=analytics` for data processing workloads, or prefer a low-cost node pool when performance allows.
+The StorageClass reclaim policy commonly uses `Delete` or `Retain`. `Delete` can remove both the PV and backing asset when the driver supports deletion. `Retain` preserves the asset for manual recovery, sanitisation, or reuse. When a StorageClass omits `reclaimPolicy`, Kubernetes assigns `Delete` to dynamically provisioned PVs. `Recycle` remains deprecated and should not support new designs. Storage protection finalisers delay removal of a PVC that a Pod still uses and of a PV that remains bound. Operators should inspect the policy before deleting a PVC. Persistent storage also needs separate backup, restore, encryption, and retention controls.
+## Scheduling decisions
+The scheduler handles an unscheduled Pod in three broad stages. It filters out nodes that cannot satisfy hard requirements, scores the feasible nodes against preferences, and binds the Pod to the highest-scoring choice. A Pod remains pending when no feasible node exists.
 
-Pod affinity and anti-affinity describe relationships between pods. Affinity co-locates related pods, such as an application and a local cache. Anti-affinity spreads replicas apart, which reduces the chance that one node failure takes down all instances of a service.
+The scheduler uses resource requests, not observed short-term utilisation, to test capacity. CPU uses cores or millicores, such as `250m`, while memory commonly uses binary units such as `256Mi`. Limits constrain runtime consumption. CPU limits can cause throttling, and memory use beyond a limit can trigger an out-of-memory kill. Limits do not replace realistic requests for placement.
 
-Resource requests and limits make scheduling safer. Requests describe the CPU and memory the scheduler reserves for placement. Limits cap runtime consumption. CPU uses cores or millicores, such as `250m`. Memory uses bytes or suffixes such as `Mi` or `Gi`. A realistic request helps the scheduler avoid overpacking nodes. A limit protects the node, but a tight CPU limit can throttle workloads and a tight memory limit can trigger termination.
-## Availability controls
-PodDisruptionBudgets (PDBs) protect replicated applications from too many voluntary disruptions at once. A PDB uses a selector and either `minAvailable` or `maxUnavailable`. For example, `minAvailable: 2` allows an eviction only when at least two selected pods remain healthy after that eviction.
+The scheduler does not continuously relocate running Pods to improve balance. `IgnoredDuringExecution` means that a Pod continues running when a relevant node label later changes. Controllers can create replacement Pods after failure, scaling, or rollout, but each replacement receives a new scheduling decision.
+### Placement controls
+| Control | Effect |
+| --- | --- |
+| `nodeSelector` | Requires all specified node labels |
+| Required node affinity | Filters out nodes that do not satisfy the expression |
+| Preferred node affinity | Adds a weighted scoring preference without blocking placement |
+| Pod affinity | Places a Pod near matching Pods within a labelled topology domain |
+| Pod anti-affinity | Avoids or forbids placement near matching Pods, depending on rule strength |
+| Taints and tolerations | Repel Pods from nodes unless their tolerations match |
+| Topology spread constraints | Control replica skew across labelled domains such as nodes or zones |
 
-PDBs apply to voluntary disruptions that use the Eviction API, such as many node drains. They do not prevent involuntary failures, and they do not replace application-level rollout settings such as Deployment update strategy. Cluster operators also need enough replicas, suitable probes, and healthy nodes for a PDB to help.
+Hard affinity and anti-affinity rules can leave Pods pending. Preferred rules preserve scheduling flexibility. Inter-Pod rules also add scheduler work and depend on consistent labels and selectors.
 
-Topology spread constraints distribute matching pods across topology domains such as nodes, zones, or regions. `topologyKey: kubernetes.io/hostname` spreads pods across nodes. `maxSkew: 1` limits imbalance. `whenUnsatisfiable: DoNotSchedule` keeps the scheduler from breaking the rule when it cannot maintain the required spread.
+A toleration permits placement on a tainted node but does not attract the Pod to that node. A dedicated node pool therefore commonly combines a taint with a trusted node label and required node affinity. `NoSchedule` blocks new placement, `PreferNoSchedule` creates a soft avoidance, and `NoExecute` also evicts running Pods without a matching toleration. `tolerationSeconds` can delay that eviction.
+## Availability during disruption
+A PodDisruptionBudget selects Pods by label and defines either `minAvailable` or `maxUnavailable`. The Eviction API uses the budget to limit voluntary disruptions such as `kubectl drain`. The PDB status reports current health, desired health, expected Pods, and allowed disruptions.
 
-PDBs and topology spread constraints complement each other. Topology spread reduces concentrated failure risk. PDBs reduce disruption during maintenance. Together, they improve availability for production workloads, especially when clusters have enough topology domains and enough replicas to satisfy both constraints.
-## Operational pattern
-A resilient Kubernetes platform should:
-- Use PVs and PVCs for stateful workloads.
-- Use StorageClasses to standardise provisioning, reclaim policy, and performance classes.
-- Prefer CSI-backed storage for production durability and portability.
-- Apply labels, taints, tolerations, affinity rules, and topology spread constraints to align placement with workload needs.
-- Set realistic CPU and memory requests.
-- Use limits carefully, based on observed behaviour.
-- Use PDBs for replicated services that must stay available during maintenance.
-- Test pod deletion, node drain, and topology failure scenarios before relying on scheduling policy.
+With three desired replicas and `minAvailable: 2`, one voluntary eviction is possible only while all three selected Pods are healthy. If one Pod is already unavailable, the budget normally allows no additional disruption. A percentage or `maxUnavailable` can adapt more naturally when a controller changes replica count.
 
-Kubernetes becomes more predictable when storage and scheduling policies express real workload intent. Persistent storage preserves state beyond container lifecycles. Scheduling controls place pods where they can run reliably. Availability controls keep services running through change.
+A PDB does not guarantee that replicas remain available. It cannot prevent node failure, direct Pod deletion, workload deletion, or every other involuntary event. Deployment rolling updates use the Deployment strategy's `maxUnavailable` and `maxSurge` settings. A strict PDB can block maintenance indefinitely when too few selected Pods are healthy.
+
+Topology spread constraints compare matching Pods across eligible domains identified by `topologyKey`. `maxSkew` sets the allowed imbalance. `DoNotSchedule` makes the constraint hard, while `ScheduleAnyway` scores placements that reduce skew. The label selector must identify the intended replica set, and relevant nodes need consistent topology labels. Four replicas can normally occupy two eligible nodes as two and two when capacity and other constraints allow it.
+
+PDBs and topology spread constraints address different risks. A PDB limits selected voluntary evictions, while spread constraints influence new placement across failure domains. Neither control creates capacity, repairs an unhealthy application, or guarantees service availability.
+## Operational checks
+1. Inspect Pod events and scheduler messages before changing placement rules.
+2. Compare requests with node allocatable capacity, taints, labels, affinity, and topology.
+3. Inspect the PVC, PV, StorageClass, CSI components, and attachment events for storage failures.
+4. Test drain, node loss, rollout, and zone failure separately because each follows different controls.
+5. Monitor pending Pods, skew, disruption allowance, storage attachment, and recovery time.

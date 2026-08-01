@@ -1,76 +1,84 @@
-## Workloads and scheduling for the CKA
-The Workloads and Scheduling domain covers 15% of the Certified Kubernetes Administrator exam. It tests how Kubernetes runs applications, keeps pods healthy, rolls out change, injects configuration, places workloads on suitable nodes and scales applications during demand spikes.
-
-Kubernetes administrators rarely create standalone pods for production workloads. A standalone pod has no controller to replace it after failure. Controllers watch cluster state and reconcile it with the desired state declared in manifests.
+# Workloads and Scheduling for CKA
+The CKA curriculum assigns 15% of the examination to workloads and scheduling. This domain covers application controllers, rolling updates and rollbacks, configuration, autoscaling, resource management, Pod placement, and disruption control.
 ## Workload controllers
-- Deployment runs stateless applications such as web servers and APIs. It manages ReplicaSets, supports rolling updates and provides the normal default for CKA workload tasks.
-- StatefulSet runs stateful applications that need stable network identity and persistent storage. A restarted database pod keeps its identity and storage claim.
-- DaemonSet runs one pod on each eligible node. It suits node-level agents such as log collectors, monitoring agents and networking components.
-- Job runs finite work until a required number of successful completions occurs, then stops.
-- CronJob creates Jobs on a schedule, such as a nightly backup or recurring report.
+A Kubernetes controller continually compares actual state with desired state and acts to reconcile any difference. A standalone Pod may restart its containers on the same node, but no higher-level controller replaces the Pod after deletion or node loss. Most applications therefore use a workload controller.
 
-Labels and selectors connect controllers to their pods. Changing a controller-managed pod label can break that relationship, which may cause the controller to create a replacement and leave the edited pod orphaned. Administrators should treat controller selectors as stable after creation.
+| Controller | Primary use | Behaviour |
+| --- | --- | --- |
+| Deployment | Usually stateless applications | Manages ReplicaSets and replaces interchangeable Pods through controlled updates |
+| StatefulSet | Stateful applications | Preserves each Pod's stable identity, ordering, and association with persistent storage |
+| DaemonSet | Node-local agents | Runs one Pod on every eligible node, or on a selected subset, and follows changes in eligible nodes |
+| Job | Finite work | Creates Pods until the required number of successful completions occurs |
+| CronJob | Scheduled finite work | Creates Jobs according to a cron schedule |
 
-Jobs use `completions` to define how many successful runs the task needs and `parallelism` to cap how many pods may run at the same time. A CronJob wraps the same pattern in a schedule. Failed Job pods can retry according to the Job policy, while completed pods provide a clear record of task success. This distinction helps administrators choose a long-running controller for services and a finite controller for batch work.
-## Deployments and rollouts
-A Deployment update changes the pod template, commonly by changing an image tag, environment variable or label. Kubernetes creates a new ReplicaSet for the new template and keeps older ReplicaSets for rollback history. The default `revisionHistoryLimit` is 10.
+Job `completions` defines the required successes, while `parallelism` limits concurrent Pods. Completed Jobs and their Pods normally remain available for status and log inspection until deletion or TTL cleanup. CronJob tasks should tolerate duplicate or missed executions because scheduling is not exact.
 
-A recreate strategy terminates existing pods before starting replacement pods. It avoids mixed versions but causes downtime. A rolling update replaces pods gradually and keeps the application available when readiness and capacity allow it.
+A CronJob's concurrency policy controls whether a new run may overlap the preceding run. History limits and `ttlSecondsAfterFinished` prevent finished Jobs from accumulating. Job programs should handle retries safely because node loss, eviction, and controller recovery can cause work to run again.
 
-Rolling updates use two key controls:
-- `maxSurge` defines how many extra pods Kubernetes may run above the desired replica count during the update.
-- `maxUnavailable` defines how many desired pods may be unavailable during the update.
+Selectors connect controllers to their Pods. A controller replaces a Pod that no longer matches its selector, so administrators must keep controller selectors and Pod-template labels aligned. Deleting a controller normally removes its dependent Pods through ownership references.
 
-The default for both fields is 25%. Increasing them can speed up a rollout but can reduce safety. Decreasing them can slow the rollout while protecting availability.
+Self-healing operates at two layers. The kubelet follows a Pod's restart policy when a container exits. A workload controller creates a replacement when a managed Pod disappears or becomes unsustainable on its node. Readiness probes keep an unready replacement out of Service endpoints, while liveness and startup probes can trigger container restarts when configured correctly.
+## Deployment lifecycle
+A Deployment creates a new ReplicaSet when its Pod template changes. Scaling the replica count alone does not create a revision. The Deployment retains old ReplicaSets for rollback, with `revisionHistoryLimit` defaulting to 10 old revisions.
 
-Administrators inspect rollout progress with `kubectl rollout status` and inspect revision history with `kubectl rollout history`. They verify the active image with `kubectl describe` or structured output, then confirm that old pods have terminated and new pods have become Ready. A failed image pull or broken pod template can stall a rollout. `kubectl rollout undo` restores the previous stable pod template by creating a new active revision from an older ReplicaSet.
-## Configuration and secrets
-Cloud native applications should separate configuration from container images. The same image should run across development, test and production while the environment supplies values such as domains, feature flags and credentials. This approach shortens build pipelines, reduces registry storage and prevents small environment changes from forcing new image builds.
+`RollingUpdate` is the default strategy. It gradually scales up the new ReplicaSet and scales down the old one. `maxSurge` sets the number of extra Pods allowed above the desired count and rounds percentages up. `maxUnavailable` sets the permitted shortfall in available Pods and rounds percentages down. Both default to 25%. Readiness probes and realistic resource requests determine whether a rollout can preserve service.
 
-ConfigMaps store non-sensitive configuration. Secrets store sensitive data such as passwords, tokens, SSH private keys and TLS certificates. Both can reach containers as environment variables or mounted files.
+`Recreate` terminates the old revision's Pods before creating the new revision's Pods during an update. It suits applications that cannot run two versions concurrently, but it introduces downtime.
 
-Environment variables work well for small values read during process start. A pod restart is required after those values change. Mounted ConfigMaps and Secrets expose data as files and can receive eventual updates from the kubelet. Mounting a single key with `subPath` prevents those updates from reaching the container.
+The principal rollout commands are:
+- `kubectl set image deployment/<name> <container>=<image>`
+- `kubectl rollout status deployment/<name>`
+- `kubectl rollout history deployment/<name>`
+- `kubectl rollout undo deployment/<name> --to-revision=<number>`
 
-Secrets improve workflow separation, but they are not encryption by themselves. Secret values are Base64 encoded and Kubernetes stores Secret resources unencrypted in etcd by default unless the cluster enables encryption at rest. Anyone with API or etcd access may retrieve or modify them, and anyone who can create a pod in a namespace can indirectly read Secrets in that namespace.
+A rollback copies an earlier Pod template into a new active revision. It does not reverse changes outside the Pod template. `kubectl describe`, Pod status, events, and logs reveal failures such as `ImagePullBackOff`, failed probes, insufficient quota, or an exceeded progress deadline.
 
-Administrators should enable encryption at rest, restrict `get`, `watch` and `list` access with RBAC, mount Secrets only into the containers that need them, and consider external secret stores for higher-security environments.
-## Pod admission, requests and limits
-Kubernetes uses resource requests and limits to control pod placement and runtime behaviour. Requests also improve cluster planning because the scheduler reserves capacity according to declared needs rather than momentary process usage. Limits protect neighbouring workloads from noisy containers, but overly tight limits can degrade performance or trigger restarts.
+Deployment selectors are immutable in `apps/v1`, and they must match the Pod-template labels. Image tags should identify known artefacts rather than changing content in place. A successful `kubectl set image` response confirms only that the API accepted the change. `kubectl rollout status` and application health checks establish whether the new revision became available.
+## Configuration and Secrets
+ConfigMaps separate non-confidential configuration from container images. Secrets hold small confidential values such as passwords, tokens, TLS material, SSH keys, and image-pull credentials. Applications can consume either object through environment variables or mounted volumes.
 
-- Requests reserve scheduling capacity. The scheduler places a pod only on a node whose allocatable capacity can satisfy the pod's requested resources after accounting for existing requests.
-- Limits cap runtime use. CPU above the limit gets throttled. Memory above the limit can trigger termination with an `OOMKilled` status.
+Environment variables receive values when a container starts. A changed ConfigMap or Secret therefore requires a Pod rollout before the process receives new environment values. Mounted ConfigMap and Secret volumes update with eventual consistency after kubelet synchronisation. A `subPath` mount does not receive automated updates. File projection also does not force the application to reload its configuration, so the application must watch, poll, or otherwise reload changed files.
 
-These values affect Quality of Service classes:
-- Guaranteed applies when every container has CPU and memory requests and limits set, and each request equals its matching limit.
-- Burstable applies when at least one CPU or memory request or limit exists, but the pod does not meet Guaranteed criteria.
-- BestEffort applies when no container defines CPU or memory requests or limits.
+Base64 encoding does not encrypt Secret data. Kubernetes stores Secrets unencrypted in etcd by default unless the cluster enables encryption at rest. Strong protection requires least-privilege RBAC, restricted Pod-creation rights, encryption at rest, access only from the containers that need each Secret, and, where appropriate, an external secret store. Administrators should avoid exposing Secret values through logs, command histories, or broad environment dumps.
+## Requests, limits, admission, and QoS
+API admission and scheduling perform different functions. Admission controls such as ResourceQuota and LimitRange can reject a Pod or supply defaults. The scheduler then compares Pod resource requests with each node's allocatable capacity. It does not use limits or momentary utilisation to decide placement.
 
-During memory pressure, Kubernetes evicts lower QoS pods before higher QoS pods. BestEffort pods face eviction first, while Guaranteed pods receive the strongest protection.
-## Scheduling controls
-The Kubernetes scheduler matches unscheduled pods to nodes. It uses requested resources, node conditions and scheduling rules. Administrators can guide placement when workloads need specific hardware, isolation or high availability.
+A request establishes the amount considered for scheduling and resource allocation. A container may use more than its request when capacity remains available. A CPU limit causes kernel throttling. A memory limit acts reactively, and the kernel may terminate a process with an out-of-memory kill after excessive allocation.
 
-`nodeSelector` provides the simplest hard placement rule. A pod with `nodeSelector: {disk: ssd}` can run only on nodes with the exact `disk=ssd` label. If no node matches, the pod remains Pending.
+Kubernetes assigns a Pod one of three QoS classes:
+- `Guaranteed` requires every application and init container to specify positive CPU and memory requests and limits, with each request equal to its corresponding limit.
+- `Burstable` applies when the Pod does not qualify as `Guaranteed`, but at least one container has a CPU or memory request or limit.
+- `BestEffort` applies when no container has a CPU or memory request or limit.
 
-Taints and tolerations create an exclusion model. A node taint repels pods that do not tolerate it. `NoSchedule` blocks new pods, `PreferNoSchedule` asks the scheduler to avoid the node where possible, and `NoExecute` can evict existing pods without a matching toleration. A toleration permits scheduling onto a tainted node but does not force placement there.
+QoS influences node-pressure eviction order, but it is not Pod priority. Kubernetes considers resource use relative to requests, Pod priority, and other conditions during eviction. `kubectl top` reports current usage only when the cluster provides the resource Metrics API.
+## Scheduling and availability
+The scheduler filters out nodes that fail a Pod's hard requirements, scores the remaining nodes, and binds the Pod to a suitable node. Several controls modify this process:
 
-Node affinity extends `nodeSelector` with richer operators and hard or preferred rules. Preferred rules let the scheduler try a placement without blocking the pod when the ideal node is unavailable.
+| Control | Effect |
+| --- | --- |
+| `nodeSelector` | Requires every specified node label to match |
+| Required node affinity | Expresses hard label rules with richer operators |
+| Preferred node affinity | Adds a weighted preference without blocking placement elsewhere |
+| Pod affinity | Co-locates Pods according to labels and a topology domain |
+| Pod anti-affinity | Separates Pods according to labels and a topology domain |
+| Taints and tolerations | Repel Pods unless they tolerate the relevant taint |
 
-Pod affinity and anti-affinity place pods according to other pods already running in the topology. Anti-affinity supports high availability by spreading replicas across nodes so one node failure does not remove every replica of an application. Affinity can also keep tightly coupled components near each other, for example when a cache and application benefit from node-local communication. Administrators should select the weakest rule that satisfies the design, since hard rules can leave pods Pending when the cluster lacks matching capacity.
-## Pod Disruption Budgets
-Cluster maintenance often uses voluntary disruption. Examples include node drains, upgrades and planned node pool changes. Pod Disruption Budgets protect applications from losing too many available replicas during these planned operations.
+`IgnoredDuringExecution` affinity rules govern scheduling only. A later node-label change does not evict an already running Pod. Hard pod anti-affinity can spread replicas across nodes or zones, but all nodes need consistent topology labels, and the cluster needs enough eligible topology domains.
 
-A PDB defines an availability floor with `minAvailable` or a disruption ceiling with `maxUnavailable`. For a three-replica application, `minAvailable: 2` allows one voluntary eviction but blocks another until Kubernetes schedules and readies a replacement pod.
+Taint effects have distinct meanings. `NoSchedule` blocks new Pods without a matching toleration. `PreferNoSchedule` asks the scheduler to avoid the node when possible. `NoExecute` also evicts existing Pods that lack a matching toleration. A toleration grants permission to use a tainted node but does not attract the Pod there. A node selector or affinity rule must provide that attraction when the workload requires placement on the tainted node.
 
-A strict PDB can block `kubectl drain`. Setting `minAvailable` equal to the replica count or `maxUnavailable` to zero allows no voluntary evictions. PDBs do not protect against every disruption. Deleting a Deployment or deleting pods directly bypasses PDB protection, and unplanned failures can still remove pods.
+A PodDisruptionBudget limits simultaneous unavailability from voluntary evictions that use the Eviction API. `kubectl drain` respects a PDB and retries an eviction that would breach `minAvailable` or `maxUnavailable`. A PDB cannot prevent node failure, direct Pod or controller deletion, or a workload controller's rolling update. Those disruptions may count against the budget even though the PDB does not control them. Replicas, topology spread, readiness, update strategy, and PDBs must work together to provide availability.
+
+An unschedulable Pod remains `Pending`. `kubectl describe pod` and namespace events expose causes such as unmatched labels, untolerated taints, insufficient requested resources, volume topology, or hard anti-affinity. `kubectl get pods -o wide` confirms the chosen node after binding. Administrators should remove temporary node labels and taints carefully because those changes can alter future placement without relocating Pods already running under ignored-during-execution rules.
 ## Workload autoscaling
-Horizontal Pod Autoscaler scales replicas for scalable targets such as Deployments and StatefulSets. It compares observed metrics, such as CPU or memory utilisation, with a target value and adjusts replica count within configured minimum and maximum bounds. HPA commonly needs resource requests and a metrics pipeline such as Metrics Server.
+A HorizontalPodAutoscaler periodically changes the replica count of a scalable workload such as a Deployment or StatefulSet. It cannot scale a DaemonSet. The stable `autoscaling/v2` API supports CPU, memory, custom, and external metrics.
 
-Vertical Pod Autoscaler changes CPU and memory requests rather than replica count. Cluster Autoscaler changes node count when pending pods cannot schedule or nodes remain underused. Both usually require separate installation and provider integration, so CKA work focuses mainly on HPA.
+For percentage-based CPU or memory utilisation, the HPA compares observed use with the relevant resource request. Missing requests leave utilisation undefined for that metric. The cluster must expose the corresponding metrics API, commonly through Metrics Server for resource metrics.
 
-HPA uses a control loop. If the target CPU utilisation is 50% and pods average 100%, HPA recommends more replicas to reduce average utilisation. When load falls, HPA avoids rapid scale-down through a stabilisation window. The default scale-down stabilisation window is 300 seconds. Administrators should test HPA under load, confirm that metrics become available and set sensible minimum replicas so the application can absorb sudden demand before new pods finish starting.
-## Exam practice guidance
-CKA tasks reward speed and precision. Candidates should switch to the context shown in each task before changing resources. Aliasing `kubectl` to `k` and using `--dry-run=client -o yaml` to generate manifests saves time and reduces syntax errors.
+The core calculation is `desired replicas = ceil(current replicas x current metric / target metric)`. Tolerance suppresses small fluctuations, readiness handling dampens misleading startup data, and scaling policies limit the rate of change. The default scale-down stabilisation window considers recommendations from the previous 300 seconds, which reduces repeated removal and recreation of replicas.
 
-Candidates should learn short resource names such as `cm`, `ds`, `deploy`, `po`, `svc` and `hpa`. They should use `kubectl get -o wide`, `kubectl describe`, events and rollout commands to verify outcomes.
+An administrator can create a basic HPA with `kubectl autoscale deployment/<name> --cpu=<percentage> --min=<n> --max=<n>` and inspect it with `kubectl get hpa`. An `unknown` metric commonly indicates unavailable metrics or missing requests. Load tests must verify both scale-up and scale-down behaviour, while workload readiness must prevent new replicas from receiving traffic before they can serve it.
 
-The exam permits official documentation. Effective preparation includes practising with the Kubernetes docs, locating examples quickly and moving past time-consuming tasks for later review. The Workloads and Scheduling domain rewards practical fluency with controllers, rollout safety, configuration injection, resource controls, scheduling rules, disruption protection and HPA.
+Vertical Pod Autoscaler is an optional add-on that adjusts resource assignments. Node autoscaling adds or removes cluster capacity when workload placement requires it. These mechanisms solve different constraints and require coordinated minimums, maximums, requests, and capacity.
+## Operational checks
+Before changing a workload, an administrator confirms the current context and namespace, inspects the live object, and records its existing state. Client-side dry runs can generate editable YAML with `--dry-run=client -o yaml`. After each change, status, events, logs, selected nodes, resource use, and controller ownership confirm the result. Temporary aliases can reduce typing, but explicit context checks prevent changes to the wrong cluster or namespace.

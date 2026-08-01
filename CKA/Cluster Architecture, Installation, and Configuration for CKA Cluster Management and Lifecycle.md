@@ -1,103 +1,154 @@
-# Cluster Architecture, Installation, and Configuration for CKA: Cluster Management and Lifecycle
-## Core purpose
-Kubernetes administrators use kubeadm to build a standards-based cluster and manage its lifecycle. The process starts with sound installation choices, then prepares each host, bootstraps a control plane, deploys pod networking, joins worker nodes and validates that the cluster can run application workloads. Ongoing operations require disciplined node maintenance and controlled upgrades.
+# Kubernetes Cluster Management and Lifecycle with kubeadm
+## Choose the deployment model
+An organisation can run Kubernetes as a managed cloud service, on cloud virtual machines, or on premises. A managed service transfers much of the control-plane operation, patching, and infrastructure maintenance to the provider. A self-managed cluster offers greater control but makes the organisation responsible for the operating system, container runtime, Kubernetes components, networking, upgrades, security, and recovery.
 
-Administrators need practical knowledge of the Kubernetes API, API objects, pods, controllers, services, deployments, ReplicaSets, pod networks, control-plane nodes and worker nodes. They also need Linux administration skills, because kubeadm installs Kubernetes components onto operating system hosts and relies on system services, networking and package management.
-## Installation choices
-Organisations can deploy Kubernetes in three common ways:
-- Managed cloud services, where the provider operates the control plane and much of the underlying platform.
-- Infrastructure as a Service, where the organisation runs Kubernetes on cloud virtual machines.
-- On-premises systems, where the organisation runs Kubernetes on bare metal or virtual machines.
+Kubeadm bootstraps and upgrades conformant Kubernetes clusters. It suits laboratories, repeatable infrastructure automation, and self-managed environments. It does not provision machines, install a pod network, or provide a complete production platform. A production design also needs high availability, load balancing, durable etcd protection, monitoring, backups, access control, and tested recovery procedures.
 
-The right option depends on organisational strategy, skills, operating model and compliance needs. Managed services reduce maintenance effort, while self-managed clusters provide greater control over configuration, upgrades and troubleshooting. kubeadm suits administrators who need to learn the cluster lifecycle, build lab environments or create a base cluster that other automation can extend.
+Desktop distributions provide a faster route for local development and basic experimentation, but they do not reproduce every operational characteristic of a multi-node cluster. Cloud virtual machines remove physical infrastructure work while leaving the guest operating systems and Kubernetes stack under the organisation's control. Selection should follow application requirements, regulatory obligations, staff capability, failure tolerance, cost, and the organisation's broader platform strategy.
+## Prepare every node
+A basic Linux cluster requires full network connectivity between nodes, open component and CNI ports, unique hostnames, unique MAC addresses, and unique `product_uuid` values. Each machine should have at least 2 GiB of RAM, while each control-plane machine should have at least two CPUs. Production capacity must cover system overhead, application requests, disruption, maintenance, and growth.
 
-Desktop Kubernetes tools, such as Docker Desktop or similar local environments, help with experimentation and application development. They do not replace understanding of a full cluster lifecycle, because production clusters require explicit decisions about networking, high availability, upgrades, security and capacity.
-## Host requirements
-A kubeadm cluster needs Linux hosts for the control plane and worker nodes. Windows can run worker workloads in supported configurations, but the installation path described here uses Linux nodes. Each node needs network connectivity to the other nodes, a unique hostname, a unique MAC address and a unique product UUID. A lab control-plane node needs at least 2 CPUs and 2 GiB of RAM. Production sizing must match the expected workload, system add-ons, failure tolerance and maintenance windows.
+The administrator should also:
+- Select a supported Linux distribution and kernel.
+- Configure stable addressing, routing, name resolution, and time synchronisation.
+- Ensure that pod, Service, host, and external network ranges do not overlap.
+- Enable IPv4 forwarding when the selected network implementation requires it.
+- Disable swap for the simplest configuration, or explicitly configure kubelet swap support with `failSwapOn` and `memorySwap` after assessing scheduling, storage, security, and performance effects.
+- Install a CRI v1 compatible runtime, such as containerd or CRI-O.
 
-Each node must run a container runtime that implements the Container Runtime Interface. Common choices include containerd and CRI-O. Docker Engine no longer integrates directly through dockershim in current Kubernetes releases. Kubernetes can still use Docker Engine only through a CRI-compatible shim. On Linux systems that use systemd, the container runtime and kubelet should use matching cgroup drivers, with systemd commonly selected.
+The kubelet and container runtime must use compatible cgroup drivers. On a systemd host, both should use the `systemd` driver. Kubeadm selects `systemd` for the kubelet by default. Containerd may require an explicit runtime setting, followed by a service restart. Its CRI plugin must remain enabled.
 
-Kubernetes now supports controlled swap configurations, but the kubelet default on Linux still fails when it detects swap unless administrators configure kubelet to tolerate it. Lab installations normally disable swap with `swapoff` and make the change persistent through the host configuration.
+Before bootstrapping, the administrator installs these components:
 
-Administrators install these components on each node:
-- `containerd` or another CRI-compatible runtime
-- `kubelet`, which runs node-level Kubernetes work
-- `kubeadm`, which bootstraps, joins and upgrades nodes
-- `kubectl`, which sends administrative requests to the API server
+| Component | Purpose | Placement |
+|---|---|---|
+| `kubelet` | Runs pods and reports node state | Every cluster node |
+| `kubeadm` | Initialises, joins, and upgrades nodes | Every node managed with kubeadm |
+| `kubectl` | Sends administrative requests to the API server | Administrative hosts, including a control-plane host if desired |
+| CRI runtime | Starts and manages containers | Every cluster node |
 
-The current Kubernetes community package repositories use `pkgs.k8s.io`. Administrators should avoid relying on the deprecated legacy `apt.kubernetes.io` and `yum.kubernetes.io` repositories for current releases. Package holds help prevent routine operating system patching from upgrading Kubernetes components outside the supported upgrade process.
-## Lab topology
-A simple lab can use one control-plane node and three worker nodes. The control-plane node can also hold the administrator kubeconfig used by `kubectl`. Hostname and address records can live in `/etc/hosts` when no DNS service exists. The lab still needs reliable node-to-node connectivity, adequate CPU and memory, persistent disk space and disabled or explicitly configured swap.
+For Debian-based systems, each Kubernetes minor release has a dedicated `pkgs.k8s.io` repository. The administrator adds the repository signing key, selects the minor release, installs explicit package versions, and places `kubelet`, `kubeadm`, and `kubectl` on hold. Kubernetes upgrades require a controlled sequence, so routine operating-system updates must not advance these packages independently. The container runtime needs its own security and compatibility lifecycle and should not be held without a deliberate policy.
 
-A representative topology uses:
-- `c1-cp1` as the control-plane node
-- `c1-node1`, `c1-node2` and `c1-node3` as worker nodes
+Before `kubeadm init` or `kubeadm join`, the kubelet may restart repeatedly while it waits for kubeadm to supply its configuration. That behaviour does not by itself show a failed installation.
+### Repeatable node configuration
+Every node should receive the same tested baseline through automation. The baseline normally configures the kernel and network, installs the CRI runtime, aligns cgroup settings, adds the Kubernetes repository, and installs pinned Kubernetes packages. The administrator verifies each stage before cloning or applying it across the fleet.
 
-This structure gives enough worker capacity to test scheduling, services and maintenance while keeping the environment small enough for a local virtualisation platform.
-## Preparing each node
-Node preparation follows the same pattern for control-plane and worker nodes. Administrators disable or configure swap, enable IPv4 forwarding where the network plugin requires it, install the container runtime, generate its default configuration and set the systemd cgroup option when appropriate. After each configuration change, administrators restart the runtime and verify that the service runs correctly.
+Typical checks include:
 
-The kubelet may appear to crash or remain inactive before cluster initialisation. That behaviour is expected when kubeadm has not yet provided cluster configuration or static pod manifests. The runtime, such as containerd, should be active before kubeadm starts.
+```bash
+swapon --show
+sysctl net.ipv4.ip_forward
+systemctl status containerd
+crictl info
+kubeadm version
+kubelet --version
+```
 
-After the container runtime works, administrators add the Kubernetes package repository for the target minor release, install `kubelet`, `kubeadm` and `kubectl`, then hold the packages. Version pinning matters because Kubernetes upgrades need deliberate sequencing rather than automatic package drift.
+An empty `swapon --show` result confirms that swap is inactive. Runtime inspection should show the intended CRI endpoint and cgroup driver. Package versions should follow Kubernetes version-skew rules. A host firewall must allow Kubernetes control-plane, kubelet, and CNI traffic without exposing sensitive ports to untrusted networks.
 
-Package installation should use explicit target versions when the cluster must start below the latest available patch for upgrade practice or staged rollout. Administrators can query the package manager for available versions, install the chosen version, then apply package holds. That sequence keeps the node predictable. Automatic upgrades may place the kubelet, kubeadm and control-plane version outside the supported version skew and can interrupt cluster operations.
+Static host-file entries can provide name resolution in a laboratory, but production systems benefit from managed DNS, stable addresses, and a durable load-balanced control-plane endpoint. Disk sizing must cover container images, logs, writable layers, and etcd data. Separate monitoring should alert before filesystem, inode, memory, or certificate exhaustion disrupts the cluster.
+## Initialise the control plane
+The first control-plane node starts with `kubeadm init`. A configuration file provides a clearer, repeatable record than a long command when the cluster needs custom settings. The configuration should define the Kubernetes version, stable control-plane endpoint, node address, pod CIDR, Service CIDR, and any required certificate subject alternative names. A stable control-plane endpoint is essential if the cluster may later gain more control-plane nodes.
 
-Runtime verification should precede kubeadm commands. `systemctl status containerd` or an equivalent runtime check should show an active service. The kubelet may restart until kubeadm supplies configuration, but that condition should disappear after initialisation or joining. Administrators should treat persistent kubelet failures after those steps as a signal to inspect the runtime socket, cgroup driver, swap configuration, node identity and kubelet logs.
-## Bootstrapping the control plane
-`kubeadm init` creates the first control-plane node. It runs preflight checks, verifies system resources and permissions, checks the container runtime, pulls control-plane images and stops when critical requirements fail. Administrators can customise the process through command-line options or a kubeadm configuration file.
+Kubeadm performs the following work:
+1. Runs preflight checks for privileges, resources, networking, swap, the runtime, and existing state.
+2. Pulls the required control-plane images.
+3. Creates or consumes a certificate authority and issues component certificates.
+4. Writes kubeconfig files for administrators and control-plane components.
+5. Writes static pod manifests for the API server, controller manager, scheduler, and local etcd.
+6. Starts the kubelet and waits for the control plane.
+7. Labels and taints the node as a control-plane node.
+8. Creates bootstrap-token and TLS-bootstrap configuration for joining nodes.
+9. Deploys CoreDNS and kube-proxy.
 
-During initialisation, kubeadm creates or uses a certificate authority, then writes certificates and kubeconfig files. Kubernetes uses certificates to secure HTTPS communication with the API server and authenticate components such as the scheduler, controller manager and kubelets. kubeadm stores certificate material under `/etc/kubernetes/pki`. Joining nodes trust the cluster through discovery information and CA public-key validation, not by receiving the CA private key.
+The default control-plane taint blocks ordinary workloads that lack a matching toleration. It does not create an absolute ban, because a pod with the appropriate toleration can still run there.
 
-kubeadm writes kubeconfig files under `/etc/kubernetes`. `admin.conf` gives cluster-administrator access. `super-admin.conf` can bypass the authorisation layer and should be treated as break-glass material. Component kubeconfig files allow the scheduler, controller manager and kubelet to locate and authenticate to the API server.
+The successful command output includes instructions for configuring `kubectl` and joining other nodes. The administrator records the non-secret cluster configuration but handles join tokens, certificate keys, and privileged kubeconfig files as credentials. A failed preflight check should prompt correction of the underlying condition. Bypassing checks with ignore flags can hide a real incompatibility and requires a documented justification.
 
-kubeadm also writes static pod manifests to `/etc/kubernetes/manifests`. The kubelet watches this directory and starts the control-plane pods described there. These static pods commonly include the API server, controller manager, scheduler and local etcd, unless the cluster uses external etcd. This design lets the control plane start after a reboot before the API server can schedule ordinary pods.
+Kubeadm creates a local etcd member when the configuration does not name an external etcd cluster. This arrangement makes a single control-plane node unsuitable for resilient production service. A highly available design uses multiple control-plane nodes, a stable API endpoint, and an etcd topology that can tolerate the planned failure set. Kubeadm cannot convert a cluster initialised without a stable `controlPlaneEndpoint` into high availability, so that endpoint belongs in the plan.
+### PKI and kubeconfig files
+Kubeadm stores its local public key infrastructure under `/etc/kubernetes/pki`. The API server uses TLS to protect connections, while client certificates authenticate components and privileged users. Kubeadm can use an externally managed certificate authority when organisational policy requires it.
 
-After the control-plane pods run, kubeadm labels and taints the control-plane node so normal application workloads do not schedule there by default. It then creates a bootstrap token for joining other nodes and deploys add-ons such as CoreDNS and kube-proxy. CoreDNS may remain pending until a pod network is installed.
+Kubeconfig files under `/etc/kubernetes` identify the API endpoint, trusted certificate authority, and client credentials. The generated `admin.conf` grants cluster-admin privileges through RBAC. The generated `super-admin.conf` belongs to the `system:masters` break-glass group and bypasses normal authorisation. Both files require strict protection, and administrators should issue separate, least-privilege credentials for routine users.
 
-Administrators copy `/etc/kubernetes/admin.conf` to the regular user's kubeconfig location when they need non-root `kubectl` access from the control-plane host. File ownership must match the user account that will run `kubectl`.
+Worker joins receive the public CA information needed to establish trust. They do not receive the cluster CA private key. Additional control-plane nodes can receive encrypted control-plane certificates only through the separate certificate-upload and certificate-key process.
 
-Administrators should also protect kubeconfig files and certificates. `admin.conf` grants broad control over the cluster, while `super-admin.conf` bypasses authorisation and carries higher risk. These files should remain on trusted hosts with restricted file permissions. Additional users should receive their own kubeconfig files and authorisation rules rather than shared administrator credentials.
-## Pod networking
-Kubernetes expects every pod to receive its own IP address and expects pods and nodes to communicate without application-level NAT assumptions. The cluster therefore needs a Container Network Interface plugin before normal workloads can run. Administrators choose a pod CIDR that does not overlap with node, service, data centre or cloud network ranges.
+The CA certificate hash in a worker join command pins discovery to the expected root of trust. During TLS bootstrap, the kubelet authenticates with the short-lived token, requests its own client certificate, and moves to certificate-based authentication. This process limits distribution of long-lived private credentials while still requiring strict control of token creation and approval policy.
+### Static control-plane pods
+Kubeadm writes these manifests to `/etc/kubernetes/manifests`:
+- `etcd.yaml`
+- `kube-apiserver.yaml`
+- `kube-controller-manager.yaml`
+- `kube-scheduler.yaml`
 
-Direct routing can satisfy the Kubernetes networking model when the underlying network supports it. Overlay networking supplies another option by encapsulating pod traffic and presenting an apparent layer 3 network across nodes. Common CNI choices include Calico, Cilium and Flannel, with different policies, routing modes and operational features. The network plugin provides pod IP address management and node-level forwarding behaviour.
+The kubelet watches this directory and starts the defined static pods, including after a reboot. These pods use host networking, which lets the control plane start before a CNI network exists. An administrator should avoid leaving backup manifest files in the watched directory because the kubelet reads every eligible manifest there.
+## Install pod networking
+Kubernetes requires a CNI-based pod network. The selected implementation must support the cluster's operating systems, address families, routing design, NetworkPolicy requirements, and scale. Some CNI implementations use an overlay, while others use native routing or combine both approaches.
 
-After `kubeadm init`, administrators apply the selected CNI manifest, such as a Calico manifest configured with the chosen pod CIDR. They then verify system pods across all namespaces. A healthy single control-plane lab shows the control-plane pods, CoreDNS, kube-proxy and the CNI pods in `Running` state, and the control-plane node in `Ready` state.
-## Joining worker nodes
-Each worker node receives the same base preparation as the control-plane node. After installing the runtime and Kubernetes packages, administrators generate or retrieve a join command from the control-plane node. `kubeadm init` prints an initial join command, and `kubeadm token create --print-join-command` can generate a fresh one. The default token from initialisation has a 24-hour time to live.
+The Kubernetes network model normally gives each pod an address and permits direct pod-to-pod communication across nodes without network address translation. The chosen pod CIDR must not overlap host or external networks, and it must match both the kubeadm configuration and CNI configuration. Only one pod network should serve a cluster.
 
-The join command points to the API server, presents a bootstrap token and includes the CA certificate hash for secure discovery. The worker runs `kubeadm join`, performs preflight checks, starts TLS bootstrap, submits a certificate signing request and receives configuration for its kubelet. The kubelet then registers the node with the API server.
+After initialisation, an authorised administrator applies the vendor's reviewed manifest:
 
-After a worker joins, administrators check `kubectl get nodes`. The node should reach `Ready` after required DaemonSet pods, such as the CNI node agent and kube-proxy, start on it. Repeating this process for each worker completes the lab cluster.
-## Validating workloads
-A simple deployment proves that scheduling, container runtime integration, pod networking and services work together. Administrators can create a deployment with multiple replicas, then inspect pods with wide output to confirm that the scheduler spreads workloads across worker nodes. Exposing the deployment as a ClusterIP service proves in-cluster service discovery and load balancing.
+```bash
+kubectl apply -f <cni-manifest.yaml>
+kubectl get pods -A
+kubectl get nodes
+```
 
-A ClusterIP exists only inside the cluster network. Testing it from a node that can reach the service CIDR confirms internal access. Repeated requests should hit different backing pods when the service has multiple endpoints. After validation, administrators should remove the test deployment and service to return the cluster to a clean state.
+CoreDNS normally remains pending until the pod network operates. The control-plane node should report `Ready`, and the CNI, CoreDNS, control-plane, and kube-proxy pods should reach their expected healthy states before workers join.
 
-A healthy validation run checks more than pod creation. Administrators should confirm that pod IPs come from the configured pod CIDR, service IPs come from the service CIDR, pods can reach each other across nodes and DNS resolution works through CoreDNS. These checks separate application faults from cluster plumbing faults and make later troubleshooting easier.
-## Worker node maintenance
-Maintenance includes operating system patching, Kubernetes upgrades and hardware or virtual machine changes. Administrators should drain a node before maintenance. `kubectl drain` marks the node unschedulable and evicts eligible pods. Controllers such as Deployments or ReplicaSets recreate replacement pods on other suitable nodes. DaemonSet-managed pods require `--ignore-daemonsets`, because DaemonSets intentionally run node-local pods.
+Network readiness requires more than pods entering `Running`. The administrator should test pod-to-pod communication across nodes, DNS resolution, Service routing, and any required NetworkPolicy enforcement. A NetworkPolicy object has no effect unless the chosen CNI supports and enforces it. Provider documentation also governs maximum transmission unit settings, encapsulation, routing, firewall rules, upgrades, and dual-stack support.
+## Join worker nodes
+Each worker needs the same node preparation, compatible package versions, kubelet, kubeadm, and a CRI runtime. `kubectl` is optional on a worker. The initial `kubeadm init` output includes a secret join command with the API endpoint, bootstrap token, and CA certificate hash. The default token expires after 24 hours.
 
-`kubectl cordon` only marks a node unschedulable. It prevents new pods from landing on the node but leaves existing pods running. After maintenance, `kubectl uncordon` returns the node to scheduling.
+An administrator can create a replacement command when required:
 
-Capacity planning matters during drains. The remaining nodes must have enough CPU, memory and placement flexibility to run the displaced workloads. Clusters should carry spare capacity for planned maintenance and unplanned failures. Rebooting a node without draining can delay pod recovery and may create avoidable application impact.
-## Upgrading kubeadm clusters
-A kubeadm upgrade follows a strict order. Administrators upgrade the first control-plane node, then any additional control-plane nodes, then worker nodes. Skipping minor versions is unsupported, so a cluster must move one minor version at a time. Patch upgrades within the same minor release are supported by the documented process. Release notes and changelogs must guide every upgrade, because API removals, feature changes and add-on requirements can affect workloads.
+```bash
+kubeadm token create --print-join-command
+```
 
-On the first control-plane node, administrators upgrade `kubeadm`, run `kubeadm upgrade plan`, then apply the selected target version with `kubeadm upgrade apply`. kubeadm runs checks, pulls images, renews certificates when required, updates static pod manifests and causes the kubelet to restart the control-plane pods with the new configuration. kubeadm stores backups under `/etc/kubernetes/tmp`, including manifest backups and local etcd backups where applicable.
+Running the printed command as root on a prepared worker performs preflight checks, discovers and authenticates the control plane, submits the kubelet certificate-signing request, writes local kubelet configuration, and registers the node. Join tokens permit authenticated nodes to enter the cluster, so administrators must protect, rotate, and delete them when no longer required.
 
-After kubeadm upgrades the control plane, administrators drain the node for non-static workloads, upgrade `kubelet` and `kubectl`, reload systemd, restart kubelet, verify status and uncordon the node. Additional control-plane nodes use `kubeadm upgrade node` rather than `kubeadm upgrade apply`.
+The cluster should show every worker as `Ready`. CNI and kube-proxy DaemonSet pods should also run on each worker. A single-control-plane cluster remains a single point of failure and needs regular etcd backups. Production environments should use a documented high-availability design.
 
-Worker node upgrades use a similar pattern. Administrators upgrade `kubeadm` on the worker, run `kubeadm upgrade node`, drain the node from the control-plane context, upgrade `kubelet` and `kubectl`, reload and restart kubelet, verify the node version and uncordon the node. The process repeats until every worker reports the target kubelet version and `Ready` status.
+Node readiness can lag while the runtime pulls images and the CNI establishes networking. Persistent `NotReady`, certificate, sandbox, or registration errors require inspection of `journalctl -u kubelet`, runtime logs, node conditions, and CNI pods. Repeating `kubeadm join` without cleaning a partial state can obscure the original failure. The administrator should diagnose first, then use the documented reset and rejoin procedure when recovery requires it.
+## Validate workloads and Services
+A concise validation creates a Deployment, confirms ready replicas, exposes it through a Service, tests access from an appropriate network location, and then removes the test resources. Three replicas do not guarantee one pod on each of three workers. The scheduler may place multiple replicas on one node unless topology spread constraints, pod anti-affinity, or other scheduling rules require distribution.
 
-CNI providers may need their own upgrade steps. Administrators should check the network add-on documentation and upgrade it according to its supported path. They should also verify API changes, storage API versions and workload manifests after the cluster upgrade.
-## Key corrections applied
-- The command name is `kubeadm`, not `kubeadmin`.
-- HTTPS is the API server transport, not HTPS.
-- Kubernetes paths use `/etc/kubernetes`, `/etc/kubernetes/manifests`, `/etc/kubernetes/pki` and `/etc/kubernetes/tmp`.
-- Joining nodes establish trust through discovery and TLS bootstrap. They do not receive the CA private key.
-- Current Kubernetes package guidance uses `pkgs.k8s.io`, while legacy package repositories are deprecated.
-- Linux swap can be configured, but kubelet still fails on swap by default unless explicitly configured to tolerate it.
-- Worker node maintenance concerns draining and cordoning nodes, not worker domains.
-- Upgrade commands use `kubeadm upgrade apply` for the first control-plane node and `kubeadm upgrade node` for additional control-plane and worker nodes.
+A `ClusterIP` Service provides a stable virtual address inside the cluster and directs traffic to ready backend endpoints. External access requires another mechanism, such as a load balancer, NodePort, Ingress, or Gateway implementation.
+
+Validation should confirm desired replicas rather than infer success from a single request. The administrator checks Deployment availability, pod readiness, EndpointSlices, events, and responses from several replicas. Topology rules can prove that scheduling spans the intended nodes or zones. Test resources should use a trusted image and explicit tag or digest, then be deleted after verification to restore the cluster's baseline.
+
+Useful checks include:
+
+```bash
+kubectl get nodes
+kubectl get pods -A -o wide
+kubectl get deployments,services,endpointslices
+kubectl describe pod <pod-name>
+```
+## Maintain worker nodes safely
+Before planned maintenance, the administrator confirms that the remaining nodes have enough CPU, memory, storage, and replica capacity. PodDisruptionBudgets should protect workloads that require availability.
+
+`kubectl cordon <node>` marks a node unschedulable but leaves existing pods in place. `kubectl drain <node> --ignore-daemonsets` also requests safe eviction of eligible pods and respects disruption budgets. DaemonSet pods remain, mirror pods cannot be deleted through the API, and unmanaged pods or pods using `emptyDir` may require carefully reviewed flags. A successful drain indicates that Kubernetes has safely evicted the pods covered by the command.
+
+After operating-system, runtime, or hardware maintenance, the administrator verifies node and workload health, then runs `kubectl uncordon <node>`. Rebooting without a drain can leave workloads unavailable until node-health taints and pod tolerations trigger replacement. The exact delay depends on cluster and workload configuration, so an assumed fixed interval is unsafe.
+## Upgrade a kubeadm cluster
+An upgrade proceeds one supported step at a time. It cannot skip a minor release. The administrator reads the target release notes, version-skew policy, kubeadm upgrade guide, and CNI provider instructions, then confirms backups, capacity, and cluster health. The Kubernetes project recommends the latest patch release of a supported minor version.
+
+Before any change, the administrator captures the current component versions, node state, configuration, certificate expiry, workload health, and backup status. Maintenance windows should allow rollback and observation after each node. Alerts, API responsiveness, DNS, Service routing, and application probes should remain under review throughout the rollout. A pause between batches helps expose faults before the same change reaches the remaining capacity in the cluster.
+
+The safe order is:
+1. Upgrade the first control-plane node.
+2. Upgrade the CNI according to its provider's instructions.
+3. Upgrade each additional control-plane node, one at a time.
+4. Upgrade worker nodes one at a time, or in small batches that preserve required capacity.
+5. Verify nodes, system pods, workloads, networking, and observability.
+
+On the first control-plane node, the administrator upgrades `kubeadm`, verifies its version, runs `kubeadm upgrade plan`, and applies the approved target with `kubeadm upgrade apply <version>`. Kubeadm checks cluster health and version policy, updates control-plane static pod manifests, restarts changed components, updates managed configuration, and renews its managed certificates by default. Additional control-plane nodes use `kubeadm upgrade node` instead of `kubeadm upgrade apply`.
+
+For each control-plane or worker node, the administrator then drains the node before the kubelet upgrade, upgrades `kubelet` and `kubectl` if installed, reloads systemd, restarts the kubelet, confirms health, and uncordons the node. A worker first receives the matching kubeadm package and runs `kubeadm upgrade node` before its kubelet upgrade.
+
+Package repositories are tied to minor releases. A minor upgrade therefore requires changing the repository to the target minor before selecting package versions. The kubelet must never be newer than the API server. Supported temporary skew can assist a rolling upgrade, but matching component versions after completion reduces operational risk.
+
+Kubeadm writes upgrade backups under `/etc/kubernetes/tmp`, including local etcd and manifest backups where applicable. These files support recovery but do not replace independent, tested etcd backups. If an upgrade stops unexpectedly, kubeadm's idempotent workflow can often resume, although recovery should follow the official procedure and the failure state.

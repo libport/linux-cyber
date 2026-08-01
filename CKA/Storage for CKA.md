@@ -1,56 +1,72 @@
 # Storage for CKA
-Kubernetes schedules pods as disposable units. Container write layers do not provide durable application storage. When a container crashes or a pod moves, Kubernetes can replace the workload, but local container changes can disappear. Stateless front ends can tolerate that behaviour. Stateful systems such as databases, queues and content stores need storage that survives pod replacement, node scheduling and routine updates.
+Kubernetes separates storage consumption from storage implementation. Applications request capacity and access characteristics, while cluster components and storage drivers provision, attach, mount, resize, and reclaim the backing resource. This separation allows Pod replacement without tying application data to a container's writable layer.
+## Storage lifecycles and resources
+A container's writable layer is ephemeral and unsuitable for durable application state. An `emptyDir` volume lets containers in one Pod share data and survives container crashes, but Kubernetes deletes it when the Pod leaves its node. Persistent storage uses a lifecycle independent of an individual Pod.
 
-Kubernetes storage separates compute from data through a small set of API objects. A volume gives containers in a pod access to a directory. Ephemeral volume types follow the pod lifecycle, so Kubernetes destroys them when the pod ends. Persistent storage exists outside that lifecycle and allows pods to reconnect to the same data after restart or replacement.
-## Core storage objects
-- PersistentVolume, or PV, represents a piece of storage in the cluster. An administrator can create it manually, or Kubernetes can create it through a StorageClass.
-- PersistentVolumeClaim, or PVC, requests storage for an application. The claim specifies requirements such as size, access mode and storage class without exposing backend details.
-- StorageClass defines a storage tier and the provisioner that creates matching PVs. It can encode disk type, performance tier, expansion support, reclaim policy and binding timing.
+| Resource | Scope | Function |
+| --- | --- | --- |
+| PersistentVolume (PV) | Cluster | Describes provisioned storage, capacity, access modes, class, volume mode, and reclaim policy |
+| PersistentVolumeClaim (PVC) | Namespace | Requests storage and provides the reference that a Pod mounts |
+| StorageClass | Cluster | Defines a provisioner and implementation-specific policy for dynamic provisioning |
 
-The control plane binds a PVC to a matching PV. A binding is exclusive and maps one claim to one volume. A PV can be Available, Bound, Released or Failed. A Released PV no longer has an active claim, but Kubernetes does not automatically make it safe for reuse when old data remains.
-## Static provisioning
-Static provisioning suits exams, labs and tightly controlled environments. The administrator creates a PV with capacity, an access mode, a backing volume such as `hostPath`, NFS or iSCSI, and a reclaim policy. The application then creates a PVC with compatible requirements. A PVC that sets `storageClassName: ""` disables dynamic provisioning and can bind only to a PV with no storage class.
+The control plane binds one PVC exclusively to one suitable PV. A static match considers storage class, requested capacity, access modes, volume mode, and any selector. The PV can exceed the requested capacity because Kubernetes does not divide one PV among claims. A claim remains `Pending` when no matching PV exists.
 
-A basic demonstration creates a 2 GiB PV and a matching PVC, mounts the claim into an NGINX pod at `/usr/share/nginx/html`, writes an `index.html` file, deletes the pod and recreates it. The file remains because the PV and PVC outlive the pod. `hostPath` works for a local Minikube exercise, but it ties data to a node and does not offer portable production storage.
-## Access modes
-Access modes describe how Kubernetes may mount a volume. They also help Kubernetes match PVs and PVCs. The storage backend determines the modes it can support.
+A `Bound` claim confirms selection or provisioning, but it does not prove that a node can attach and mount the volume. A Pod can remain `Pending` or `ContainerCreating` because of topology conflicts, multi-attach restrictions, missing CSI node components, credentials, permissions, or file-system faults. Events distinguish these stages and identify the responsible component.
 
-| Mode | Meaning |
+A PV commonly moves through `Available`, `Bound`, `Released`, and `Failed` phases. Deleting and recreating a Pod does not delete its PVC, so a replacement can mount the same bound storage. Protection finalisers delay deletion of a PVC that a Pod still uses and of a PV that remains bound.
+### Using and reserving claims
+A Pod declares a PVC under `spec.volumes` and mounts the named Pod volume through a container's `volumeMounts`. The Pod and PVC must occupy the same namespace, while the PV remains cluster-scoped. A mount path exposes the volume inside the container and does not identify the storage location on a node or provider.
+
+A StatefulSet can create one PVC for each replica through `volumeClaimTemplates`. Each replacement Pod then reuses the claim associated with its stable ordinal. This pattern preserves per-replica storage identity, but application consistency still depends on the storage system, shutdown behaviour, replication design, and recovery process.
+
+Static provisioning can target a specific PV by setting `spec.volumeName` in the PVC. An administrator can reserve that PV with `claimRef` so another claim does not bind first. Pre-binding still requires compatible storage class, access modes, and requested capacity. A PV with `Retain` also needs careful data sanitisation and a new binding definition before reuse.
+
+Modern clusters normally integrate external storage through Container Storage Interface drivers. Several legacy in-tree cloud drivers, including the original AWS EBS and Google Persistent Disk plugins, no longer ship in current Kubernetes releases. Driver capabilities and supported Kubernetes versions therefore require verification.
+
+`hostPath` mounts a directory from one node. It does not provide portable, multi-node persistence and can expose sensitive host files or privileged sockets. It suits controlled single-node tests or narrowly governed system workloads, not a general stateful application design. A supported CSI-backed service, network file system, or topology-aware local PV provides a safer production basis.
+## Access modes and volume modes
+The storage backend determines which access modes a volume supports.
+
+| Access mode | Meaning |
 | --- | --- |
-| ReadWriteOnce | The volume can mount read-write on one node. Multiple pods on that node may use it. |
-| ReadOnlyMany | The volume can mount read-only on many nodes. |
-| ReadWriteMany | The volume can mount read-write on many nodes. Distributed filesystems such as NFS commonly support it. |
-| ReadWriteOncePod | The volume can mount read-write by one pod across the cluster. It is stable and supported for CSI volumes. |
+| `ReadWriteOnce` (RWO) | One node can mount the volume read-write. Several Pods on that node may use it |
+| `ReadOnlyMany` (ROX) | Many nodes can mount the volume read-only |
+| `ReadWriteMany` (RWX) | Many nodes can mount the volume read-write |
+| `ReadWriteOncePod` (RWOP) | One Pod across the cluster can mount the volume read-write. This mode requires CSI support |
 
-Access modes do not replace application-level locking or filesystem permissions. Except for ReadWriteOncePod, they do not guarantee write protection after a volume has mounted. A ReadWriteOnce claim can fail when pods on different nodes attempt to mount the same backend at the same time.
-## Reclaim policies
-Reclaim policies define what happens after a PVC releases a PV.
+Access modes guide binding and attachment. Apart from the RWOP constraint, they do not independently enforce write protection after a mount. Workloads that require a read-only view should also configure the volume mount and underlying storage permissions accordingly. A volume uses only one access mode at a time.
 
-- Retain keeps the PV and the underlying data. An administrator must inspect, recover, back up or clean the volume before reuse.
-- Delete removes the PV and, when the plugin supports it, deletes the external storage asset. Dynamically provisioned PVs inherit the StorageClass reclaim policy, and a StorageClass defaults to Delete when the field is omitted.
-- Recycle is deprecated. Dynamic provisioning has replaced its old scrub-and-reuse behaviour.
+`volumeMode: Filesystem` is the default and mounts a formatted file system at a directory. `volumeMode: Block` presents a raw block device, so the application must manage it correctly. The PV and PVC must request compatible modes.
+## Static and dynamic provisioning
+Static provisioning requires an administrator to create a PV before a claim binds. Dynamic provisioning creates a PV for a PVC through the requested StorageClass. A StorageClass commonly defines a CSI `provisioner`, driver-specific `parameters`, `reclaimPolicy`, `allowVolumeExpansion`, and `volumeBindingMode`.
 
-Retain protects important data, especially databases and audit stores. Delete fits temporary environments, scratch workloads and cases where automatic cleanup matters more than recovery.
-## Dynamic provisioning and StorageClasses
-Dynamic provisioning removes the need to create every PV by hand. A developer creates a PVC that names a StorageClass, or omits `storageClassName` to use the default class when one exists. Kubernetes reads the StorageClass, calls its provisioner and creates a new PV that matches the claim.
+Storage class selection requires precise YAML:
+- Omitting `storageClassName` allows the cluster's default StorageClass to apply.
+- Setting `storageClassName: ""` disables dynamic provisioning for that claim and restricts it to PVs with no class.
+- Naming a class requests only PVs from that class or triggers its provisioner.
 
-A StorageClass centres on these fields:
-- `provisioner`, which identifies the volume plugin or CSI driver.
-- `parameters`, which pass backend settings such as disk type or replication.
-- `reclaimPolicy`, which applies to dynamically created PVs.
-- `allowVolumeExpansion`, which allows users to grow a PVC when the driver supports expansion.
-- `volumeBindingMode`, which controls when binding and provisioning occur.
+Omission does not guarantee static provisioning. Kubernetes can assign a default class later to an unclassified PVC when the cluster gains a default StorageClass.
 
-`Immediate` provisions and binds storage as soon as the PVC appears. This reserves storage early, but it can ignore pod scheduling constraints for topology-bound backends. `WaitForFirstConsumer` waits until a pod uses the claim, then provisions storage that respects the pod's scheduling requirements. This improves placement for zonal, node-local and topology-aware storage. Pods should use selectors or affinity for that case, not `nodeName`, because `nodeName` bypasses the scheduler and can leave the PVC pending.
-## Practical CKA patterns
-CKA candidates should practise both static and dynamic flows until manifest edits feel routine.
+`Immediate` binding, the default, provisions or binds storage when the PVC appears. This can select storage in a zone that conflicts with the eventual Pod placement. `WaitForFirstConsumer` delays binding or provisioning until the scheduler evaluates a Pod that uses the claim. It can then consider resource requests, node selectors, affinity, anti-affinity, taints, tolerations, and storage topology.
 
-For a static task, create a PV such as `task-pv` with `200Mi`, `ReadWriteOnce`, `Retain` and `hostPath: /opt/data`. Then create a PVC such as `task-pvc` in the required namespace with matching capacity, access mode and no storage class. Validate with `kubectl get pv,pvc` and confirm that both objects show Bound.
+A Pod using `WaitForFirstConsumer` should express placement through scheduler constraints rather than `spec.nodeName`. Directly setting `nodeName` bypasses the scheduler and can leave the PVC pending.
+## Reclaiming and expanding storage
+The PV reclaim policy controls the result after PVC deletion:
 
-For a dynamic task, create a PVC such as `dynamic-pvc` with `50Mi` and the default StorageClass. Then create a pod such as `data-pod` using `busybox:latest`, mount the claim at `/data`, and provide a long-running command such as `sleep` so the container stays Running. If a pod crashes, `kubectl describe pod` and event messages usually reveal missing commands, failed mounts or scheduling conflicts.
-## Exam focus
-The current CKA exam is online, proctored and performance-based. Candidates solve command-line tasks in Kubernetes within 2 hours. The passing score is 66 percent. The exam currently uses Kubernetes v1.35, with updates aligned to recent Kubernetes minor releases.
+| Policy | Result |
+| --- | --- |
+| `Retain` | Leaves the PV in `Released` state and preserves the backing asset for manual recovery, sanitisation, or reuse |
+| `Delete` | Removes the PV and, when the driver supports it, permanently deletes the backing storage asset |
 
-Storage accounts for 10 percent of the CKA curriculum. The wider weighting is Cluster Architecture, Installation and Configuration at 25 percent, Workloads and Scheduling at 15 percent, Services and Networking at 20 percent, Storage at 10 percent and Troubleshooting at 30 percent.
+Dynamically provisioned PVs inherit their StorageClass policy. A StorageClass that omits `reclaimPolicy` defaults to `Delete`, so operators should inspect the policy before deleting a claim. `Recycle` remains deprecated and should not support new designs.
 
-Efficient candidates reduce typing and context errors. They set an alias such as `alias k=kubectl`, learn short names such as `po`, `pv`, `pvc` and `sc`, generate starter YAML with `--dry-run=client -o yaml`, and confirm the active context and namespace before each task. The official Kubernetes documentation and quick reference remain essential exam tools. Fast lookup, accurate YAML editing and repeated validation with `get`, `describe` and events matter more than memorising every manifest field.
+Expansion requires `allowVolumeExpansion: true` and driver support. The operator increases the PVC request, and Kubernetes resizes the existing backing volume. Editing PV capacity directly can prevent the resize workflow. Kubernetes supports growth, not shrinking. File-system expansion can complete during Pod start or online when the driver and file system support it.
+
+Persistent storage does not replace backups. Reclaim policy, snapshots, replication, backup, restore testing, encryption, and retention address different failure and recovery needs.
+## Operational checks
+1. Inspect available StorageClasses, their defaults, provisioners, binding modes, reclaim policies, and expansion settings.
+2. Confirm that the PVC requests the intended class, capacity, access mode, and volume mode.
+3. Compare a pending claim with PV capacity, class, modes, selectors, node affinity, and topology.
+4. Inspect Pod and PVC events for provisioning, scheduling, attachment, mounting, permission, and resize failures.
+5. Verify CSI controller and node components before changing workload manifests.
+6. Confirm data recovery and deletion consequences before removing a PVC or PV.

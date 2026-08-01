@@ -1,84 +1,129 @@
-# Advanced Kubernetes cluster configuration
-## Secure API access with RBAC
-Kubernetes administrators control API access through role-based access control, or RBAC. RBAC answers three questions: which subject is acting, which action it wants to perform and which resource it wants to affect. Subjects include users, groups and service accounts. Actions map to verbs such as `get`, `list`, `watch`, `create`, `update`, `patch` and `delete`. Resources include API objects such as Pods, Deployments, Secrets, Nodes and PersistentVolumes.
+# CKA Advanced Cluster Configuration Cluster Architecture, Installation, and Configuration
+Advanced cluster configuration combines strict authorisation, reusable deployment methods, stable extension interfaces, resilient control-plane design, and tested recovery procedures. Each layer requires explicit scope, controlled credentials, and operational verification.
+## Role-based access control
+Kubernetes RBAC grants permissions through additive rules. It contains no deny rules. After authentication, the API server evaluates the request against applicable authorisers. An RBAC rule grants an action only when the verb, resource or non-resource URL, API group, and scope match. An ungranted request normally receives an HTTP 403 response when RBAC controls the decision.
 
-RBAC grants permissions additively. Kubernetes does not use deny rules in RBAC. When no RoleBinding or ClusterRoleBinding grants a requested permission, the API server rejects the request with `Forbidden`. This default supports least privilege when administrators grant only the permissions that a role needs. A permission review should start from the intended task and add only the verbs and resources required for that task.
+RBAC separates permissions from their assignment:
 
-Rules combine API groups, resources and verbs. Core resources, such as Pods and Services, use the empty API group. Workloads such as Deployments use the `apps` API group. `get` retrieves one object. `list` retrieves a collection. `watch` streams changes. A read-only Pod role in one namespace should grant `get`, `list` and `watch` on `pods`, not update or delete permissions. A role that manages Deployments must include the correct API group and resource name, otherwise the API server will not match the request.
+| Object | Permission scope | Binding scope |
+| --- | --- | --- |
+| `Role` | Resources in one namespace | `RoleBinding` assigns it within that namespace |
+| `ClusterRole` | Cluster-scoped resources, non-resource URLs, or namespaced resources | `ClusterRoleBinding` assigns it across the cluster |
+| `ClusterRole` with `RoleBinding` | Namespaced permissions from a reusable cluster-wide definition | The binding limits access to its namespace |
 
-Scope determines the correct RBAC object:
-- A Role grants permissions inside one namespace.
-- A ClusterRole defines permissions at cluster scope.
-- A RoleBinding grants a Role or ClusterRole inside one namespace.
-- A ClusterRoleBinding grants a ClusterRole across the cluster.
+A subject can be a user, group, or ServiceAccount. Kubernetes stores ServiceAccounts as API objects, but an external identity provider usually manages human users and groups. Bindings should favour groups and workload-specific ServiceAccounts because this reduces repetitive configuration and simplifies review.
 
-ClusterRoles suit non-namespaced resources such as Nodes and PersistentVolumes. They also suit reusable permission sets, including the built-in `view`, `edit`, `admin` and `cluster-admin` roles. Binding a ClusterRole with a RoleBinding limits those ClusterRole rules to the RoleBinding namespace. Binding the same ClusterRole with a ClusterRoleBinding grants the rules globally. This distinction prevents accidental cluster-wide access.
+Least privilege starts with the narrowest verbs, resources, resource names, and namespaces. Wildcards can silently grant access to resources or verbs introduced by later releases. Cluster-wide bindings therefore require stronger justification than namespaced bindings. Built-in roles also need careful review. The `edit` role can access Secrets and run Pods as namespace ServiceAccounts, which may allow privilege escalation through those identities. Administrators should avoid changing default system roles because API-server reconciliation can restore missing permissions. Custom roles provide clearer ownership.
 
-ClusterRole aggregation lets Kubernetes combine several ClusterRoles into a parent ClusterRole by label selector. This keeps permission libraries modular. For example, a monitoring platform can add permissions for its own custom resources by labelling its ClusterRoles so the monitoring administrator role inherits them automatically.
+RBAC rules should name API groups explicitly. Core resources such as Pods use the empty group, while Deployments use `apps`. Subresources such as `pods/log` and `pods/exec` require separate entries. Permission to create Pods can indirectly expose mounted credentials or powerful node features, so admission policy and Pod Security controls must complement RBAC.
 
-Imperative `kubectl create role` and `kubectl create rolebinding` commands can generate manifests quickly. `--dry-run=client -o yaml` is safer for exam and production work because it prints the object without creating it. Administrators can then inspect the API group, resource, verb, subject and namespace before applying the manifest. Deleting a namespace removes the namespaced Roles and RoleBindings inside it.
-## Validate and troubleshoot access
-Administrators should verify RBAC with `kubectl auth can-i`. The command sends a SubjectAccessReview to the API server and returns whether the nominated subject can perform the action. Impersonation with `--as` allows an administrator to test a user without using that user's credentials. The same approach works for service accounts, which often need tightly scoped access for Pods and controllers.
+Aggregated ClusterRoles combine labelled rules into another ClusterRole. Aggregation supports extensible roles, but the controller manages the resulting `rules` field. Administrators should add or remove labelled source roles instead of editing aggregated rules directly.
 
-Effective checks include:
-
-```bash
-kubectl auth can-i get pods --namespace test-space --as test-user
-kubectl auth can-i delete pods --namespace test-space --as test-user
-kubectl auth can-i --list --namespace test-space --as test-user
-kubectl auth can-i get /healthz
-```
-
-`kubectl` verbosity exposes how the client talks to the API server. `-v=6` shows request URLs and response codes, which helps identify namespace, API group and endpoint mistakes. `-v=8` shows request and response headers and more raw HTTP detail. That level can reveal credential and kubeconfig problems, but logs from high verbosity can contain sensitive authentication material and need careful handling.
-
-An RBAC denial normally identifies the user, verb, resource, API group and namespace. Administrators should use those fields to grant the smallest useful permission rather than broad access. A `Forbidden` response points to authorisation. A `NotFound` response may point to a missing resource, wrong API group or wrong namespace. High verbosity separates those cases from local command syntax errors and network failures.
-## Manage configuration with Helm and Kustomize
-Production Kubernetes administration requires repeatable configuration, not hand-edited YAML. Helm and Kustomize solve different parts of that problem.
-
-Helm packages Kubernetes resources into charts. A chart contains metadata in `Chart.yaml`, templates, default values in `values.yaml` and optional dependencies. A release is a running instance of a chart. Helm renders templates with supplied values, sends the resulting manifests to Kubernetes and stores release history. That history supports upgrades and rollbacks when a new application version or configuration fails.
-
-A typical Helm workflow adds a repository, updates the local index, searches for a chart, inspects values, installs a named release and later uninstalls or rolls it back. Chart version and application version are different. Chart version tracks packaging and templates. Application version tracks the software deployed by the chart. Values files let teams adjust replica counts, image tags, Service types, resource requests and other settings without editing chart templates.
-
-Helm improves lifecycle management because it tracks all resources that belong to a release. `helm uninstall` removes the release objects as a set. `helm history` lists revisions. `helm rollback` returns a release to a previous revision when a failed upgrade causes crash loops or incorrect configuration. The package model suits third-party applications and shared internal platforms.
-
-Kustomize manages environment differences without templating syntax. A base contains ordinary Kubernetes manifests that describe the shared application. An overlay points to the base and applies changes such as name prefixes, replica counts, labels, images, ConfigMaps, Secrets or environment-specific patches. `kubectl kustomize` renders the final manifest. `kubectl apply -k` applies it.
-
-Kustomize uses patching rather than template substitution. An overlay can change the replica count for development, set a production hostname or add labels while leaving the base files untouched. Kustomize generators can create ConfigMaps and Secrets from local files. Kustomize appends hashes to generated names, which lets Kubernetes roll workloads when configuration changes. Small overlays make differences between development, staging and production easy to review.
-## Extend the platform
-Kubernetes stays portable because it delegates runtime, networking and storage work to standard interfaces.
-
-- The Container Runtime Interface lets the kubelet talk to runtimes such as containerd or CRI-O.
-- The Container Network Interface lets compatible plugins implement the Kubernetes network model, assign Pod networking and support features such as network policy.
-- The Container Storage Interface lets storage vendors expose storage systems to Kubernetes workloads through drivers.
-
-This modularity points troubleshooting in the right direction. A container that will not start often involves the runtime, image or kubelet. A Pod that cannot reach another Pod often involves CNI, routing, DNS or network policy. A volume that will not attach or mount often involves CSI, a StorageClass, a PersistentVolumeClaim or provider credentials. The control plane orchestrates the request, while specialised plugins perform provider-specific work.
-
-CustomResourceDefinitions extend the Kubernetes API with new resource types. After installing a CRD, users can create and manage that resource with `kubectl`, RBAC and the normal API machinery. Cert-manager, for example, adds resource types such as `certificates`, `issuers`, `clusterissuers`, `orders` and `challenges`. Before the CRDs exist, the API server cannot recognise those resources. After installation, a query may return no objects rather than an unknown resource error.
-
-A CRD defines and stores data. An operator adds behaviour. Operators are controllers that watch custom resources, compare the current state with the desired state and take action. They encode operational knowledge for tasks such as provisioning databases, rotating certificates, running backups, applying schema changes and handling failover. This moves administration from manual runbooks to reconciliation loops that keep complex services healthy.
-## Build a highly available control plane
-A production control plane should survive node failure. Kubernetes stores cluster state in etcd, a distributed key-value store that relies on quorum. Quorum is the majority required to make safe decisions, calculated as `floor(N/2) + 1`. A three-member etcd cluster needs two members for quorum and can lose one. A five-member cluster needs three and can lose two. A two-member etcd cluster still needs two members, so it cannot tolerate the loss of either member.
-
-Control plane designs usually use one of two topologies:
-- A stacked topology runs etcd on each control plane node. It is common, efficient and simpler for kubeadm to manage.
-- An external etcd topology runs etcd on separate hosts. It costs more and adds operational complexity, but it isolates database performance from API server load.
-
-A highly available API needs a stable endpoint in front of all API servers. A load balancer such as HAProxy can distribute traffic across healthy control plane nodes. Keepalived can provide a virtual IP so another load balancer takes over if the active one fails. The load balancer must perform health checks and send traffic only to live API servers. Without that stable endpoint, workers and administrators would need to know every control plane address.
-
-Kubeadm must know the shared endpoint during initialisation. `kubeadm init --control-plane-endpoint` places the load balancer DNS name or virtual IP into the cluster configuration and certificates. This prevents TLS failures when clients connect through the shared endpoint rather than a single node IP. `--upload-certs` stores encrypted control plane certificates temporarily so additional control plane nodes can join. Later control plane joins need `kubeadm join --control-plane` and the matching certificate key. Worker joins omit the control plane flag.
-## Recover etcd after disaster
-High availability protects against infrastructure failure. It does not protect against logical failure. If an authorised user deletes a production namespace, a healthy HA control plane faithfully records and replicates that deletion. Etcd snapshots provide the recovery point.
-
-Etcd holds the cluster state and requires TLS authentication for direct access. A snapshot command normally supplies the endpoint, trusted CA certificate, client certificate and client key:
+Authorisation checks should begin with focused commands:
 
 ```bash
-ETCDCTL_API=3 etcdctl snapshot save /var/lib/etcd/etcd-backup.db \
---endpoints=https://127.0.0.1:2379 \
---cacert=/etc/kubernetes/pki/etcd/ca.crt \
---cert=/etc/kubernetes/pki/etcd/server.crt \
---key=/etc/kubernetes/pki/etcd/server.key
+kubectl auth can-i get pods -n team-a
+kubectl auth can-i create deployments.apps -n team-a --as=alice
+kubectl auth can-i --list -n team-a --as=system:serviceaccount:team-a:builder
 ```
 
-A safe restore writes to a new data directory, not the active etcd directory. On kubeadm clusters, etcd commonly runs as a static Pod under `/etc/kubernetes/manifests`. Recovery stops the affected static Pods or moves manifests aside, restores the snapshot into a clean directory, updates the etcd static Pod manifest to mount the restored path, then lets the kubelet restart the control plane. Verification checks nodes, namespaces and all Pods after the API server returns.
+Impersonation requires its own RBAC permission. `kubectl auth can-i` evaluates authorisation, but it does not prove that admission controls, quotas, validation, or runtime conditions will accept an operation. Increased client verbosity can help diagnose request paths and responses, although high levels may expose credentials or sensitive payloads. Logs should use the lowest useful level and receive the same protection as other secrets.
+## Reusable deployment configuration
+### Helm
+A Helm chart packages templates, default values, metadata, and optional dependencies. Installing a chart creates a release, and Helm stores release state in the cluster, normally in Secrets. A release is a Helm record rather than a native Kubernetes workload type.
 
-Backups need regular testing. A snapshot that cannot be restored does not provide disaster recovery. Administrators should protect snapshot files because they contain cluster state, including objects that may hold sensitive data. Restore procedures should record the exact etcd member, data directory, certificate paths and static Pod manifest paths used by the cluster.
+Values from files and command-line flags override chart defaults. Teams should version environment values, inspect rendered manifests, and avoid placing unencrypted secrets in values files or command history. The following sequence supports review before mutation:
+
+```bash
+helm repo update
+helm template payments ./chart -f values-production.yaml
+helm upgrade --install payments ./chart -n payments --create-namespace \
+  -f values-production.yaml --atomic
+```
+
+`helm history` lists revisions, and `helm rollback` reapplies an earlier release configuration. A rollback cannot reverse database migrations, persistent-volume changes, or effects produced outside Helm. `helm uninstall` removes resources tracked by the release, but hooks, persistent volume claims, and resources protected by retention annotations can remain. Safe charts document these lifecycle boundaries and use idempotent hooks.
+
+Charts can place CRDs in a `crds` directory. Helm installs them before templated resources, but it does not upgrade or delete them automatically. Teams must manage CRD schema changes, stored versions, and removal as a separate lifecycle.
+### Kustomize
+Kustomize transforms plain Kubernetes manifests without a template language. A `kustomization.yaml` file declares resources, patches, name changes, labels, images, and generated ConfigMaps or Secrets. A shared base captures common configuration, while overlays express environment-specific differences.
+
+```bash
+kubectl kustomize overlays/production
+kubectl diff -k overlays/production
+kubectl apply -k overlays/production
+kubectl delete -k overlays/production
+```
+
+Generators add a content hash to generated names by default. That change updates workload references and triggers a rollout when configuration changes. Teams should commit bases and overlays together, review rendered output, and keep patches small enough to reveal intent.
+
+Remote bases and chart dependencies should be pinned to immutable revisions or verified packages. Floating references can change rendered resources without a local commit, weakening review, auditability, and rollback.
+
+Helm suits packaged applications with release history and parameterised templates. Kustomize suits declarative variation across related manifests. A delivery pipeline can render a Helm chart and then apply Kustomize, but each additional transformation complicates provenance and debugging.
+## Cluster extension interfaces and operators
+Kubernetes relies on defined interfaces to separate orchestration from node implementations:
+
+| Interface | Primary relationship | Responsibility |
+| --- | --- | --- |
+| CRI | kubelet to container runtime | Creates Pod sandboxes and manages containers and images |
+| CNI | runtime integration to network plugins | Connects Pods to networks and configures interfaces and routes |
+| CSI | Kubernetes to storage drivers | Provisions, attaches, mounts, resizes, and snapshots supported storage |
+
+A conforming CRI runtime does not remove the need for planned node migration. Runtime changes can alter configuration, image storage, cgroups, and operational behaviour, so administrators should cordon, drain, change, test, and return nodes gradually. CNI capabilities also vary. NetworkPolicy enforcement works only when the selected network plugin supports it.
+
+A CustomResourceDefinition extends the Kubernetes API with a new resource schema and storage endpoint. A custom resource alone stores desired state. A controller watches that state and reconciles external or native resources. An operator applies this pattern to specialised operational knowledge such as installation, upgrades, backup, failover, or certificate renewal.
+
+Controllers should reconcile idempotently, report conditions through `status`, retry transient failures with backoff, and avoid assuming that events arrive once or in order. Leader election allows multiple controller replicas to provide availability without performing the same mutation concurrently. Metrics and events should expose stalled reconciliation without leaking secret values.
+
+CRD schemas should use structural OpenAPI validation, appropriate status subresources, clear versioning, and conversion when versions diverge. Finalisers can protect cleanup, but a stalled finaliser can also block deletion. Deleting a CRD removes its stored custom resources, so removal requires a backup and migration plan.
+
+cert-manager illustrates the pattern. `Issuer` and `ClusterIssuer` resources describe certificate authorities, `Certificate` resources request certificates, and controllers store issued material in Secrets. Workloads must reference or mount those Secrets explicitly. They do not receive certificates automatically.
+## Highly available control planes
+Control-plane availability depends on redundant API servers, a stable endpoint, healthy network paths, and an etcd cluster that retains quorum. The voting-member count, not the API-server count, determines etcd quorum.
+
+| etcd members | Quorum | Member failures tolerated |
+| ---: | ---: | ---: |
+| 1 | 1 | 0 |
+| 2 | 2 | 0 |
+| 3 | 2 | 1 |
+| 4 | 3 | 1 |
+| 5 | 3 | 2 |
+
+An odd number of voting members provides the same failure tolerance as the next even number with fewer machines. Three members suit many clusters, while five can tolerate two failures at greater cost. Loss of quorum prevents etcd from committing state changes and stops normal control-plane progress. It should not be treated as a general read-only operating mode.
+
+A stacked topology runs an etcd member beside each control-plane node. It reduces infrastructure and bootstrap complexity, although failure of a node removes both an API server and an etcd member. An external topology separates etcd from control-plane nodes and can isolate failure domains, but it adds machines, certificates, networking, monitoring, and recovery work.
+
+A load balancer presents one stable `controlPlaneEndpoint` to clients and joining nodes. It should perform TCP or suitable health checks against API servers, exclude failed backends, and avoid becoming a single point of failure. DNS, virtual IPs, firewall rules, and load-balancer redundancy form part of the design.
+
+Nodes should span independent failure domains where the platform permits. Capacity planning must allow the surviving control plane and worker pool to absorb a planned drain or an unplanned loss. Time synchronisation, certificate expiry monitoring, component alerts, and tested administrative access support the same availability objective.
+
+For kubeadm, the first control-plane node must initialise the cluster with the stable endpoint and shared certificate workflow:
+
+```bash
+kubeadm init \
+  --control-plane-endpoint "api.cluster.example:6443" \
+  --upload-certs
+```
+
+The administrator then configures `kubectl`, installs a compatible CNI plugin, and verifies core Pods. Each additional control-plane node uses the generated join command with both `--control-plane` and `--certificate-key`. Worker nodes use the separate worker join command. Control-plane nodes should join one at a time, with component and etcd health checked after each addition.
+
+The uploaded certificates reside temporarily in the `kubeadm-certs` Secret, encrypted by the certificate key. The key grants sensitive access and the uploaded data expires after two hours by default. If that window closes, `kubeadm init phase upload-certs --upload-certs` creates a new key and upload. Production automation should protect join tokens, certificate keys, and discovery information.
+## etcd backup and recovery
+An etcd snapshot captures Kubernetes API state, including Secrets. It does not capture container images, external databases, application-level state, or persistent-volume contents. Backup design must cover those systems separately.
+
+Snapshots should run regularly, transfer to encrypted off-cluster storage, and use strict access controls. They should not remain inside the active etcd data directory. The snapshot interval should follow the recovery-point objective, while restore exercises should measure the recovery-time objective. Retention should include multiple generations because corruption or accidental deletion may remain unnoticed until the newest snapshot already contains the damage.
+
+A kubeadm-managed member can create and verify a snapshot with its client certificates:
+
+```bash
+etcdctl --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key \
+  snapshot save /secure-backup/etcd.db
+
+etcdutl snapshot status /secure-backup/etcd.db
+```
+
+Recovery requires a planned maintenance window. Administrators should stop API-server writes, preserve existing data directories, verify the snapshot, and restore with `etcdutl snapshot restore`. A restore creates new member data and a new logical etcd cluster. Every member in an HA cluster must restore from the same snapshot with the correct unique member name, peer URL, initial cluster, and data directory. Editing one static Pod on one member does not restore a multi-member cluster.
+
+Kubernetes restores benefit from a revision bump and `--mark-compacted` because controllers may otherwise retain stale watch caches after the apparent revision moves backwards. After restoration, administrators should update static Pod manifests or service configuration, restart members and API servers in the required order, verify endpoint health and alarms, confirm node and workload state, and test a representative API change. Regular recovery exercises validate certificates, commands, storage access, timings, and staff readiness before an incident.

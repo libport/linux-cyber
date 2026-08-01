@@ -1,149 +1,209 @@
 # Certified Kubernetes Administrator: Working with Your Cluster
-`kubectl` is the main command-line client for Kubernetes. It sends requests to the API server, which exposes the Kubernetes API and stores cluster state in etcd. Administrators use `kubectl` to create, read, update and delete API resources such as Pods, Deployments, Services, ReplicaSets and Nodes.
+## kubectl access and command structure
+`kubectl` communicates with the Kubernetes control plane through the API server. It creates, reads, updates, deletes, and troubleshoots API resources such as Pods, Deployments, Services, and Nodes. A kubeconfig file supplies cluster endpoints, credentials, contexts, and default namespaces. Before changing a cluster, an operator should confirm the active context and namespace.
 
-A standard command combines an operation, a resource type, an optional object name and optional flags:
+A context combines a cluster, an identity, and an optional default namespace. The `--context`, `--namespace`, and `--kubeconfig` flags can override those defaults for one command. This explicit form reduces the risk of changing the wrong environment during production work. Kubeconfig files can contain powerful credentials and require the same protection as other authentication material.
 
-```bash
-kubectl get pods
-kubectl get pod nginx -o yaml
-kubectl create deployment nginx --image=nginx
-```
-
-Resource names also have short names. For example, `po` can refer to Pods, `svc` to Services and `no` to Nodes. Short names reduce typing, especially when Bash completion is enabled.
-## Core kubectl operations
-Common operations support day-to-day cluster administration:
-- `kubectl get` lists resources and shows basic status.
-- `kubectl describe` shows detailed configuration, status, conditions and events.
-- `kubectl apply -f file.yaml` applies declarative configuration from a manifest.
-- `kubectl create` creates resources imperatively or from a file.
-- `kubectl run` creates a Pod from an image.
-- `kubectl delete` removes a named resource.
-- `kubectl explain` describes API resources and fields.
-- `kubectl logs` reads container output written to stdout or stderr.
-- `kubectl exec` runs a command inside a container.
-- `kubectl expose` creates a Service for an existing workload.
-- `kubectl scale` changes the replica count of a scalable workload.
-- `kubectl edit` opens the live object definition in the configured editor.
-
-The `-h` flag provides command help. For example, `kubectl get -h` shows supported options and examples. `kubectl explain pod.spec.containers` helps administrators build manifests by showing the structure and required fields for a Pod container specification.
-## Discovering resources and API structure
-`kubectl api-resources` lists the resource types supported by the cluster. Its output includes names, short names, API versions, whether a resource is namespaced and its kind. Nodes and persistent volumes are cluster-scoped. Pods, Deployments and Services usually live inside namespaces.
-
-Namespaces group many resources for management and access control. `kubectl get pods` uses the current namespace, often `default`. System components usually run in `kube-system`, so `kubectl get pods -n kube-system` shows control plane and cluster service Pods such as CoreDNS and kube-proxy.
-
-`kubectl get all --all-namespaces` lists many common resource types across namespaces, but it does not list every resource in the API. Discovery commands remain important when a cluster has custom resources or less common built-in objects.
-## Contexts, namespaces and completion
-`kubectl` uses the current context from kubeconfig to decide which cluster, user and namespace to use. Administrators should confirm the context before changing resources, especially when they work across development, testing and production clusters. `kubectl config current-context` shows the active context, while `kubectl cluster-info` confirms the API endpoint that receives requests.
-
-Namespace flags reduce mistakes. `-n kube-system` limits a command to the system namespace. `--all-namespaces` expands a read command across namespaces. Write commands should name the target namespace explicitly when the default namespace is not intended.
-
-Bash completion improves accuracy as well as speed. It completes command names, resource types, object names and flags after the shell loads the kubectl completion script. Completion is especially useful with generated Pod names, where Deployments add a ReplicaSet hash and Kubernetes adds a unique suffix.
-## Output formats and dry runs
-`kubectl` can change output with `-o` or `--output`:
-- `-o wide` adds useful columns such as node placement, Pod IP addresses, operating system details or container runtime details.
-- `-o yaml` returns a YAML representation of an object.
-- `-o json` returns a JSON representation for tools and automation.
-
-YAML and JSON matter because Kubernetes represents desired state as structured API objects. Administrators can inspect a live object, save its definition and reuse part of it in configuration management.
-
-`--dry-run=client -o yaml` generates a manifest without creating the object in the cluster. It works well as a starting point for reliable YAML:
+The kubectl client should remain within one minor version of the API server. Client and server versions do not need to match exactly, but unsupported skew can produce missing commands, incompatible fields, or misleading local generation.
 
 ```bash
-kubectl create deployment hello-world --image=example/hello-app:1.0 --dry-run=client -o yaml > deployment.yaml
-kubectl expose deployment hello-world --port=80 --target-port=8080 --dry-run=client -o yaml > service.yaml
+kubectl config current-context
+kubectl config view --minify
+kubectl cluster-info
 ```
 
-Generated manifests still need review. They often include a minimal, valid structure rather than the complete policy, labels, resource requests, probes and security settings needed for production.
-## Inspecting cluster state
-`kubectl cluster-info` shows the API server endpoint for the current context. `kubectl get nodes` shows node names, status, roles, age and Kubernetes version. `kubectl get nodes -o wide` adds information such as internal IP addresses, operating system images, kernel versions and container runtimes.
+`kubectl cluster-info` displays control plane and service endpoints. A successful response confirms API access, but it does not establish the health of every component or workload.
 
-`kubectl describe node c1-cp1` gives deeper detail about a node. It reports labels, annotations, conditions, addresses, capacity, allocatable resources, system information and Pods running on that node. Conditions reveal problems such as memory pressure, disk pressure or network unavailability. Capacity shows physical resources. Allocatable resources show what Kubernetes can schedule for workloads after system reservations.
+Most commands follow this form:
 
-`kubectl describe pod name` gives scheduling and runtime detail for a Pod. Events show the scheduler assigning the Pod to a node, the kubelet pulling or reusing an image, the container runtime creating the container and the kubelet starting it. These events are often the quickest path to failed image pulls, scheduling failures and container start errors.
-## Reading ownership and readiness
-Kubernetes object names often reveal ownership. A Deployment named `hello-world` creates a ReplicaSet with the Deployment name plus a Pod template hash. That ReplicaSet creates Pods whose names include the same prefix plus a unique suffix. The `Controlled By` field in `kubectl describe pod` confirms the owner rather than relying only on the name.
+```text
+kubectl [command] [TYPE] [NAME] [flags]
+```
 
-Status columns give a quick health check. A Pod readiness value such as `1/1` means one of one containers is ready. A Deployment readiness value such as `20/20` means all requested replicas are available. Restart counts show container restarts, while age shows when the object was created, not how long the current container process has run.
+Resource types accept singular, plural, and recognised short names. For example, `pod`, `pods`, and `po` identify the same type. Resource names remain case-sensitive. The `-n` or `--namespace` flag selects one namespace, while `-A` or `--all-namespaces` queries all namespaces when the resource supports namespace scope.
 
-Events place those facts in time. They show scheduling decisions, image pull attempts, container creation and start operations. Events do not replace logs, but they often explain why logs are absent. For example, a Pod stuck in `ImagePullBackOff` may never start the application process that would produce logs.
-## Logs and container access
-`kubectl logs pod-name` reads logs from a container in a Pod. For multi-container Pods, the command should include `-c container-name`. Logs help diagnose application startup, configuration and runtime issues when the application writes useful output to stdout or stderr.
+Namespaces scope names and help isolate groups of namespaced resources. They are not nested folders. Deployments, Pods, and Services are namespaced, while Nodes, PersistentVolumes, and StorageClasses have cluster scope. `kubectl api-resources` reports each available resource's API group, short name, kind, verbs, and scope.
+## Discovery, inspection, and output
+The following commands cover the main discovery and inspection tasks:
 
-`kubectl exec -it pod-name -- /bin/sh` starts an interactive shell inside a container when the image includes a shell. Administrators can inspect files, environment variables, DNS resolution and network interfaces from the container's point of view. The command runs through the Kubernetes API and the kubelet on the target node, so it does not require direct SSH access to that node.
+| Command | Function |
+| --- | --- |
+| `kubectl get` | Lists resources or returns a named resource |
+| `kubectl describe` | Presents human-readable state, relationships, conditions, and recent events |
+| `kubectl api-resources` | Discovers resource types served by the cluster |
+| `kubectl explain` | Reads the server's OpenAPI documentation for resource fields |
+| `kubectl logs` | Retrieves container logs |
+| `kubectl exec` | Runs a command in a selected container |
+| `kubectl create` | Creates a new resource and normally fails if it already exists |
+| `kubectl apply` | Creates or patches resources from declarative configuration |
+| `kubectl delete` | Requests resource deletion |
 
-Direct node access with tools such as `crictl` can confirm which containers run on a specific node, but Kubernetes administration should usually start with API objects and `kubectl`. Direct runtime inspection is useful for low-level troubleshooting.
+`kubectl get nodes -o wide` adds node addresses, operating-system details, kernel versions, and runtime versions to the standard output. A Node with `Ready=True` reports healthy node status, but taints, cordons, resource pressure, or policy can still prevent workload scheduling.
+
+`kubectl get pods` queries the current namespace. System Pods commonly reside in `kube-system`, and `kubectl get pods -A` spans all namespaces. The Pod `READY` column shows ready containers against total containers. `RESTARTS` records container restarts for the current Pod and does not reveal their cause. Events, current logs, previous-container logs, and kubelet data provide the necessary context.
+
+`kubectl get all -A` does not list every resource in the cluster. The word `all` selects a limited API category of common resource types. It omits many namespaced resources and does not provide a complete cluster inventory. An operator should query the required types directly or discover categories and listable resources with `kubectl api-resources`.
+
+Output flags support different tasks:
+- `-o wide` adds selected columns.
+- `-o yaml` and `-o json` return the live API representation.
+- `-o name` returns resource identifiers suitable for scripts.
+- JSONPath and custom columns extract specific fields.
+
+Live YAML and JSON include server defaults, status, resource versions, and other generated data. They support inspection and troubleshooting, but they should not replace maintained source manifests without review and cleaning.
+
+`kubectl explain pod`, `kubectl explain pod.spec`, and `kubectl explain pod.spec.containers` progressively expose the schema. The `--recursive` flag outlines subordinate fields, while a precise field path provides definitions and types. Shell completion generated by `kubectl completion bash`, `zsh`, or `fish` reduces typing errors and exposes commands and resource names interactively.
+
+API discovery reflects the connected cluster, including enabled API groups and installed custom resources. It therefore provides more reliable operational evidence than a memorised list.
+
+```bash
+kubectl api-resources --namespaced=true
+kubectl api-resources --namespaced=false
+kubectl api-resources --verbs=list --sort-by=name
+```
+
+Labels allow efficient selection across related objects. `kubectl get pods -l app=hello-world -o wide` narrows output to a workload and shows placement and addresses. Field selectors can filter supported server-side fields, while `--sort-by` orders output for review. Scripts should request stable fields through JSONPath, custom columns, or structured JSON instead of parsing human-readable tables.
+## A systematic troubleshooting path
+An operator can investigate a failed workload in a consistent sequence:
+1. The operator confirms the context, namespace, and caller identity before collecting evidence.
+2. `kubectl get` establishes desired counts, observed status, node placement, addresses, and recent restarts.
+3. `kubectl describe` exposes conditions, selectors, ownership, scheduling decisions, and recent events.
+4. `kubectl logs` examines the current container and, after a restart, the previous container instance.
+5. `kubectl exec` performs a focused in-container check only when logs and status do not answer the question.
+6. Node conditions, kubelet logs, runtime state, CNI components, and Service EndpointSlices complete the investigation when the fault lies outside the application.
+
+Events are namespaced API objects with limited retention. They provide valuable recent evidence but do not form a durable audit log. An operator should capture relevant output during an incident and use central logging, metrics, and audit records for historical analysis.
+
+`kubectl describe pod` often exposes the full lifecycle of a new Pod. Typical events show scheduling, image pulling or reuse, container creation, and container start. A `Pending` Pod may reflect an unsatisfied scheduling constraint, unavailable capacity, an unbound volume, or an image issue. A restart count can reflect an application failure, probe failure, out-of-memory termination, or node disruption. The status alone cannot establish the cause.
+## Container logs and command execution
+`kubectl logs` returns a container's standard output and standard error streams as captured by the node logging system. A multi-container Pod requires `-c CONTAINER` unless a default container applies. Useful flags include `-f` for streaming, `--since` or `--tail` for bounded output, and `-p` for the previous terminated container instance.
+
+```bash
+kubectl logs hello-world-pod -c hello-app --tail=100
+kubectl logs hello-world-pod -c hello-app -p
+```
+
+`kubectl exec` runs a process in a container. It selects the annotated default container or the first container unless `-c` identifies another one. The double hyphen separates kubectl arguments from the remote command.
+
+```bash
+kubectl exec -it hello-world-pod -c hello-app -- /bin/sh
+```
+
+The container image must contain the requested executable. An interactive shell also requires suitable RBAC permission and can change application state, so operators should prefer read-only diagnostics where possible.
 ## Imperative and declarative management
-Imperative commands make immediate changes from the command line. They suit quick experiments and urgent repairs:
+Imperative commands act directly on live resources. They suit learning, short-lived tests, and urgent operations.
 
 ```bash
-kubectl create deployment hello-world --image=example/hello-app:1.0
-kubectl run hello-world-pod --image=example/hello-app:1.0
-```
-
-A Deployment creates and manages Pods through a ReplicaSet. A bare Pod created with `kubectl run` has no higher-level controller. If the Pod fails or a node disappears, Kubernetes has less information about the desired application state than it has for a Deployment.
-
-Declarative management stores the desired state in manifests and applies them to the cluster:
-
-```bash
-kubectl apply -f deployment.yaml
-kubectl apply -f service.yaml
-```
-
-Declarative configuration scales better than repeated one-off commands because it creates an auditable source of truth. Teams can review, version and reuse manifests. They can also reapply the same files to correct drift.
-## Manifest structure
-A basic Pod manifest includes:
-- `apiVersion`, which identifies the API group and version.
-- `kind`, which identifies the object type.
-- `metadata`, which names and labels the object.
-- `spec`, which describes the desired state.
-
-A Pod `spec` must define at least one container. Each container needs a unique name within the Pod and an image. A Deployment manifest uses `apiVersion: apps/v1`, `kind: Deployment`, metadata, a desired replica count, a selector and a Pod template. The selector matches labels on Pods created from the template. The template contains the Pod metadata and Pod specification used for each replica.
-
-Labels and selectors connect related resources. A Deployment selector identifies the Pods it manages. A Service selector identifies the Pods that should receive traffic. Clear labels make troubleshooting and automation easier.
-## Deployment flow inside Kubernetes
-When `kubectl apply -f deployment.yaml` creates or updates a Deployment, the request goes to the API server. The API server validates the object and persists state in etcd. Controllers and the scheduler watch the API server, not etcd directly.
-
-The Deployment controller reconciles the desired Deployment state by creating or updating a ReplicaSet. The ReplicaSet controller reconciles the desired replica count by creating or deleting Pod objects. The scheduler watches for Pods without assigned nodes and binds each suitable Pod to a node.
-
-The kubelet on each node watches the API server for Pods assigned to that node. When it finds assigned work, it asks the container runtime to pull the required image and start containers. The kubelet reports Pod and container status back through the API server.
-
-Services use selectors to find matching Pods. Modern Kubernetes clusters represent Service backends with EndpointSlices, while older workflows may also show Endpoints. kube-proxy watches Service and EndpointSlice changes and programs node-level networking rules so traffic to a Service reaches one of its ready backends.
-## Services and application access
-A ClusterIP Service gives an application a stable virtual IP inside the cluster. It exposes a Service port and forwards traffic to a target port on matching Pods:
-
-```bash
+kubectl create deployment hello-world --image=registry.example.com/hello-app:1.0
+kubectl run hello-world-pod --image=registry.example.com/hello-app:1.0
 kubectl expose deployment hello-world --port=80 --target-port=8080
+```
+
+`kubectl run` creates a Pod that no workload controller manages. A Deployment provides replication, replacement, and rollout behaviour, so it normally suits long-running applications better than a standalone Pod.
+
+Declarative management stores desired state in YAML or JSON and uses `kubectl apply`. Source control can then provide review, audit history, repeatable environments, and recovery data. An operator should preview changes with `kubectl diff -f` before applying them.
+
+```bash
+kubectl diff -f manifests/
+kubectl apply -f manifests/
+```
+
+`--dry-run=client -o yaml` can generate a starting manifest for commands that support client-side generation. It constructs the object without persisting it. `--dry-run=server` sends a non-persistent request through server validation, defaulting, and admission, which provides a stronger compatibility check.
+
+```bash
+kubectl create deployment hello-world \
+  --image=registry.example.com/hello-app:1.0 \
+  --dry-run=client -o yaml > deployment.yaml
+```
+
+Generated YAML remains a starting point. It still needs meaningful labels, resource requests, probes, security settings, image-pull policy, and other application requirements.
+## Kubernetes manifests
+A manifest identifies an API schema with `apiVersion`, an object type with `kind`, identity and labels with `metadata`, and desired configuration with `spec`. General-availability APIs maintain compatibility, but Kubernetes can add optional fields and evolve behaviour. Alpha and beta APIs require closer upgrade planning.
+
+A minimal Deployment can take this form:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-world
+  labels:
+    app: hello-world
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-world
+  template:
+    metadata:
+      labels:
+        app: hello-world
+    spec:
+      containers:
+      - name: hello-app
+        image: registry.example.com/hello-app:1.0
+        ports:
+        - containerPort: 8080
+```
+
+The Deployment selector must match the Pod template labels, and the selector becomes immutable after creation. The Pod template requires at least one item in the `containers` list, and container names must be unique within the Pod.
+
+A corresponding internal Service can declare the stable access point separately:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-world
+spec:
+  selector:
+    app: hello-world
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+```
+
+Applying both files creates or updates the objects. The Service selector and Deployment Pod labels form the link between them. The Service does not select the Deployment object itself.
+## Reconciliation and workload creation
+The API server validates an applied Deployment, runs admission, and persists the accepted desired state in etcd. Other components communicate through the API server rather than reading etcd directly.
+
+The Deployment controller observes the new object and creates a ReplicaSet through the API. The ReplicaSet controller creates the requested Pods. The scheduler observes unscheduled Pods, selects suitable Nodes, and records bindings through the API. Each kubelet watches for Pods assigned to its Node, then uses the Container Runtime Interface to prepare sandboxes, pull images, and start containers. Controllers continue reconciling actual state with desired state after the initial creation.
+
+The Deployment, ReplicaSet, and Pod names often show their relationship, but `metadata.ownerReferences`, labels, and selectors provide authoritative links. Useful checks include:
+
+```bash
+kubectl get deployment,replicaset,pod -l app=hello-world
+kubectl describe deployment hello-world
+kubectl rollout status deployment/hello-world
+```
+
+For a Deployment, `READY` reports ready replicas against desired replicas, `UP-TO-DATE` counts replicas built from the current Pod template, and `AVAILABLE` counts replicas that satisfy availability requirements. Scaling changes replica counts but does not create a new rollout because it does not change the Pod template.
+
+`kubectl describe` reports controller events such as ReplicaSet scaling and Pod creation. The Deployment controller creates or adopts ReplicaSets, and the ReplicaSet controller creates or adopts Pods. A naming pattern can assist visual inspection, but generated names can change across rollouts. Labels, selectors, owner references, and rollout history provide stronger evidence than name parsing.
+## Services and application access
+`kubectl expose deployment` creates a Service from a compatible Deployment selector. A default `ClusterIP` Service exposes a stable, cluster-internal virtual IP. Its `port` is the Service-facing port, while `targetPort` identifies the backend application port. A Service on port 80 with `targetPort: 8080` sends eligible connections to backend Pods on port 8080.
+
+The EndpointSlice controller records Pods that match the Service selector and their readiness. Kube-proxy, or another Service data-plane implementation, watches Services and EndpointSlices and programs traffic forwarding. The older Endpoints API is deprecated, so current diagnostics should query EndpointSlices.
+
+```bash
 kubectl get service hello-world
-kubectl describe service hello-world
+kubectl get endpointslices \
+  -l kubernetes.io/service-name=hello-world
 ```
 
-The Service port is the port clients use. The target port is the port where the container listens, such as port 8080 for a web application. `kubectl describe service` shows the Service type, ClusterIP, ports and backend addresses. EndpointSlices show the Pod IP addresses and ports that currently back the Service.
+Repeated requests can reach different ready endpoints, but a Service does not promise equal round-robin distribution. Session affinity, traffic policy, topology, connection reuse, and the data-plane implementation can change endpoint selection. Direct access to a Pod IP bypasses the Service and can isolate backend faults, although Pod IPs are ephemeral.
 
-When a Deployment scales from 1 replica to 20 or 40 replicas, the Service distributes traffic across the ready Pods selected by its labels. Accessing a Pod IP directly can help isolate a single backend during troubleshooting, but clients should normally use the Service address because Pod IPs are temporary.
-## Imperative exposure and generated manifests
-`kubectl expose deployment` can create a Service quickly from an existing Deployment. The command infers selectors from the workload and maps a stable Service port to the target port used by the containers. The same command can run with `--dry-run=client -o yaml` to create a Service manifest before any object reaches the API server. This pattern combines speed with reviewability.
+Service troubleshooting should compare the Service selector with Pod labels, inspect EndpointSlice readiness, and test both the Service port and the backend target port. An empty EndpointSlice normally indicates that no eligible Pods match the selector. A populated EndpointSlice with failed Service access shifts attention towards ports, policy, kube-proxy or its replacement, and the cluster network.
+## Changing and removing resources
+The preferred declarative scaling workflow changes `spec.replicas` in the maintained manifest, previews the result, and reapplies it. `kubectl scale` and `kubectl edit` change the live object immediately, which can help during an incident but creates drift from source control. A later apply operation or autoscaler can replace that live value. Teams should define one owner for each field and reconcile emergency changes back into source.
 
-Generated YAML should become a starting point, not a finished design. Production manifests usually need labels that match team conventions, resource requests and limits, readiness probes, liveness probes, security contexts and rollout settings. The generated object proves the structure, while review adds operational intent.
-## Changing existing resources
-Administrators can change a Deployment by editing its manifest and applying it again:
+An operator should inspect `kubectl diff` before a large scale change and watch `kubectl rollout status` afterwards. Scaling from one replica to many can expose insufficient node capacity, image-registry limits, storage constraints, quota limits, and application dependencies. Ready replicas should reach the intended count before the change is treated as successful.
+
+Deleting a Deployment normally triggers garbage collection of its owned ReplicaSets and Pods. A standalone Pod and a separately created Service require their own deletion requests. File-based cleanup keeps deletion aligned with the declared objects.
 
 ```bash
-kubectl apply -f deployment.yaml
+kubectl delete -f manifests/
 ```
 
-Changing `spec.replicas` from 1 to 20 in the manifest and reapplying it changes the live Deployment. Kubernetes then reconciles the cluster until the requested number of Pods is ready.
-
-`kubectl edit deployment hello-world` changes the live object directly. `kubectl scale deployment hello-world --replicas=40` also changes the live object directly. These commands are useful, but they can create drift when the manifest or repository still records an older desired state. Declarative files should be updated after any urgent live change.
-
-Deleting a Deployment removes its owned ReplicaSets and Pods through Kubernetes ownership and garbage collection. A Service is a separate object and must be deleted separately when it is no longer needed:
-
-```bash
-kubectl delete deployment hello-world
-kubectl delete service hello-world
-```
-## Practical operating principles
-Effective Kubernetes administration starts with the API model. `kubectl` is not just a shell tool. It is a client for structured resources, their desired state and their observed state.
-
-Administrators should use `get` for a quick view, `describe` for detailed status and events, `logs` for application output, `exec` for in-container inspection and `explain` for API field discovery. They should prefer declarative manifests for repeatable work and reserve imperative edits for temporary, exploratory or emergency changes.
-
-Strong troubleshooting follows the chain from intent to runtime state: manifest, API object, controller, ReplicaSet, Pod, scheduler decision, kubelet action, container runtime and Service routing. Each layer exposes enough information through the Kubernetes API to show where the actual state diverges from the desired state.
+An operator should verify cleanup by querying the specific resource types, namespaces, and labels involved. `kubectl get all` cannot prove that every related object has disappeared.
