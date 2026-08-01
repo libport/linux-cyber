@@ -1,81 +1,118 @@
 # Getting Started with Docker and AI
 > [!NOTE]
 > This guide explains how Docker Model Runner enables private, container-integrated local AI deployment while highlighting model management, application integration, hardware, security, and operational considerations.
-## Local AI deployment
-Organisations increasingly deploy large language models and chatbots locally to protect data, reduce cloud dependency, control costs and meet container-first engineering standards. Docker Model Runner helps Docker teams run AI models locally without adding a separate model platform. It brings model pulling, caching, serving and application integration into the Docker workflow.
+## Local inference with Docker Model Runner
+Docker Model Runner (DMR) lets teams manage and serve local generative AI models through familiar Docker workflows. It integrates with Docker Desktop, Docker Engine, Docker Hub, OCI registries, the Docker CLI, and Docker Compose. Applications can call its compatible APIs without adopting a separate model-management stack.
 
-Docker Model Runner fits teams that already use Docker Desktop, Docker Engine, Docker Hub, Docker Compose and the Docker CLI. It does not replace every specialised model platform, but it reduces tool sprawl when local inference belongs beside containerised applications.
-## What Docker Model Runner provides
-Docker Model Runner manages and serves local AI models through Docker tooling. It pulls models from Docker Hub, OCI-compliant registries and supported Hugging Face repositories. It stores models locally, loads them when applications request inference and unloads them when they are idle.
+Local inference can reduce cloud expenditure, latency, and external transfer of prompts or proprietary data. It does not guarantee privacy or security. Model downloads, Docker Engine metadata requests, application integrations, updates, and telemetry settings can still create network traffic. Operators must inspect the entire system before describing it as offline or air-gapped.
 
-It exposes compatible API formats so existing applications can talk to local models with minimal changes. Current Docker documentation describes OpenAI-compatible, Anthropic-compatible and Ollama-compatible APIs, plus Docker-native management endpoints. OpenAI-compatible clients should use the Docker Model Runner OpenAI base path under `/engines/v1`, for example `/engines/v1/chat/completions`.
+Local deployment also shifts responsibility. The organisation supplies accelerator capacity, memory, storage, power, patching, monitoring, backups, and support. A small stable workload may cost less locally, while a large or highly variable workload may benefit from cloud elasticity. Model quality also varies. A compact local model can serve classification, summarisation, retrieval, or narrow chat tasks well, yet perform below a larger hosted model on complex reasoning. A sound decision compares data-residency requirements, workload shape, model quality, total cost, and operational capability.
 
-The practical value is simple. A chatbot can keep its frontend and backend in containers while Docker Model Runner serves the model from the host. The application still behaves like a Docker application, but model execution can use host-side inference engines and hardware support.
-## Why the model runs outside the container
-AI models can run on CPUs, but many useful workloads need acceleration for acceptable latency and throughput. Container access to acceleration hardware differs across operating systems, drivers and devices. Docker Model Runner avoids putting all of that device support inside each model container. It runs the inference engine on the host and lets containerised applications call it over documented endpoints.
+DMR supports language, embedding, and image-generation workloads. Its APIs include OpenAI, Anthropic, and Ollama-compatible formats, as well as native model-management endpoints. Compatibility does not ensure that every client feature will work because models differ in tool use, structured output, context capacity, and other capabilities.
+## Architecture and hardware
+DMR pulls models from Docker Hub, another OCI-compliant registry, or Hugging Face, stores them locally, and loads them when an inference request arrives. An inference engine executes each model and uses compatible CPU or accelerator hardware. The application sends prompts to DMR and receives generated output through an HTTP API.
 
-The inference engine performs the model execution. Docker Model Runner handles Docker integration, model lifecycle and API exposure. Current Docker documentation lists three supported engines:
-- `llama.cpp` for efficient local development with quantised GGUF models
-- `vLLM` for higher throughput serving with Safetensors models on supported Linux and NVIDIA GPU environments
-- `Diffusers` for Stable Diffusion image generation with Safetensors models on supported environments
+DMR separates model distribution from inference. The Docker CLI and API manage model artefacts, while the selected engine converts prompts into tokens, performs inference, and generates tokens for the response. This separation lets Docker retain a consistent management surface while engines optimise for different formats and hardware. It also means that an engine, model, and device must form a supported combination. An OCI artefact alone does not make every model executable on every host.
 
-Support varies by platform and hardware. Teams should validate the engine, driver, model format and target device before treating a local setup as production-ready.
-## Model storage and OCI artifacts
-Docker treats models as managed artifacts. A `docker model pull` command downloads a model and stores it in the local model cache. At request time, Docker Model Runner loads the model into memory, runs inference through the selected engine and returns the response.
+The execution boundary depends on the operating system. On Linux, DMR and its inference engines run in a container. On macOS and Windows, the engines run outside containers in operating-system sandboxes. Containerised applications can still call DMR through a Docker-provided endpoint.
 
-OCI registries matter because they already store much of the cloud-native supply chain. The same registry ecosystem that stores container images can also store adjacent artifacts such as Helm charts, SBOMs, signatures, policies and model files. Packaging models as OCI artifacts lets organisations reuse existing registry controls, access rules, metadata workflows and distribution practices rather than creating a new registry system only for models.
+DMR currently supports three inference engines:
 
-Docker Hub provides a curated AI model catalogue, but a verified publisher does not necessarily mean the model creator trained the model. Teams still need to assess model origin, licence, benchmark claims, safety properties and suitability for the task.
-## Installing and enabling
-Docker Model Runner can be enabled through Docker Desktop or installed with Docker Engine. On Docker Desktop, the setting now sits under the AI area of the settings interface. Host-side TCP support is optional and allows local host processes to reach the service on a configured port, commonly `12434`.
+| Engine | Primary model format | Typical use | Hardware |
+| --- | --- | --- | --- |
+| llama.cpp | GGUF | Efficient local inference with quantised models | CPU, NVIDIA, AMD, Apple Silicon, and Vulkan-compatible devices |
+| vLLM | Safetensors and Hugging Face models | High-throughput language-model serving | NVIDIA CUDA on supported Linux or Windows environments |
+| Diffusers | DDUF | Text-to-image generation | NVIDIA CUDA on supported Linux systems |
 
-On Docker Engine, the `docker-model-plugin` package provides the CLI integration. After installation, `docker model version` checks the plugin and `docker model run ai/smollm2` provides a basic interactive test.
+Small quantised models can run effectively on a CPU, although a supported GPU usually improves latency and throughput. Model size, quantisation, context length, concurrency, memory bandwidth, and available RAM or VRAM determine practical performance. Hardware tests should use representative prompts and workloads.
+## Installation and initial use
+Administrators should use a current, supported Docker release and follow the installation instructions for the host platform. Docker Desktop exposes DMR under Settings > AI. Host-side TCP access remains optional and should stay disabled unless a trusted host process needs it. Docker Engine users install the current `docker-model-plugin` package from Docker's repository.
 
-For Docker Desktop, containers can reach Docker Model Runner at `http://model-runner.docker.internal`. Host processes can use `http://localhost:12434` when TCP support is enabled. For Docker Engine on Linux, host processes can also use `http://localhost:12434`, while containers may need an explicit host gateway mapping before the same internal hostname works inside a Compose project.
-## Pulling and testing models
-Models can be pulled from the Docker Desktop Models interface or through the CLI. Model names usually include a repository, a model family and a tag that describes the variant. Variants often specify parameter count and quantisation.
+The CLI confirms the service status, pulls a model, lists local models, and runs an interactive smoke test:
 
-Quantisation reduces the precision of model weights to reduce storage size and memory use. A 4-bit quantised model usually runs on smaller local hardware than the original higher-precision model, though quality and behaviour can change. GGUF is a common packaging format for models intended to run efficiently with `llama.cpp` on consumer and developer hardware.
+```shell
+docker model status
+docker model pull ai/smollm2:360M-Q4_K_M
+docker model list
+docker model run ai/smollm2:360M-Q4_K_M
+```
 
-The CLI command `docker model run` is useful for confirming that a model loads and responds. It should not be mistaken for a full chatbot experience. A real chat application needs conversation history, system instructions, context management, streaming and a user interface.
+`docker model run` provides a useful loading and response check. An application normally calls an API instead. DMR loads a pulled model on demand, so the first request can take longer than later requests. Memory pressure, engine configuration, and idle-unloading behaviour can alter subsequent latency.
+## Model selection and distribution
+A model tag often records parameter count, quantisation, or an engine variant. GGUF quantisation reduces numerical precision and usually lowers memory use. Aggressive quantisation can also reduce output quality, so teams should compare accuracy, speed, memory use, licence conditions, and task-specific performance.
 
-Direct API tests give a better integration check. A request to `/engines/v1/chat/completions` can name a local model, pass system and user messages, and receive a response through the OpenAI-compatible shape. Docker Model Runner can pull a missing model on demand, but production environments should usually pre-pull and test required models.
+Parameter count offers only a rough guide to resource demand. The runtime must also hold the context, intermediate state, and generated tokens. Long conversations can therefore exhaust memory even when model weights fit. Applications should cap prompt size, reserve space for output, summarise or retrieve older context when appropriate, and reject oversized requests cleanly. Context capacity does not prove that a model will use every distant token reliably.
+
+OCI packaging allows existing registries, access controls, and distribution workflows to carry model artefacts. Registry tags can move even though manifests and blobs use content-addressed digests. Production deployments should pin a reviewed digest where the platform permits it and should record the model's publisher, licence, provenance, model card, intended use, and evaluation results. A verified publisher establishes publishing identity, not model safety or accuracy.
+
+Model output can contain factual errors, insecure code, harmful content, or fabricated sources. Teams must validate consequential output and must not grant a model unsupervised authority over sensitive tools or data.
+## API access
+Host applications can reach an enabled TCP endpoint at `http://localhost:12434`. OpenAI-compatible clients use the base URL `http://localhost:12434/engines/v1`. Containers on Docker Desktop use `http://model-runner.docker.internal`, while Docker Engine deployments may need a `host-gateway` mapping. Platform documentation should govern the final address.
+
+An OpenAI-compatible chat request uses the full model identifier:
+
+```shell
+curl http://localhost:12434/engines/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "ai/smollm2:360M-Q4_K_M",
+    "messages": [
+      {"role": "user", "content": "Explain container images briefly."}
+    ]
+  }'
+```
+
+DMR does not require an API key, although some clients require a placeholder value. The absence of authentication creates a significant boundary. Any client that can reach the API can submit prompts and can pull, load, or run models. Administrators should bind TCP access only to trusted interfaces, restrict networks and firewalls, limit CORS origins, and place authenticated TLS termination in front of remote access.
+
+Chat-completion requests remain stateless unless the client resends prior messages or maintains conversation state elsewhere. A user interface may appear conversational because it stores and includes that history. The model itself does not retain earlier exchanges through a standard stateless request.
+
+A three-tier chat application normally places a browser interface in front of an application backend, which then calls DMR. The backend should authenticate users, validate request size and content, enforce quotas, construct the system instruction, select approved models, and record only necessary telemetry. Keeping DMR behind the backend prevents browsers from receiving unrestricted access to its unauthenticated management and inference surface. The backend can also trim conversation history to fit the context budget and can return a controlled error when inference fails.
 ## Compose integration
-Docker Compose can describe model dependencies alongside application services. Compose v2.38 and later supports a top-level `models` element for platforms that implement Compose models, including Docker Model Runner.
+Docker Compose 2.38 or later can declare models as first-class application dependencies on a platform that implements the Compose models specification. A service references a top-level model and receives the endpoint and model identifier as environment variables:
 
-A Compose file can define frontend and backend services, attach them to a network and declare the model that the backend requires. The service-level `models` attribute grants the service access to the model, lets the platform provision it and injects environment variables that identify the model endpoint and name.
+```yaml
+services:
+  backend:
+    image: example/chat-backend:1.0
+    models:
+      local_llm:
+        endpoint_var: MODEL_ENDPOINT
+        model_var: MODEL_NAME
 
-A typical local chatbot has three logical parts:
-- A frontend service that exposes the chat interface, often on a host port such as `3000`
-- A backend API service, for example a FastAPI service on an internal container network
-- Docker Model Runner on the host, reached from containers through the documented model runner hostname or configured endpoint
+models:
+  local_llm:
+    model: ai/smollm2:360M-Q4_K_M
+    context_size: 4096
+```
 
-The frontend sends prompts to the backend. The backend calls the model endpoint. Docker Model Runner loads the model if necessary, runs inference and streams the result back through the backend to the interface.
+Compose asks the supporting platform to provision the model and make it available to the service. `context_size` sets the maximum token context, including input and generated output, and larger values consume more memory. Engine-specific `runtime_flags` allow further tuning but reduce portability and require validation against the selected engine.
 
-This design keeps prompts, responses and inference local after the model exists in the local cache. However, model pulls, registry requests and optional product telemetry may still reach external services unless administrators configure the environment for offline or air-gapped use.
-## Open WebUI integration
-Open WebUI provides a self-hosted chat interface that can connect to local model runners and OpenAI-compatible APIs. It offers a more complete experience than a custom test chatbot, including accounts, chat history, settings, prompt configuration and a familiar commercial-chat style interface.
+Plain `depends_on` controls service start order, not readiness. A backend or user interface that requires another service to accept requests should use a healthcheck with `condition: service_healthy`, or should implement bounded retries and backoff. Services should also expose only necessary ports. A binding such as `127.0.0.1:3000:8080` keeps a development interface on the local host.
 
-A Compose deployment can run the Open WebUI container, persist `/app/backend/data` in a volume and point the application at Docker Model Runner. Docker documentation now shows an Ollama-compatible quick start by default and also documents OpenAI-compatible configuration. Either approach can work when the correct base URL and environment variables match the selected API mode.
+Compose interpolation can read ordinary configuration from an `.env` file, but that file should not hold production credentials in source control. A secrets manager or platform-specific secret mechanism should supply sensitive values. Application images should run as a non-root user where practical, mount filesystems read-only where possible, drop unnecessary capabilities, and use separate networks to limit service-to-service reachability.
+## Deployment and validation workflow
+1. The team defines the task, quality threshold, latency target, concurrency, privacy boundary, retention policy, and hardware budget.
+2. Engineers shortlist models whose licences, capabilities, context limits, formats, and engine requirements fit those constraints.
+3. Operators pull a specific model variant, inspect its identity and metadata, and record the resolved content digest.
+4. Engineers run CLI and direct API smoke tests before adding application code, which separates runtime faults from integration faults.
+5. The application backend sends representative requests, includes required conversation history, handles timeouts, and limits retries.
+6. Compose declares services and models, injects endpoint details, protects internal networks, and adds readiness checks where services need them.
+7. Evaluators test factual quality, refusal behaviour, prompt injection, sensitive-data handling, malformed input, long context, and concurrent load.
+8. Operators establish logs, metrics, alerts, backups, patching, rollback, model replacement, and incident-response procedures before release.
+## Open WebUI and local chat applications
+Open WebUI can provide accounts, conversation history, model selection, and a browser-based chat interface over DMR. A Compose deployment can connect it through DMR's OpenAI or Ollama-compatible API and store application data in a named volume.
 
-Persistent storage matters. Without a volume, account data, conversation history, selected models and interface settings disappear when the container is removed. With a volume, the interface can survive Compose restarts and continue using the same local model configuration.
+An operational deployment should pin a reviewed Open WebUI version or image digest instead of a mutable `main` tag. It should enable authentication outside a tightly isolated single-user environment, protect and back up the data volume, restrict model and web ports, and use TLS for remote access. The volume can contain credentials, settings, and conversations. Removing it with `docker compose down --volumes` deletes that persistent state.
 
-Open WebUI can list available local models, switch between them and save conversation context. The first prompt against a model can be slower because Docker Model Runner must load the model into memory. Later prompts are faster while the model remains loaded. Idle models unload to conserve resources.
-## Operational guidance
-Local models improve privacy and control, but they do not remove the need for governance. Teams should choose models based on licence, provenance, accuracy, language support, tool support, context length, memory footprint and latency. Benchmarks supplied by model publishers should be treated as starting points, not acceptance evidence.
+Open WebUI and similar clients can add web search, document retrieval, tools, or external integrations. Those features may transmit prompts, documents, or generated data outside the host. Operators should disable unnecessary functions, review outbound connections, apply least privilege, and define retention rules for prompts and responses.
 
-Hardware sizing drives the user experience. Smaller quantised models run more easily, but they may produce weaker reasoning, shorter useful context or less reliable output. Larger models need more memory and stronger acceleration. Production use needs monitoring, repeatable deployment, model version control, access control, prompt and response logging policies, and a rollback path.
-
-Compose makes the local stack repeatable. Application services, networks, volumes and model dependencies can live in one YAML definition and start with `docker compose up`. Cleanup can use `docker compose down`, with image and volume removal only when the operator intentionally wants to discard cached artefacts or persisted application data.
-## Security and offline considerations
-Local inference reduces exposure because prompts and responses do not need to leave the organisation after the model, application image and dependencies are present locally. It does not automatically create a secure environment. Administrators still need to control who can reach the model endpoint, which models developers can pull, which registries they can use and how application logs handle prompts and responses.
-
-Model provenance matters as much as image provenance. A model may come from a verified publishing namespace while its weights originate from another organisation. The operator should check the creator, licence, training claims, supported languages, permitted uses and known safety limitations before deployment. A smaller model may be easier to run, but it may also fail more often on reasoning, coding or domain-specific tasks. A larger model may deliver better answers, but it can raise hardware cost, latency and operational complexity.
-
-Air-gapped deployments need more preparation than a normal development machine. Required models, application images and base images should be pulled, scanned and approved before disconnection. Compose files should refer to approved tags or digests. Volumes should be treated as data stores, not disposable build artefacts, because they can contain user accounts, saved prompts, chat history and system configuration.
-## Key takeaways
-Docker Model Runner brings local model serving into the Docker ecosystem. It reduces the need for separate local LLM tools when an organisation already standardises on Docker. It runs inference through host-side engines, exposes compatible APIs and lets containerised applications call local models in a familiar way.
-
-The main architectural pattern is clear. Applications remain containerised, while model execution runs through Docker Model Runner on the host. Models can be stored and distributed as OCI artifacts. Compose can declare model dependencies beside services. Open WebUI can provide a capable local chat interface on top of the same model runner.
-
-The result is a practical local AI stack that supports privacy, cost control and developer familiarity, provided that teams validate hardware, model quality, licensing and operational controls before production use.
+During diagnosis, operators should first confirm DMR status, list local models, and call the models endpoint directly. A successful list request followed by a failed completion often indicates an incompatible model, insufficient memory, an engine problem, or invalid request data. A failed connection usually indicates a disabled TCP listener, an incorrect container hostname, a missing host-gateway mapping, or a network rule. Browser-only failures may indicate a CORS restriction. Cold loading can explain a slow first response, but sustained latency requires measurement of token rate, queueing, context size, and device utilisation.
+## Production controls
+- Benchmark each model on representative tasks, hardware, context sizes, and concurrency levels.
+- Pin application images and model artefacts, verify publishers and licences, and control registry access.
+- Treat models and model files as untrusted supply-chain inputs until validation succeeds.
+- Protect prompts, responses, embeddings, logs, conversation stores, and backups as potentially sensitive data.
+- Constrain network reachability, authenticate remote access, encrypt traffic, and audit administrative actions.
+- Defend tool-enabled applications against prompt injection, excessive permissions, unsafe actions, and data exfiltration.
+- Apply CPU, memory, GPU, request-size, context, concurrency, and rate limits to reduce resource exhaustion.
+- Monitor quality, latency, failures, resource use, and model changes, and retain a tested rollback path.

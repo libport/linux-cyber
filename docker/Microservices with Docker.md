@@ -1,55 +1,61 @@
 # Microservices with Docker
 > [!NOTE]
 > This guide shows how to build, connect, scale, and deploy a containerized microservices application across Docker Compose, Docker Swarm, and Google Kubernetes Engine while addressing networking, storage, resilience, and monitoring.
+## Architecture
+A microservices architecture divides a system into small, autonomous services aligned with business capabilities. Each service owns a clear boundary. Teams can build, deploy, scale, and revise each service independently. Running a web front end, an API, and PostgreSQL in separate containers creates a multi-container application, but container count alone does not establish microservice boundaries. Independent ownership, deployment, and data responsibilities provide that distinction.
 
-Containerised microservices separate an application into independently packaged services that run together through shared networking, configuration and storage. The example application contains an ASP.NET Core API, a PostgreSQL database and an NGINX web front end. Docker Compose runs the local development environment, Docker Swarm demonstrates cluster orchestration, and Google Kubernetes Engine (GKE) shows a managed Kubernetes deployment path.
-## Local orchestration with Docker Compose
-`docker init` can generate container files for an ASP.NET Core project, including a Dockerfile and Compose configuration. After the API port is set to `9000`, `docker compose up` builds the image, pulls the required .NET SDK base image, creates a container and attaches the logs. The running API responds on `localhost:9000`.
+Containers package each component consistently. Docker Compose coordinates local development, Docker Swarm orchestrates Docker Engine clusters, and Kubernetes manages workloads on platforms such as Google Kubernetes Engine (GKE).
+## Local development with Docker Compose
+`docker init` can generate a Dockerfile, `.dockerignore`, and Compose configuration for a detected application such as ASP.NET Core. Teams should review generated files, pin supported base images, remove unnecessary build content, and run application processes as non-root users where feasible.
 
-The API returns an HTTP 500 error when a route depends on a missing database. Compose fixes the environment by adding a PostgreSQL service and giving the API a connection string that uses the database service name as the host. Compose creates a project network, so services can resolve each other by name without exposing every internal port to the host.
+Compose defines services, networks, volumes, configurations, and secrets in YAML. A catalogue application can use three services:
 
-A robust Compose file defines:
-- an API service built from the API source directory
-- a PostgreSQL service using a tagged image, such as `postgres:17.2`
-- environment variables for the database name, user and password
-- a named volume for PostgreSQL data
-- an initialisation script mounted into `/docker-entrypoint-initdb.d/`
-- an NGINX web service built from the web directory and published on `localhost:8080`
+| Service | Role | Deployment requirement |
+| --- | --- | --- |
+| `web` | Serves static files through NGINX | Builds from the web directory and publishes the public port |
+| `api` | Runs the catalogue API | Builds from source and connects to PostgreSQL through `db:5432` |
+| `db` | Stores catalogue data | Uses a maintained PostgreSQL image and a named data volume |
 
-PostgreSQL initialisation scripts run when the database starts for the first time with an empty data directory. The named volume preserves the data when containers are recreated. `docker compose down` removes the service containers and default network, but named volumes remain unless the command includes `--volumes`. Images remain unless the command includes an image removal option such as `--rmi local`.
+Compose creates a default network and registers each service name in internal DNS. Services should connect by name, not by changing container IP addresses. Only components that require host access need published ports. The database normally remains internal.
 
-The final local environment has three containers. The API image and NGINX image are built locally, while the PostgreSQL image is pulled from Docker Hub. `docker compose up -d` starts or recreates the environment in detached mode. After a teardown, another `docker compose up` recreates the application from the Compose file and reuses the database volume.
-## Running services with Docker Swarm
-Docker Swarm mode coordinates containers across multiple Docker hosts. A manager node creates the cluster with `docker swarm init`, and worker nodes join with the generated `docker swarm join` command. `docker node ls` confirms the participating nodes.
+PostgreSQL credentials should not appear as fixed values in the Compose file. Development environments can use restricted local secrets or an untracked environment file, while production systems should use an orchestrator or external secret store. The PostgreSQL image runs scripts under `/docker-entrypoint-initdb.d` only when it initialises an empty data directory. Schema evolution after initialisation requires an idempotent migration process.
 
-Swarm manages workloads as services. A service declares the desired state, and Swarm creates tasks that run containers on suitable nodes. A visualisation service can run only on a manager when it needs access to the Docker socket. Placement constraints express that requirement.
+A named volume preserves database files when Compose recreates or removes containers. `docker compose down` removes the project's containers and networks by default, but retains named volumes and images. `--volumes` removes named volumes, and `--rmi` removes images, so destructive options require deliberate use.
 
-A simple echo service demonstrates scaling and load balancing. `docker service create` publishes a port, and `docker service scale echo=2` raises the replica count. Requests to the published port can reach different replicas because Swarm balances traffic across the service tasks. `docker service ps echo` shows task placement, including the node running each replica. Scaling a service to zero leaves the service definition in place but runs no tasks. `docker service rm echo` removes it.
+Startup order does not prove readiness. Compose starts a dependency before its consumer, but the database might not yet accept connections. A database health check combined with `depends_on` and `condition: service_healthy` can gate startup. APIs and web proxies should still retry transient failures and terminate cleanly.
 
-Swarm recreates failed or removed tasks to match the desired replica count. When a task container is forcibly deleted, Swarm schedules a replacement for the same service slot. This behaviour gives services self-healing characteristics, although it does not remove the need for proper health checks, persistent storage and operational monitoring.
-## Deploying a stack to Swarm
-A Swarm stack gives a multi-service application a declarative deployment file. The stack file resembles a Compose file, but it adds production-oriented details such as registry image names, deploy settings, placement constraints and configs.
+| Command | Effect |
+| --- | --- |
+| `docker compose up -d --build` | Builds changed images and starts the application in the background |
+| `docker compose ps` | Shows service containers and their state |
+| `docker compose logs -f api` | Streams API logs |
+| `docker compose down` | Removes service containers and the default network |
+## Cluster orchestration with Docker Swarm
+`docker swarm init --advertise-addr <manager-ip>` creates a swarm manager with a stable advertised address. Worker nodes join with a generated token, which operators must protect and rotate if exposed. A single manager suits a lab, but production requires an odd manager quorum, commonly three or five managers distributed across failure domains.
 
-The API and web images need registry-ready names so they can be pushed and pulled by Swarm nodes. Docker configs can inject non-sensitive files, such as an SQL initialisation file, into services. Passwords and connection credentials should use secrets or another secure mechanism rather than plain environment variables in production.
+A Swarm service declares an image, replica count, ports, placement rules, update behaviour, and resource constraints. Swarm schedules each replica as a task, replaces failed tasks, and maintains the requested count. Scaling a replicated service changes that count. Published ports use the routing mesh, which accepts traffic on swarm nodes and routes requests to service tasks.
 
-A PostgreSQL placement constraint can pin the database service to a node that has the expected local volume. This avoids accidentally starting the database on another node with empty storage. It is not a high-availability design. Production data needs reliable persistent storage, backup and recovery planning.
+Useful commands include `docker service ls`, `docker service ps <service>`, `docker service logs <service>`, `docker service scale web=3`, and `docker service rm <service>`. A visualiser that mounts the Docker socket receives powerful host control and belongs only in a tightly controlled demonstration environment.
 
-`docker compose -f stack.yaml build` and `docker compose -f stack.yaml push` build and publish the local images. `docker stack deploy -c stack.yaml staging` deploys the application as a named stack. Swarm prefixes service names with the stack name, producing services such as `staging_api`, `staging_db` and `staging_web`.
+A stack groups services, networks, volumes, configs, and secrets. `docker stack deploy -c stack.yaml staging` runs only on a manager. It does not build images and ignores `build`, so a pipeline must build, test, tag, and push images to a registry first. Stack deployment still uses the legacy Compose version 3 format rather than the complete current Compose Specification.
 
-`docker stack services staging` lists the services, and `docker stack ps staging` lists the tasks. Early web tasks can fail if NGINX starts before the API name resolves. Swarm retries according to the service restart behaviour. Logs from a failed task usually reveal the upstream resolution failure. Scaling `staging_web` to three replicas spreads the web front end across the cluster. Removing the stack deletes the stack services, networks and configs, while volume lifecycle depends on the volume type and where it resides.
-## Deploying to GKE
-Kubernetes is the production orchestration model in the example. GKE Autopilot creates a managed cluster where Google manages nodes and infrastructure capacity. After authentication with the Google Cloud CLI, `gcloud container clusters create-auto` creates the cluster, and `gcloud container clusters get-credentials` configures `kubectl` access.
+Docker configs distribute non-sensitive files such as NGINX or initialisation configuration. Swarm does not encrypt configs at rest. Docker secrets protect passwords and keys, and only authorised service tasks can access them. A placement constraint that binds PostgreSQL to one node can reconnect it to a node-local volume, but it also creates a failure dependency. Production databases need durable shared storage, tested backups, recovery procedures, or a managed database service.
+## Production deployment on GKE
+GKE Autopilot manages cluster nodes and infrastructure. Current commands should state the location and project explicitly:
 
-A dedicated namespace, such as `library1`, separates the application resources. Kubernetes manifests replace the Compose and stack files. The database, API, web front end and ingress each have their own manifest.
+```sh
+gcloud container clusters create-auto prod --location=REGION --release-channel=regular --project=PROJECT_ID
+gcloud container clusters get-credentials prod --location=REGION --project=PROJECT_ID
+```
 
-The PostgreSQL manifest defines the container image, environment variables and service. A local `kubectl port-forward` allows `psql` to test the database before external access exists. The SQL initialisation script creates the `books` table and sample records. In production, PostgreSQL should use a PersistentVolumeClaim or a managed database service so pod recreation does not destroy data.
+A namespace isolates the catalogue's namespaced resources. Deployments manage stateless API and web replicas, Services provide stable internal discovery, and an Ingress or Gateway implementation routes external HTTP and HTTPS traffic. An Ingress resource has no effect without a controller. Production entry points need DNS, trusted TLS, controlled exposure, and provider-specific configuration.
 
-The API manifest uses the published API image, container port and database connection settings. The web manifest deploys the NGINX image and exposes port `80` through a Kubernetes Service. The Ingress routes `/api` requests to the API service and other paths to the web service. GKE can take time to provision the external IP address, and `kubectl describe ingress` shows provisioning events while it synchronises.
+PostgreSQL must not rely on a Pod's writable filesystem. A production design should use a managed PostgreSQL service or a supported operator with PersistentVolumeClaims, high availability, backups, and restore testing. A migration Job or application migration tool should apply versioned schema changes instead of manual `psql` commands.
 
-A PostgreSQL exporter sidecar can expose database metrics on port `9187` at `/metrics` for Prometheus-compatible scraping. The exporter reports scrape health and database metrics, including database size metrics such as `pg_database_size_bytes`. Metrics can show the size difference before and after schema creation, but meaningful production monitoring also needs durable storage, secure credentials, alert thresholds and a Prometheus or managed monitoring backend.
-## Key operational lessons
-- Compose suits local development and repeatable multi-container startup.
-- Swarm demonstrates service scheduling, scaling and replacement across Docker nodes.
-- Stack files make Swarm deployments reproducible and closer to production practice.
-- Kubernetes and GKE provide a stronger production model for managed cluster operations.
-- Stateful services need deliberate storage, backup, security and migration design in every orchestrator.
+Kubernetes Secrets separate credentials from ordinary workload configuration, but base64 encoding does not encrypt them. Clusters should enable encryption at rest, apply least-privilege RBAC, restrict each Secret to the containers that need it, and prefer short-lived credentials or an external secret provider. Workloads also need readiness, liveness, and startup probes, plus realistic CPU and memory requests and limits. A HorizontalPodAutoscaler can then scale stateless Deployments from relevant resource or application metrics.
+
+`kubectl apply -f` creates or updates declared resources. Operators can diagnose deployments with `kubectl get pods`, `kubectl get services`, `kubectl get ingress`, `kubectl describe`, and `kubectl logs`. `kubectl get all` covers only a common resource set, not every object in a namespace. `kubectl port-forward` supports temporary local inspection and does not provide production exposure.
+
+A PostgreSQL exporter can run beside the database and expose Prometheus metrics on port 9187. It should use a dedicated, least-privilege database account and read its password from a mounted secret file. Prometheus should scrape the endpoint through cluster networking. `pg_exporter_last_scrape_error` reports scrape failure, while `pg_database_size_bytes` reports database size. Dashboards, alerts, retention, and trend analysis provide stronger operations than manual snapshots.
+
+Deleting manifests removes declared workloads but can leave external resources or persistent data, depending on their policies. Deleting the GKE cluster stops cluster charges, while registries, disks, load balancers, databases, and reserved addresses may require separate cleanup.

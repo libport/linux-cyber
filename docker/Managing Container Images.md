@@ -1,81 +1,103 @@
 # Managing Container Images
 > [!NOTE]
 > This guide explains how disciplined Dockerfile design, reproducible builds, secure registries, image-trust controls, and Kubernetes credential policies make container images reliable, efficient, and safe deployment artifacts.
+## Image architecture and selection
+A container image packages an application's filesystem and runtime configuration as immutable, content-addressed layers. It does not contain a separate kernel or boot like a virtual machine. When a container starts, the engine adds a thin writable layer and runs one or more isolated processes. Removing the container discards that writable layer unless the application stores data in a volume or bind mount.
 
-Container images give container platforms a repeatable way to package operating system files, application code, libraries, dependencies and configuration. A well-designed image lets a team build once, test consistently and deploy the same artefact across workstations, private hosts, public clouds and Kubernetes clusters.
+Layers support build caching, deduplication, and efficient distribution. A changed Dockerfile instruction invalidates its layer and the layers that follow it. `docker image history` shows how an image was assembled, while `docker image inspect` exposes configuration, platform data, labels, and digests.
 
-A container image remains immutable. When a runtime starts a container from an image, it adds a writable layer for the container's runtime changes. This design gives containers much of their speed and predictability. Docker can reuse layers that already exist on a host, so a pull may download only missing metadata or layers rather than an entire software stack.
+Tags such as `1.4` provide convenient names but remain mutable. The `latest` tag has no special stability and can identify a different image after a later push. A digest such as `sha256:...` identifies exact content. Digest pinning strengthens reproducibility, but maintainers must deliberately refresh the digest to receive security fixes. Multi-platform images use a manifest list so the client can select an image for the host's operating system and processor architecture. Portability still depends on platform compatibility, runtime configuration, and external services.
 
-Image reliability depends on disciplined image design. Teams should build images from source-controlled Dockerfiles rather than creating them from modified running containers with `docker commit`. A Dockerfile provides a reproducible build record. A manually changed container does not.
-## Dockerfiles and image structure
-A Dockerfile is a plain-text build specification. Docker reads its instructions in order and normally begins from a `FROM` line that selects a base image. Common instructions include:
-- `FROM` selects the base image or build stage.
-- `RUN` executes build commands.
-- `COPY` copies local files into the image.
-- `ADD` copies files and can also fetch remote sources or unpack archives, so `COPY` is clearer for ordinary local files.
-- `ENV` sets environment variables.
-- `ARG` defines build-time variables.
-- `CMD` supplies default commands for a running container.
-- `ENTRYPOINT` defines the main executable for a container.
-- `EXPOSE` documents the port the application listens on, but it does not publish that port by itself.
-- `LABEL` adds metadata. The older `MAINTAINER` instruction is deprecated.
-- `USER` sets the user and group for following build steps and for runtime commands.
-- `WORKDIR` sets the working directory for later instructions.
-- `VOLUME` declares a mount point, while a host path is mounted with runtime options such as `-v`.
-- `HEALTHCHECK` tests whether the containerised process still responds as expected.
+Applications should externalise durable data, environment-specific configuration, and credentials. They should send operational logs to standard output and standard error unless the platform provides another managed destination. This separation allows one tested image to progress through development, testing, and production while deployment configuration changes independently.
 
-A simple Apache image might start with an Ubuntu base, update package indexes, install Apache, copy an `index.html` file into the web root, document port 80 and start Apache in the foreground. In practice, production Dockerfiles should also minimise installed packages, remove unnecessary package metadata, run services as non-root users where possible and keep the final image focused on one clear purpose.
+Image selection should consider:
+- A trusted, accountable publisher and a maintained release line
+- Compatibility with the required operating system and architecture
+- A small package set, clear licensing, and timely security updates
+- Available vulnerability results, an SBOM, provenance, and a verifiable signature
+- An explicit version or digest rather than an unqualified tag
 
-Build context also matters. Docker sends the selected context to the builder, so large source directories can slow builds and leak unwanted files into the process. A `.dockerignore` file should exclude logs, caches, local credentials, dependency directories and generated artefacts that the image does not need. This keeps builds faster and reduces the chance that sensitive or irrelevant files reach an image layer.
+Docker Official Images provide useful curation, but publisher status, popularity, and star counts do not establish security on their own.
+## Reproducible Dockerfiles
+A Dockerfile commonly defines an image build. Kubernetes manifests define runtime resources and do not replace that build recipe. A clean build context and a `.dockerignore` file keep unrelated source, credentials, version-control data, and generated files out of the image and cache.
 
-The build should also separate configuration from application binaries. Runtime settings that differ between environments belong in variables, secrets or orchestration manifests rather than baked into the image. This keeps the same image usable across development, test and production while allowing each environment to supply its own credentials, endpoints and scaling settings.
-## Reliable and efficient builds
-Image tags need careful handling. The `latest` tag is not a stable promise. It is a mutable reference that publishers may retarget. Relying on it can introduce unexpected changes between development and production. Specific version tags improve predictability, but tags can still move. Digest pinning gives the strongest reproducibility because a digest identifies the exact image content.
+The following Dockerfile builds a simple Apache image:
 
-Reproducibility must still be balanced with patch management. Pinning an old base image can freeze vulnerabilities into the build. A mature workflow monitors base images and dependencies, rebuilds images when fixes are available and records the exact images deployed.
+```dockerfile
+FROM ubuntu:24.04
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends apache2 \
+    && rm -rf /var/lib/apt/lists/*
+COPY index.html /var/www/html/index.html
+EXPOSE 80
+CMD ["apachectl", "-D", "FOREGROUND"]
+```
 
-Image size affects pull time, storage and startup behaviour. Each `RUN` instruction can add a layer, so related package operations should usually be combined with `&&`, then cleaned in the same instruction. Multi-stage builds can keep compilers, test tools and temporary files out of the runtime image. Smaller base images such as Alpine can help, but compatibility and security support matter more than size alone.
+The build and run commands remain separate:
 
-Trusted sources reduce supply-chain risk. Docker Official Images and other trusted publisher programmes provide better-maintained starting points than unknown community images. Popularity signals such as star counts may help discovery, but they do not replace provenance checks, vulnerability monitoring and policy controls.
-## Registries and persistent storage
-A registry stores and distributes images. Docker Hub is the default public registry for many workflows, and private registries let organisations keep images near their build and runtime environments. Cloud registries, hosted registries and self-managed registries all serve the same core function: they provide a place to push, pull, share and govern container images.
+```sh
+docker build -t webserver:1.0 .
+docker run -d --name web -p 127.0.0.1:8080:80 webserver:1.0
+```
 
-A local registry can run from the registry image. The server commonly listens on port 5000. Clients tag images with the registry host, port and repository path before pushing them. For example, an image may be retagged from a local name to a registry-qualified name, then uploaded with `docker push`.
+`EXPOSE 80` records intended container-port metadata. It does not publish the port. The `-p` option maps host port 8080 to container port 80, and binding to `127.0.0.1` limits access to the host. Applications should use published ports or an orchestrated network rather than relying on a container's bridge address.
 
-A registry container needs persistent storage. Without a mounted volume or durable storage backend, deleting the registry container can delete the stored images. Running the registry with a host-mounted directory or another supported storage backend preserves image data across container restarts and host maintenance.
+| Instruction | Purpose and limits |
+| --- | --- |
+| `FROM` | Selects the base image and platform. A production build can pin its digest. |
+| `RUN` | Executes build-time commands and creates a filesystem layer. |
+| `COPY` | Copies local build-context files. It suits ordinary file transfer. |
+| `ADD` | Adds features such as local tar extraction and remote URLs. Builds should use it only when those features are required. |
+| `ARG` | Supplies a build-time value. It must not carry secrets because image metadata and build records can expose it. |
+| `ENV` | Sets configuration that persists in later build steps and running containers. It also must not carry secrets. |
+| `WORKDIR` | Sets the working directory for later instructions and at runtime. |
+| `USER` | Selects the identity for later build steps and the default runtime process. Applications should use a non-root identity where practical. |
+| `ENTRYPOINT` | Defines the primary executable. The operator can replace it with `--entrypoint`. |
+| `CMD` | Supplies the default command or default arguments. Runtime arguments can replace it. |
+| `VOLUME` | Declares a container mount point. It does not select a host directory. |
+| `HEALTHCHECK` | Runs a command whose exit status marks the container healthy or unhealthy. |
+| `LABEL` | Adds searchable ownership, version, licensing, and build metadata. |
+| `STOPSIGNAL` | Chooses the signal that requests graceful termination. |
+| `ONBUILD` | Records a trigger for a downstream build and requires careful use. |
+| `SHELL` | Changes the default shell used by shell-form instructions. |
 
-A registry on a secure local network may be useful for development, but production registries should not rely on trusted networks alone. They need transport encryption, access control, backup, monitoring and clear retention rules.
-## Registry security and image trust
-Transport encryption protects image data as clients push and pull layers. A registry can use certificates from a recognised certificate authority, including certificates issued through Let's Encrypt. Certificate and key files are mounted into the registry container, and registry configuration points to those files. Self-signed certificates require extra client configuration and should be handled deliberately.
+BuildKit secret or SSH mounts should provide sensitive build inputs without preserving them in image layers. Runtime secret stores should supply application credentials after deployment.
+## Efficient, maintainable builds
+Small, maintained base images reduce download time and attack surface, although compatibility and operational support remain essential. Multi-stage builds can compile an application in a tool-rich stage and copy only the runtime artefacts into the final stage.
 
-Authentication controls who can push and pull. The open-source registry implementation, now maintained as CNCF Distribution, supports native basic authentication with `htpasswd`. Basic authentication must run over TLS because the scheme sends credentials in HTTP headers. The registry expects bcrypt-formatted htpasswd entries.
+The main runtime process should handle termination signals correctly so the engine can stop the container cleanly. Exec-form `ENTRYPOINT` and `CMD` instructions avoid an unnecessary shell and usually preserve signal delivery. A container can include supporting processes when the design requires them, but each image should retain a clear operational responsibility.
 
-Image signing protects against tampering and helps consumers verify provenance. Docker Content Trust signs and verifies images through Notary, but it does not perform vulnerability scanning. Docker has transitioned Notary to the CNCF Notary project, so modern workflows should treat image signing as one part of a broader supply-chain security model that also includes vulnerability scanning, policy enforcement, digest pinning and restricted registry access.
+Dockerfile order controls cache reuse. Stable dependency files should appear before frequently changed source files. Package-index refresh, installation, and cache removal belong in the same `RUN` instruction. Deleting files in a later layer does not remove bytes already stored in an earlier layer, so reducing layer count alone does not guarantee a smaller image. BuildKit cache mounts can accelerate repeated package operations without placing the cache in the final image.
 
-Credentials also need protection on client machines. Docker login data may be stored through a credential helper or in Docker configuration. Kubernetes and shell commands that include secrets can expose credentials through shell history or process listings. Teams should prefer credential stores, short-lived tokens, limited permissions and platform-native secret management.
-## Kubernetes and private images
-Kubernetes can run public images with a simple `kubectl run` command, but private images require registry credentials. A Pod or workload can reference an image from a private registry and specify `imagePullSecrets`. Kubernetes expects those secrets to exist in the same namespace as the Pod. The common secret type is `kubernetes.io/dockerconfigjson`.
+Automated builds should replace manual `docker commit` workflows. Version-controlled Dockerfiles, pinned dependencies, repeatable tests, and regular rebuilds create an auditable path to new patches. Local maintenance uses `docker image ls`, `pull`, `inspect`, `history`, `tag`, `push`, `rm`, and carefully scoped `prune` operations.
+## Registries and secure distribution
+A registry stores image manifests and layers. A repository groups related image versions. A publisher normally authenticates, adds the registry and repository to the tag, and pushes the result:
 
-A cluster can access private images in several ways:
-- A Pod can reference an `imagePullSecrets` entry.
-- A service account can provide image pull secrets for many Pods.
-- Nodes can be configured with registry credentials.
-- A kubelet credential provider can fetch credentials dynamically.
-- Images can be pre-pulled onto nodes, although this requires strict operational control.
+```sh
+docker tag webserver:1.0 registry.example.com/team/webserver:1.0
+docker push registry.example.com/team/webserver:1.0
+```
 
-The Pod-level secret approach is usually the clearest option for application workloads. It keeps registry access tied to the namespace and workload rather than granting every Pod on a node the same access.
+Teams can use Docker Hub, a cloud registry, or a self-hosted CNCF Distribution registry. Google Container Registry stopped serving images on 18 March 2025, so Google Cloud deployments should use Artifact Registry.
 
-Kubernetes admission controllers can add policy checks before API requests take effect. `AlwaysPullImages` can force image pulls and help ensure the requester has permission to use the image. `ImagePolicyWebhook` can call an external policy service to decide whether an image may run, although Kubernetes disables it by default and recommends using it only where it fits a deliberate policy design. Third-party admission controllers can also rewrite tags to digests or block images from unapproved registries.
-## Key practices
-Effective image management depends on a small set of disciplined habits:
-- Build images from source-controlled Dockerfiles.
-- Use trusted base images and pin production workloads with digests where reproducibility matters.
-- Monitor and rebuild images when base images or dependencies receive security fixes.
-- Keep images small through focused builds, combined package operations and multi-stage builds.
-- Store images in registries with persistent storage, backups and access controls.
-- Encrypt registry traffic and require authentication for private registries.
-- Verify image provenance through signing and policy controls.
-- Use Kubernetes image pull secrets or credential providers for private registries.
-- Avoid putting secrets directly into command histories, Dockerfiles, image layers or build arguments.
+The following command starts a loopback-only Distribution registry for local testing:
 
-Container images are most valuable when teams treat them as governed deployment artefacts rather than convenient snapshots. Clear Dockerfiles, careful tagging, secure registries and Kubernetes policies turn images into reliable units of delivery across development, testing and production.
+```sh
+docker run -d -p 127.0.0.1:5000:5000 --restart=always --name registry registry:3
+```
+
+A production registry requires more than a running container. It needs a fully qualified domain name, trusted TLS, authenticated and authorised access, persistent storage for `/var/lib/registry`, backups, monitoring, renewal of certificates, and an availability plan. Basic authentication must operate over TLS and use bcrypt password records. An `insecure-registries` engine setting belongs only in isolated testing. Credential helpers and `--password-stdin` reduce exposure of registry passwords.
+
+Registry governance should define repository ownership, immutable release tags, retention periods, and deletion procedures. Garbage collection must follow the registry's documented process because removing a manifest does not always reclaim layer storage immediately. Replication or geographically appropriate mirrors can support recovery and reduce pull latency for large deployments.
+## Supply-chain assurance
+Secure distribution combines several independent controls. A digest fixes the selected artefact. Provenance records how a build produced it. An SBOM inventories components. Vulnerability analysis compares those components with current advisories. A signature links an artefact to an identity and verification policy. A valid signature does not show that an image lacks vulnerabilities or unsafe configuration.
+
+Docker Content Trust relies on Notary v1 and is being retired. Docker states that its hosted Notary service will shut down on 8 December 2026. New workflows should adopt supported signing and verification systems such as Sigstore Cosign or Notation, then enforce identity, repository, and provenance requirements in policy. Docker Scout or another maintained scanner can analyse an SBOM and report known vulnerabilities. Teams should scan during build, before promotion, and again as advisory data changes.
+## Kubernetes image access and policy
+Kubernetes pulls public images directly and uses `imagePullSecrets` for private registries. The referenced Secret must exist in the same namespace as the Pod. A `kubernetes.io/dockerconfigjson` Secret can hold registry credentials, but base64 encoding does not encrypt them. Clusters should enable Secret encryption at rest, restrict access with least-privilege RBAC, prefer short-lived credentials or an external credential provider, and avoid placing passwords directly on command lines where shell history or process listings can expose them.
+
+An `imagePullSecrets` entry authorises the kubelet to pull an image. It does not inject registry credentials into the application environment. Likewise, a `containerPort` field documents the application's listening port but does not expose it outside the Pod. A Service, and sometimes an Ingress or Gateway, provides network access.
+
+An image reference can use a tag or digest. A digest gives the strongest identity. `imagePullPolicy: Always` resolves the image reference each time a container starts, although the node can reuse cached layers with the same digest. `IfNotPresent` can avoid registry access when the required content already exists. Mutable tags can still change between deployments, so release processes should record and promote digests.
+
+Admission controllers evaluate authenticated and authorised API requests before storage. `AlwaysPullImages` can strengthen isolation in a multi-tenant cluster by requiring image-authorisation checks for every start. `ImagePolicyWebhook` can consult an external policy service, but Kubernetes disables it by default. Modern admission policy can restrict registries, reject mutable tags, require digests and signatures, and apply vulnerability or provenance gates. Such controls complement registry access, network security, runtime hardening, and continuous monitoring.

@@ -1,80 +1,127 @@
 # Tactics and Tools for Troubleshooting Docker
 > [!NOTE]
 > This guide presents an evidence-first approach to diagnosing Docker failures across containers, images, builds, filesystems, registries, volumes, networking, and host environments while minimizing risky or destructive changes.
+### Use an evidence-first workflow
+Effective troubleshooting separates symptoms from causes and changes one variable at a time. An operator first records the exact command, complete error, Docker client and server versions, active context, operating system, recent changes, and expected result. The investigation then follows the failing path through the client, daemon, image, container, network, storage, and application.
 
-Docker troubleshooting works best when engineers collect evidence before changing configuration. Container logs, inspection output, filesystem checks and network state usually reveal whether the fault sits in the image, the container command, the host, a registry, a mount or a network.
-## Core workflow
-Engineers should start with the smallest reliable signal and then widen the investigation.
+Broad cleanup, reinstallation, and factory reset destroy evidence and can remove data. They belong near the end of a diagnosis, after checks and a backup. A workflow keeps the process controlled:
+1. Reproduce the failure with the smallest safe command.
+2. Capture logs, state, configuration, resource use, and timestamps.
+3. Test one hypothesis with a reversible action.
+4. Compare the result with the baseline.
+5. Record the cause and durable correction.
 
-- Check container logs for application output, startup errors and runtime exceptions.
-- Inspect the container for its image, command, exit code, mounts, logging path, host settings and network settings.
-- Check the container filesystem when path, permission or missing-file errors appear.
-- Remove unused Docker objects when stale containers, old networks or dangling images may be influencing the result.
-- Rebuild or recreate resources only after the current state has been recorded.
-## Logs, inspection and the container filesystem
-`docker logs` retrieves output written to a container's standard output and standard error streams. The `--tail` option limits the number of lines, `--follow` streams new output, `--details` adds available logging metadata, `--since` and `--until` filter by time, and `--timestamps` adds timestamps. Logs are the first practical check for most Docker failures because they show what the container process attempted to do.
+The active Docker context deserves an early check because a valid command can reach the wrong daemon. `docker version` distinguishes client access from server access, while `docker info` exposes daemon, storage, security, and runtime details.
 
-`docker inspect` returns low-level JSON for Docker objects. Useful fields include `Id`, `Name`, `State`, `Config`, `HostConfig`, `NetworkSettings`, `Mounts` and `LogPath`. Go template formatting narrows the output. For example, `{{.Config.Image}}` returns the image name, `{{.State.ExitCode}}` returns the exit code and `{{json .Config}}` returns the runtime configuration as JSON.
+```shell
+docker context show
+docker version
+docker info
+docker system df
+```
+### Inspect containers, logs, and files
+`docker logs` retrieves output that the container writes to standard output and standard error, subject to the configured logging driver. It does not expose application logs written only inside the container. Time filters and a bounded tail reduce noise.
 
-Engineers can examine a running container with `docker exec -it <container> /bin/sh` or another shell available in the image, such as `/bin/bash`. Minimal images may not include Bash. If a container is stopped, `docker export` can write the filesystem to a tar archive, and `docker cp` can copy files between the container and the host when permissions allow it.
-## Cleaning resources safely
-Pruning reduces conflicts and frees disk space, but it can remove data or dependencies that other work still needs. `docker image prune` removes dangling images, and `docker image prune -a` removes all images not used by an existing container. `docker container prune` removes stopped containers. `docker network prune` removes unused networks. `docker volume prune` removes unused local volumes, and current Docker behaviour removes only anonymous volumes by default unless `--all` is specified.
+```shell
+docker logs --tail 200 --since 15m --timestamps CONTAINER
+docker logs --follow CONTAINER
+docker inspect CONTAINER
+docker stats --no-stream CONTAINER
+```
 
-`docker system prune` removes unused containers, networks and images. It does not remove volumes unless `--volumes` is supplied. Teams should avoid blind pruning on shared machines or production hosts. They should inspect the target resources first and preserve named volumes that contain important data.
-## Build cache and image build failures
-Docker builds execute Dockerfile instructions in order. For each instruction, Docker checks whether it can reuse the build cache. A cached layer is reused when the instruction and relevant inputs have not changed. For `COPY` and `ADD`, Docker calculates a checksum from file metadata, but modification time alone does not invalidate the cache. If a layer changes, later layers must be rebuilt because their parent layer has changed.
+`docker inspect` returns the container's declaration and observed state. Useful fields include `.State.Status`, `.State.ExitCode`, `.State.Error`, `.State.OOMKilled`, `.RestartCount`, `.Config`, `.HostConfig`, `.Mounts`, and `.NetworkSettings`. Go templates select a field without manual JSON searching:
 
-The build cache speeds up development, but it can hide stale dependencies or old base images. `--no-cache` forces Docker to re-run build steps that would otherwise be cached. It does not by itself guarantee a fresh base image, so `--pull` should be used when the latest base image is required. `--cache-from` can seed the cache from another image when builds share layers.
+```shell
+docker inspect --format '{{json .State}}' CONTAINER
+docker inspect --format '{{json .Mounts}}' CONTAINER
+docker inspect --format '{{json .NetworkSettings.Networks}}' CONTAINER
+```
 
-Build failures often come from instruction order. For example, an application build that runs before dependencies are installed will fail. Engineers should read the first failing Dockerfile instruction, confirm that paths exist in the build context and image, and verify that each command can run under the configured user.
+A running container can execute a diagnostic command with `docker exec`. The selected image may provide `sh` but not `bash`, and minimal images may omit common network tools.
 
-Modern BuildKit changes the visibility of intermediate containers compared with the legacy builder. Detailed logs, targeted multi-stage builds, temporary diagnostic commands and `--progress=plain` are usually safer than relying on legacy intermediate-container inspection. Where an older workflow exposes intermediate image or container IDs, they can help inspect the filesystem around the last successful step.
-## Docker Desktop, filesystem and YAML failures
-Docker Desktop startup problems usually come from installation state, virtualisation, host security tools, incompatible versions or a stale daemon. On Windows, Docker Desktop depends on suitable Windows features and virtualisation support, commonly through WSL 2 or Hyper-V depending on the setup. Endpoint protection can also block networking or filesystem operations. On macOS, Docker Desktop must match a supported macOS version. A restart, clean uninstall and reinstall can resolve corrupted local state, but that step can remove settings and should not be the first response on a machine with active projects.
+```shell
+docker exec -it CONTAINER sh
+docker cp CONTAINER:/path/file ./evidence/
+docker export --output container-files.tar CONTAINER
+```
 
-File access errors usually involve the wrong base image, wrong path, missing executable, insufficient permissions, incorrect user, bad volume mount or Windows line endings in scripts that run inside Linux containers. Engineers should inspect the container, confirm the command path, check user permissions, convert scripts to LF line endings where needed and test the command inside an interactive shell.
+`docker cp` works with running or stopped containers. `docker export` captures the container filesystem but excludes mounted volume contents. A separate, tested process must protect volume data.
 
-Tar writer errors during builds or file copies often indicate a daemon issue, a file lock, a stopped Docker service, mismatched permissions or another process holding files open. The practical checks are Docker Desktop status, active file handles, consistent host and container users, administrator rights where required, and a daemon restart after the evidence has been captured.
+Exit status narrows the search but does not establish the root cause:
 
-Compose files use YAML. YAML is sensitive to indentation and does not allow tabs for indentation. Parser errors should be fixed by checking the reported line and the surrounding block. A YAML-aware editor extension helps detect invalid keys, bad indentation and malformed strings before Docker Compose runs.
-## Registry access and image trust
-A `pull access denied` error usually means that the image name, tag, namespace or registry URL is wrong, or that the registry requires authentication. Engineers should confirm the exact image reference, run `docker login` or the relevant cloud CLI login, check proxy settings, review DNS configuration and consider lower concurrent download settings on slow links.
+| Code | Meaning and next check |
+| ---: | --- |
+| 0 | The main process completed successfully. A long-running service may still have exited too early. |
+| 1 | The application reported a general failure. Application logs provide the next evidence. |
+| 125 | Docker could not run the container, often because the invocation or daemon failed. |
+| 126 | Docker found the command but could not invoke it. Permissions and executable format need inspection. |
+| 127 | Docker could not find the command. The image, path, entrypoint, and arguments need inspection. |
+| 137 | The process received `SIGKILL`. Memory exhaustion, `docker kill`, or host action can cause it. |
+| 139 | The process received `SIGSEGV`, usually from an application or native-library fault. |
+| 143 | The process received `SIGTERM`, often during an orderly stop. Docker may send `SIGKILL` after the grace period. |
+### Diagnose Docker Desktop and the daemon
+A Desktop startup failure calls for version compatibility, virtualisation, available disk, security software, WSL or hypervisor health, and daemon logs before destructive repair. Docker Desktop diagnostics and operating-system logs preserve useful evidence. On Linux, daemon logs commonly appear through `journalctl -xu docker.service`.
 
-Docker Hub still applies pull-rate limits to unauthenticated users and Docker Personal accounts. Pro, Team and Business accounts have unlimited pull rate under the current Docker Hub limits. Rate-limit errors should be handled by authenticating, using the right subscription or reducing unnecessary pulls in automation.
+Routine Docker use should not require every tool or terminal to run as an administrator. Docker daemon access grants extensive host authority, so teams should configure access deliberately rather than use blanket elevation. A restart may clear a transient fault. Clean or purge operations, factory reset, and reinstallation remove local state and settings, so the operator must understand and back up the affected images, containers, volumes, and configuration first.
 
-Older Docker workflows used Docker Content Trust and `docker trust inspect` to inspect signatures. Docker has been retiring Docker Content Trust for Docker Official Images, and Docker Engine 29 removed Docker Content Trust from the Docker CLI. Current image-integrity work should favour immutable digests, trusted publishers and modern signing or analysis tools such as Docker Scout, Sigstore or Notation where they fit the organisation's policy.
-## Exit codes
-Exit codes help separate Docker invocation errors from application errors.
+If the daemon stops responding, the operator checks its service state, host resources, and logs before sending more commands. Debug logging can expose daemon activity, but it may increase volume and disclose operational details. A diagnostic bundle should receive the same access controls as other system evidence.
 
-- `0`: the foreground process completed successfully or no long-running foreground process remained.
-- `1`: the application or command inside the container failed.
-- `125`: Docker itself failed to run the container, often because of an invalid flag or daemon problem.
-- `126`: Docker found the specified command but could not invoke it, often because of permissions.
-- `127`: Docker could not find the specified command.
-- `137`: the process received `SIGKILL`, often from manual killing or an out-of-memory condition.
-- `139`: the process received `SIGSEGV`, which usually indicates a memory access violation.
-- `143`: the process received `SIGTERM`, commonly after `docker stop` or a graceful shutdown request.
-## Volumes
-Volume errors commonly appear as invalid volume specifications, missing files, overwritten directories or permission failures. The host path and container path must be correct. Containers must mount directories as directories and files as files. A mount over a non-empty container directory hides the existing container contents while the mount is active.
+Useful escalation includes the smallest reproduction, exact timestamps, diagnostic identifier, relevant logs, redacted configuration, platform version, and actions already attempted. Official support depends on the applicable product and subscription. Community answers can suggest hypotheses, but the operator should verify commands against current documentation and test them in a disposable environment before changing production or deleting data.
+### Troubleshoot builds and Compose
+Build failures often arise from an incorrect build context, `.dockerignore` exclusion, instruction order, missing dependency, wrong platform, file permission, or Windows line ending. A `COPY` source must exist inside the build context. Its destination belongs to the image filesystem.
 
-`docker volume ls` lists volumes, and `docker volume inspect <volume>` shows details such as the mount point. `docker inspect` can show which mounts a container uses. Named volumes often hold important application data, so Docker does not remove them automatically. Engineers should prune volumes only after confirming that no container or future workflow needs the data.
-## Networking
-Docker provides several network drivers. `bridge` is the default driver and suits containers on the same host. User-defined bridge networks are better than the default bridge because they provide automatic DNS resolution between containers and better isolation. `host` removes network isolation from the Docker host. `overlay` connects containers across multiple Docker daemons, commonly in Swarm-style deployments. `ipvlan` gives direct control over IPv4 and IPv6 addressing. `macvlan` can make a container appear like a physical device on the network. `none` gives the container only a loopback interface.
+Errors involving a tar writer often occur while Docker packages or transfers the build context. The investigation checks unreadable files, changing generated files, broken symbolic links, insufficient disk, security software, and an unnecessarily large context. A focused `.dockerignore` reduces transfer time and prevents local secrets, repositories, dependencies, and build output from entering the context. The same host account should read every required source file, but granting global administrator access creates more risk than correcting the specific permission.
 
-`docker network ls` shows available networks, and `docker network inspect <network>` shows the driver, subnet, gateway and attached containers. `docker inspect` shows a container's `NetworkSettings` and `HostConfig`, including network mode, bind mounts and port bindings.
+File-not-found errors require a distinction between host and container paths. Build sources come from the context, bind sources come from the daemon host, and command paths exist inside the image. Alpine and other minimal images commonly provide `/bin/sh` without `/bin/bash`. Linux containers also need Unix line endings and executable permission for scripts. `docker image inspect`, a targeted build stage, or a temporary shell can confirm the image contents without guessing.
 
-Port conflicts occur when another container or host process already uses the requested host port. Compose port syntax places the host port on the left and the container port on the right, as in `8080:80`. Engineers should stop or remove stale containers, check host processes with tools such as `lsof` on macOS and Linux or `netstat` on Windows, and change the host port when another service must keep it.
+BuildKit forms cache keys from Dockerfile instructions and relevant inputs. `COPY` and `ADD` respond to source content and metadata, while most `RUN` cache decisions use the instruction text rather than checking remote package changes. Once a layer misses the cache, later layers rebuild. BuildKit remains the supported default, so operators should not disable it for legacy intermediate containers.
 
-Docker Compose creates a project-level default network and registers service names with internal DNS. Containers on that network should address each other by service name rather than hard-coded IP address. DNS failures usually come from using the wrong network, hard-coding old IP addresses, overriding DNS carelessly or expecting the host's DNS behaviour to match container DNS behaviour.
+```shell
+docker build --check .
+docker build --progress=plain .
+docker build --no-cache --pull .
+docker build --target STAGE --progress=plain .
+```
 
-Connectivity checks should test name resolution, IP reachability and the application port separately. ICMP tools such as `ping` may be unavailable in minimal images or blocked by policy, so application-level tools such as `curl`, `wget`, `nc` or service-specific clients often provide better evidence. Certificate errors require separate checks for host certificates, container trust stores, proxy interception and whether TLS terminates inside the container or before traffic reaches it.
+`--no-cache` bypasses reusable layers, while `--pull` requests a newer base image. Multi-stage targets isolate the failing stage. Build secrets and SSH mounts protect credentials better than build arguments or environment variables, which can persist in image metadata or history.
 
-`network not found` errors often follow manual stopping, manual network removal, daemon restarts or stale Compose resources. `docker compose down` removes the Compose containers and networks cleanly. `docker compose up --force-recreate` can rebuild the expected relationship between containers and networks after stale IDs or removed networks cause failures.
-## Support and escalation
-Good troubleshooting notes make escalation faster. Engineers should record the Docker version, Docker Desktop version, operating system, failing command, exact error text, relevant logs, Compose file fragments, Dockerfile fragments and recent changes. They should also record whether the failure reproduces after `docker compose down`, after a daemon restart and after rebuilding without cache.
+Compose v2 uses `docker compose`, not the retired `docker-compose` spelling. `docker compose config` parses files, resolves variables, merges overrides, and renders the model that Compose will apply. YAML requires spaces rather than tabs, but it does not impose four-space indentation or universal single quoting.
 
-Official Docker support depends on the organisation's subscription and product entitlement. Community support remains useful for development issues. Docker forums, Docker community channels and DevOps Stack Exchange can help when the question includes a minimal reproducible example, command output and environment details. Public questions should not include secrets, private registry tokens, internal hostnames or confidential paths.
+```shell
+docker compose config --quiet
+docker compose --progress=plain build
+docker compose up
+```
+### Resolve registry and certificate failures
+A failed pull may indicate a misspelt reference, missing tag, unsupported platform, absent authentication, denied authorisation, proxy fault, DNS failure, certificate error, registry outage, or rate limit. `docker login` should use an appropriate account or scoped token. Swarm secret inspection does not reveal a registry credential, and it applies only to Swarm secrets.
 
-Teams should treat destructive repair steps as escalation actions. Factory resets, clean reinstalls, broad prune commands and volume removal can solve corrupted local state, but they can also delete caches, containers, networks, images and data. A backup or documented recovery plan should come before those actions.
-## Continuing practice
-Docker troubleshooting improves with repeated practice across logs, inspection output, build cache behaviour, filesystem layout, volumes, registry access and networking. The strongest habit is to gather the current state, make one controlled change, and verify the result before moving to the next hypothesis.
+Current Docker Hub limits allow 100 pulls per six hours for an unauthenticated IPv4 address or IPv6 `/64`, 200 for an authenticated Personal account, and unlimited pulls for authenticated Pro, Team, and Business accounts, subject to fair use. A `429` response can also indicate the separate abuse limit. Authentication, caching, controlled retries, and efficient automation provide safer remedies than repeated pulls.
+
+A private registry signed by an internal certificate authority needs a trusted CA certificate. On Linux, Docker Engine uses `/etc/docker/certs.d/REGISTRY:PORT/ca.crt` for this trust. Docker treats `.crt` files as CA roots and `.cert` plus `.key` files as client credentials. Docker Desktop may also require trust in the host certificate store. An application inside a container maintains its own trust store, so host trust does not automatically fix application TLS. Corporate TLS inspection requires the organisation's authorised CA, not a public resolver or an arbitrary certificate.
+### Check mounts before pruning data
+`docker inspect --format '{{json .Mounts}}'` shows each mount's type, source, destination, and access mode. `docker volume inspect` describes a Docker-managed volume. Its host mountpoint is not a path that must exist inside the image.
+
+Bind mounts may target a file or directory when source and destination types agree. Mounting over existing container content obscures that content. An empty volume mounted over populated image content receives a copy by default, while `volume-nocopy` suppresses that behaviour. Overlapping mounts can hide one another, so specific and parent mounts need deliberate ordering. Host paths, ownership, labels, and sharing settings also vary across Linux, macOS, and Windows.
+
+Pruning is a storage operation, not a universal repair step. `docker system prune` removes stopped containers, unused networks, dangling images, and unused build cache. `-a` expands image removal, and `--volumes` adds unused anonymous volumes. `docker volume prune` removes unused anonymous volumes by default, while `--all` includes unused named volumes. Filters can narrow several prune commands. An operator should list dependencies, back up required data, read the confirmation, and prefer the narrowest object-specific command.
+### Isolate network failures by layer
+The bridge driver connects containers on one host. A user-defined bridge supplies automatic name and alias resolution and stronger application separation than the default bridge. Host mode shares the host network stack. Overlay networks connect eligible Docker hosts through Swarm mode. Macvlan and IPvlan integrate containers with underlay addressing but impose platform and network constraints. The `none` driver disables normal networking.
+
+```shell
+docker network ls
+docker network inspect NETWORK
+docker port CONTAINER
+docker inspect --format '{{json .NetworkSettings.Ports}}' CONTAINER
+```
+
+A published mapping uses `HOST_PORT:CONTAINER_PORT`. Dockerfile `EXPOSE` documents an intended port but does not publish it. If the host port is busy, `docker ps`, `docker port`, `ss` or `lsof` on Linux or macOS, and `Get-NetTCPConnection` on Windows identify the owner. Restarting or resetting Docker should not precede that check.
+
+On a user-defined network, Docker's embedded DNS resolves container names and aliases, not the network's name. `/etc/resolv.conf` shows the resolver configuration. A fixed public resolver such as `8.8.8.8` is not a general correction because internal names, virtual private networks, and corporate policy may require approved DNS servers.
+
+Connectivity testing should progress from name resolution to route, TCP connection, TLS handshake, and application response. `ping` tests ICMP only, and many images or networks omit or block it. A controlled diagnostic image on the same network can supply `getent`, `nslookup`, `dig`, `curl`, and `openssl` without modifying the application container.
+
+Route tables show reachable prefixes rather than every address already allocated. Docker IP address management normally assigns container addresses, but a Docker subnet that overlaps a host, virtual private network, or corporate route can divert traffic. `ip addr`, `ip route`, `route print`, or `netstat -rn` can reveal the relevant host path. The operator compares the network's subnet and gateway with those routes, then creates a non-overlapping network instead of assigning arbitrary container addresses.
+
+An IP connection that succeeds while a name lookup fails points towards DNS. A successful TCP connection followed by a certificate failure points towards trust, hostname, or time. An HTTP error confirms network delivery and shifts attention to the application. This layered interpretation avoids treating every failed request as an IP problem.
+
+Docker refuses to remove a network that connected containers still reference. `docker network rm` therefore requires container disconnection or removal. For a Compose project, `docker compose down` removes project containers and its non-external networks, while `docker compose up` recreates the declared state. `--force-recreate` can replace containers when reconciliation does not. Routine system pruning, daemon restarts, and disabled automatic updates add risk without proving the cause of a network error.

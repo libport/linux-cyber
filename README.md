@@ -13,8 +13,9 @@ Linux provides the operating-system foundation for much of platform engineering,
 - :notebook: [Red Hat Certified Specialist in Containers](RHCSC/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-containers-ex188)) 
 - :notebook: [Docker](docker/README.md) ([course link](https://www.pluralsight.com/paths/managing-docker-in-production)) 
 - :notebook: [Certified Kubernetes Administrator](CKA/README.md) ([course link](https://www.pluralsight.com/paths/certified-kubernetes-administrator)) 
-- :construction: :notebook: [Terraform](terraform/README.md) ([course link](https://www.pluralsight.com/paths/terraform)) 
-- Splunk Search Expert Specialization ([course link](https://www.coursera.org/specializations/splunk-search-expert))
+- Terraform ([course link](https://www.pluralsight.com/paths/terraform)) 
+- Microservices Architecture ([course link](https://www.pluralsight.com/paths/microservices-architecture-new))
+- Observability and Monitoring Tools and Techniques ([course link](https://www.pluralsight.com/paths/observability-and-monitoring-tools-and-techniques))
 - :construction: :notebook: [IBM DevOps and Software Engineering Professional Certificate](IBM-DSE/README.md) ([course link](https://www.coursera.org/professional-certificates/devops-and-software-engineering))
 ### Book Notes
 - UNIX and Linux System Administration Handbook, 5th edition, by Evi Nemeth, Garth Snyder, Trent R. Hein, Ben Whaley, and Dan Mackin. ([publisher page](https://www.admin.com/))
@@ -26,7 +27,8 @@ Linux provides the operating-system foundation for much of platform engineering,
 Cybersecurity is the practice of protecting systems, networks, and data from unauthorized access, disruption, damage, and theft. In platform engineering, cybersecurity requirements are embedded into shared infrastructure and developer workflows through secure defaults, access controls, automated scanning, secrets management, and policy enforcement.
 ### Course Notes and Project Files
 - :package: :notebook: [IBM Cybersecurity Analyst Professional Certificate](IBM-CySA/README.md) ([course link](https://www.coursera.org/professional-certificates/ibm-cybersecurity-analyst))
-- :notebook: [TCM Security Practical OSINT Research Professional](TS-PORP/README.md) ([course link](https://certifications.tcm-sec.com/porp/))
+- :notebook: [TCM Security Practical OSINT Research Professional](TS-PORP/README.md) ([course link](https://certifications.tcm-sec.com/porp/))Splunk Search
+- Expert Specialization ([course link](https://www.coursera.org/specializations/splunk-search-expert))
 - LPIC-3 Exam 303: Security ([course link](https://www.pluralsight.com/courses/lpic-3-exam-303-security))
 - Red Hat Certified Specialist in Security: Linux ([RH Doc](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html-single/security_hardening/index))
 - Johns Hopkins University Intrusion Detection Specialization ([course link](https://www.coursera.org/specializations/intrusion-detection))

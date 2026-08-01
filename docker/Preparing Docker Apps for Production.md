@@ -2,286 +2,326 @@
 > [!NOTE]
 > This guide explains how to make containerized applications production-ready through portable images, runtime configuration, secure secrets, centralized logging, meaningful health checks, resilient routing, and explicit deployment models.
 
-Production containers need more than a working image. A container image must run consistently, accept environment-specific configuration, expose useful logs, report its health, wait for dependencies when necessary, and fit into a routing model that can handle traffic securely. These practices let a platform such as Docker Compose, Docker Swarm, Kubernetes, or a managed cloud service operate the application rather than merely start a black-box process.
+Production containers need more than a working image. Each application must cooperate with the platform that configures it, collects its logs, assesses its health, and routes its traffic. This integration allows the platform to operate replicated workloads, roll out updates, replace failed instances, and separate application code from environment-specific settings.
 
-A production-ready image keeps application binaries and dependencies stable while pushing environment-specific values into the runtime platform. The same image should move from development to test to production. Configuration, secrets, logging destinations, health policies, scaling rules, and routing rules should belong to the deployment model, not to a rebuilt image. This separation gives teams repeatable releases and reduces the risk that production runs code that has not passed earlier tests.
+A sound production design promotes one immutable image through development, testing, staging, and production. The image contains the same application binaries and runtime dependencies in every environment. Runtime configuration supplies the differences, including service addresses, release settings, log levels, credentials, and feature controls. An image digest provides a stronger identity than a mutable tag and allows operators to confirm that production runs the artefact that passed earlier checks.
 
-Container platforms treat containers through standard runtime interfaces and image formats. Docker remains a common tool for building and running images, but modern Kubernetes clusters run containers through Container Runtime Interface-compliant runtimes such as containerd or CRI-O. A production model should therefore describe portable container behaviour rather than depend on Docker Engine-specific assumptions.
+Containers isolate processes and their resources while sharing the host kernel. They are not small virtual machines. Their short lifespans, replaceable filesystems, and platform-managed networking shape the application design. Persistent data belongs in durable storage, configuration belongs outside the image when it varies by environment, and operational output belongs on interfaces that the platform can observe.
 
-A container is not a full virtual machine. It is an isolated process environment built from image layers, runtime settings, namespaces, filesystems, network configuration, environment variables, and, on Windows, registry settings. That environment gives applications practical integration points. Files can appear in known paths. Environment variables can supply simple values. Standard output and standard error can become container logs. Health commands and endpoints can expose state to the platform. Network names and reverse proxies can route traffic without embedding host addresses in application code.
-## Distributed application example
-A small distributed application makes these practices easier to see. A web front end can display NASA's Astronomy Picture of the Day. A background API can fetch image details from NASA and cache the result so repeated visits do not overload the external service. A separate access-log API can record requests. The components can use different languages, such as Go for the web front end, Java for the image API, and Node.js for the logging API.
+Four capabilities establish the core production contract:
+- Configuration enters through controlled runtime sources without rebuilding the image.
+- Application logs reach standard output and standard error in a useful, structured form.
+- Health signals distinguish startup, readiness, and liveness without causing avoidable failures.
+- A managed gateway or reverse proxy provides routing, TLS, load balancing, and traffic policy.
 
-The language mix matters because production patterns should not depend on one framework. Each component can read configuration, emit logs, report health, and receive traffic through the same platform contract even when the internal libraries differ. The Go service can use TOML configuration. The Node.js service can use JSON. The Java service can use properties files. The platform should not care which format the application uses internally, provided the image exposes predictable integration points.
+These capabilities support, but do not replace, metrics, traces, resource controls, security hardening, backups, capacity planning, and incident response.
+### A representative distributed application
+A small image-gallery system illustrates the contract. A Go web component serves the user interface. A Java API retrieves and caches NASA's Astronomy Picture of the Day data. A Node.js API records access events. Each service runs in its own container, uses a stable service name to reach its dependencies, and exposes only the interface needed by other components.
 
-Each component can run as a separate image and a separate service. The web front end calls the image API and the access-log API by service name. The APIs can run on private internal ports. Only the reverse proxy or ingress layer needs public exposure. This structure supports independent scaling, replacement, and troubleshooting. If the access-log API fails, the web component can show degraded logging behaviour without necessarily taking down the whole user-facing page. If the image API becomes unhealthy, the platform can restart it or remove it from traffic while other components continue to run.
+The three languages use different configuration libraries and logging frameworks, but operators should see a consistent application. Every component receives an environment name and release identifier. Each component writes logs with a common correlation identifier. Each HTTP service exposes separate readiness and liveness endpoints. A gateway presents one public origin and directs website and API paths to the correct internal Services.
 
-The same example also shows why production preparation belongs early in the build. A team that adds configuration, logging, health, and routing only after the application reaches production will usually create emergency scripts and manual fixes. A team that builds those contracts into images and deployment models can move the same application across environments with fewer surprises.
-## Configuration
-Configuration should come from the container environment rather than from separate images for each environment. An image can include safe defaults, but runtime settings should override them. This allows one image to run with different behaviour in development, system test, integration, and production.
+This separation creates useful failure boundaries. The web component can scale independently from the cache API. A failing access recorder should not necessarily take the gallery offline. The Java API can continue serving cached data during a short upstream outage if the product accepts stale responses. Those decisions belong in service contracts and health logic rather than in the container runtime.
 
-A good configuration hierarchy usually has three layers:
-- Default settings packaged with the image
-- Override files mounted into the container filesystem
-- Environment variables that override file-based settings
+The deployment model should also state ownership. An application team owns code, application configuration, and service-level signals. A platform team may own cluster logging, gateway infrastructure, certificate automation, and policy. Clear boundaries prevent application manifests from acquiring unrestricted host access while still allowing teams to publish the routes, settings, and telemetry their services require.
 
-The hierarchy lets an application start with sensible defaults, take environment-wide values from files, and accept quick overrides through environment variables. Many modern application frameworks already support this model. Go applications often use libraries such as Viper. Node.js applications can use packages such as node-config. .NET and Spring Boot also provide strong configuration support, although each framework uses its own conventions.
+A local Compose deployment can exercise the same fundamental interfaces as Kubernetes. Compose provides service DNS, mounted files, secrets, health checks, and private networks. Kubernetes adds controllers, declarative rollouts, Services, ConfigMaps, Secrets, probes, and Gateway API resources. Exact manifests differ, but the image's operational contract should remain stable. A production migration then changes the platform model rather than the application binary.
+## Runtime configuration
+### A layered configuration model
+An application should combine configuration sources according to an explicit precedence order. A practical order, from lowest to highest priority, is:
+1. Non-sensitive defaults packaged in the image
+2. An environment-specific configuration file mounted at runtime
+3. Environment variables for targeted overrides
+4. Command-line flags or an explicit administrative override, when the application supports them
 
-A production image should keep its defaults deliberately modest. For example, it can set a low logging level, default to non-sensitive endpoints, and use placeholder values for external dependencies. Runtime configuration can then raise the logging level, point to real services, enable or disable metrics, and identify the environment. This approach keeps the image portable and avoids rebuilding merely to change a setting.
+The exact order depends on the framework. The application must document and test its own rules. A Go service can use Viper, a Node.js service can use node-config, and a Spring Boot service can use its native externalised-configuration support. Each component may use a different library, but the distributed application should expose a coherent operational model.
 
-Environment variables suit small values, feature flags, endpoint names, and settings that operators often override. Names should use an application-specific prefix when the framework scans the whole environment. Prefixes reduce accidental collisions with variables intended for the operating system, the container runtime, or another process.
+Defaults should let the process start safely in a local or diagnostic environment. They should not contain production credentials, private keys, or environment-specific endpoints. Runtime values then alter behaviour without changing the image. A configuration report may show non-sensitive effective values at startup, but it must redact credentials and tokens.
 
-Configuration files suit larger and structured settings. They can use the format the application already understands, such as TOML, JSON, YAML, XML, or properties files. A platform can mount a file or a whole directory into the container. Mounting a directory is often easier to maintain than mounting individual files, especially when configuration grows or when teams need separate files for several components.
+Environment variables work well for small scalar values such as a log level, feature flag, or service hostname. They become awkward for long, structured documents and can expose secrets through process inspection, debugging output, support bundles, or platform interfaces. Files suit structured TOML, JSON, YAML, XML, and properties data. Secret files or references to an external secret store suit sensitive values.
 
-Modern Docker supports bind mounts and volumes. A bind mount maps a host file or directory into a container path. Docker supports both `--volume` and `--mount`, but the explicit `--mount` syntax is generally clearer because it names the mount type, source, and target. Bind mounts work well for local development and demonstrations. Managed platform objects such as ConfigMaps, Secrets, and managed volumes are more suitable for production.
+The configuration contract should define:
+- Every supported setting, type, default, and valid range
+- The precedence of sources
+- Whether the application reads a value only at startup or can reload it
+- Whether a change requires a rolling restart
+- Which values are confidential
+- How validation failures appear in logs and status
 
-Docker Compose captures the same runtime configuration in a YAML model. A service can declare its image, environment variables, networks, ports, volumes, and dependencies in one file. Current Compose uses the Compose Specification, and the common command is `docker compose`, not the legacy `docker-compose` command. Compose is useful for local multi-container environments and small deployments, but production teams should still decide whether they need a scheduler, orchestrator, secret management, rolling updates, and stronger recovery behaviour.
+The process should validate the complete effective configuration before accepting traffic. A missing required value, invalid port, malformed URL, or unsupported mode should cause a clear startup failure. Silent fallback can make a deployment appear healthy while it uses the wrong environment or dependency.
 
-Some older applications cannot merge settings from multiple sources. They may expect a single configuration file in a fixed path. Those applications can still fit the same runtime model by adding a small configuration loader to the image. The loader runs before the main application. It reads the default file, mounted override files, and selected environment variables. It then writes the final configuration file to the path the application already expects.
+Configuration parsing should preserve types. The string `false` must not become true because a library treats every non-empty string as truthy. Durations need units, lists need unambiguous encoding, and numbers need safe bounds. A schema or typed options object can catch these errors during automated tests and again at startup. Validation messages should name the invalid setting without echoing its sensitive value.
 
-A loader utility should be simple and explicit. It should report which sources it used, fail fast when required files are invalid, and write only the values the application needs. The container startup command should run the loader first and start the application only if configuration succeeds. That pattern keeps legacy applications manageable without changing their core code.
+Configuration ownership also affects change control. A feature flag may change frequently without an image release, while a database schema name may need coordination with a migration. Teams should classify settings by owner, risk, and reload behaviour. High-risk changes need peer review, progressive rollout, and a rollback value. An emergency override should expire so it does not become undocumented permanent configuration.
+### Docker and Compose
+Docker can inject environment variables and mount files when it creates a container. Compose records these settings with the service definition and makes a multi-container application repeatable. The Compose model can declare networks, volumes, configuration, health checks, secrets, and dependencies alongside the image reference.
 
-A multi-stage Dockerfile can build both the main application and the loader utility. The final runtime image can contain the compiled application, the loader, safe defaults, and an entry command that prepares configuration before launch. This keeps the build repeatable and keeps configuration support versioned with the application.
+Bind mounts are useful during development and for controlled single-host deployments, but they couple a container to a host path. Production mounts should be read-only unless the process must write to them. A missing or incorrectly permissioned host file can prevent startup, and a broad bind mount can expose more of the host than the application requires.
 
-Kubernetes applies the same principles with platform objects. ConfigMaps store non-confidential configuration as key-value pairs or files. Pods can consume ConfigMaps through environment variables, command-line arguments, or mounted files. Secrets store sensitive values, but they are not automatically secure merely because they are called Secrets. Kubernetes stores Secrets unencrypted in etcd by default unless the cluster enables encryption at rest, and access control must prevent unauthorised reading. Teams should use Secrets for sensitive values, enable encryption at rest, limit role-based access, and consider external secret managers for higher-risk systems.
+Compose secrets provide sensitive data to authorised services as files under `/run/secrets`. They provide a clearer boundary than ordinary environment variables. The application can receive a non-sensitive environment variable that names the secret file, then read the credential from that file. Secret source files must remain outside source control and require appropriate host permissions.
 
-The boundary between configuration and secrets should be deliberate. A log level, feature flag, cache size, or public service name belongs in configuration. A password, token, private key, certificate key, or API credential belongs in a secret store. Images should not contain either environment-specific configuration or secrets because image registries, build caches, and vulnerability scanners can expose image contents to more systems than intended. Even a deleted layer can remain recoverable from image history if a secret was added during a build.
+The `depends_on` field controls service creation and shutdown order. Short-form `depends_on` does not prove that a dependency can serve requests. Long-form conditions can wait for a dependency marked `service_healthy`, or for an initialisation service that completes successfully. Applications still need bounded connection retries because dependencies can fail after startup.
 
-Secret delivery should also match the application. Some applications can read secrets from files with restrictive permissions. Others expect environment variables. File-based secrets can reduce accidental exposure through process listings and diagnostic dumps, but both methods need careful logging discipline. Applications should never print their complete effective configuration when that output might include secret values. Diagnostic endpoints should redact or omit sensitive keys.
+Compose files belong in source control when they contain non-sensitive application topology and defaults. Environment-specific secret values, local `.env` files, and private key material do not. A release process should render and review the effective Compose configuration without printing confidential values.
+### Kubernetes configuration
+Kubernetes separates workload objects from configuration objects. A Deployment commonly manages replicated, stateless Pods through a ReplicaSet. StatefulSets, DaemonSets, Jobs, and other controllers manage different workload patterns. A Service gives changing Pod replicas a stable network endpoint, while cluster DNS publishes consistent names for Services and selected Pods.
 
-A Kubernetes Deployment usually creates Pods, and each Pod contains one or more containers. A Service provides a stable network endpoint for a set of Pods. Cluster DNS creates names for Services and Pods so workloads can use names rather than fragile Pod IP addresses. A ConfigMap or Secret can be mounted into a Pod as files or exposed as environment variables. Mounted ConfigMap data is read-only. Teams should understand update behaviour, especially when using `subPath`, because some mounts do not receive updates automatically.
+A ConfigMap holds non-confidential configuration. A Secret holds confidential data and supports separate access controls. Both can appear in a container as environment variables or mounted files. This flexibility allows one image to run with different settings in several namespaces or clusters.
 
-Good configuration practice produces several production benefits:
-- The same image moves through every environment.
-- The platform owns environment-specific values.
-- Operators can change configuration without changing code.
-- Sensitive data stays outside the image.
-- Application models become easier to review in source control.
-- Rollbacks can reuse the same tested image with earlier settings.
+Kubernetes Secrets are not a complete secret-management system. Base64 encoding does not encrypt data, and Secrets are stored unencrypted in etcd unless the cluster enables encryption at rest. Production clusters should apply least-privilege role-based access control, restrict which Pods can consume each Secret, enable encryption at rest, protect backups, audit access, and consider an external secret store. Plain-text credentials must not remain in Git-managed manifests.
 
-The key discipline is to make configuration explicit. A container should start with clear defaults, accept known overrides, fail when required values are missing, and avoid hiding important behaviour in ad hoc scripts or manual commands.
-### Configuration patterns by component
-A Go component can read a default `config.toml` file from the image, then read a mounted override file from a known directory, then read environment variables with an application-specific prefix. The application code can ask for logical settings such as `environment`, `metrics.enabled`, or API URLs without knowing which source supplied the final value. The framework or library merges the values during startup.
+Configuration updates have different effects:
 
-A Node.js component can follow the same shape with JSON files. The default file can ship inside the image, and an environment-specific file can arrive through a mounted directory. Some Node configuration libraries use a single environment variable such as `NODE_CONFIG` to hold JSON overrides. That is a framework convention, not a general container rule. The deployment model should document it so operators understand how to override values safely.
+| Delivery method | Behaviour after an object changes |
+| --- | --- |
+| Environment variable | The running process keeps the old value until the Pod is replaced |
+| Mounted ConfigMap or Secret volume | Kubernetes updates the projected files after a delay, except for some mount patterns such as `subPath` |
+| Application-specific reload | The process must detect or receive the change and apply it safely |
+| Versioned immutable object | A workload update points to a new object and triggers a controlled rollout |
 
-A Java component that uses Spring Boot can already read many configuration sources, but older Java applications may require a fixed properties file. A loader utility can preserve the container contract. It can read a mounted `application.properties` file, scan environment variables with a prefix, merge the values, and write the final file before the main application starts. The application then sees the single properties file it expects, while the platform still uses normal environment variables and mounted files.
+A mounted file changing does not guarantee that the application reloads it. Many frameworks read configuration only at startup. Versioned ConfigMaps and Secrets, combined with a checksum or name change in the Pod template, provide an auditable rolling update. Immutable objects also reduce accidental mutation.
 
-This component-level detail produces a consistent operator experience. Each service can accept a mounted configuration directory and selected environment variables. Each service can report its effective non-sensitive configuration through a protected diagnostic endpoint. Each service can keep secrets out of those diagnostics. Operators can then inspect behaviour without learning the internals of each language runtime.
+Kubernetes manifests should state resource names, namespaces, selectors, ports, service accounts, probes, volume mounts, and security settings explicitly. A ConfigMap does not create service discovery, and a Service does not create the cluster DNS system. The DNS add-on publishes records from Kubernetes data, while the Service and EndpointSlice mechanisms route traffic to eligible backends.
+### Adapting applications with limited configuration support
+Some older applications read one fixed file and cannot merge environment variables or override files. A small configuration adaptor can translate runtime inputs into the file format the application expects. A multi-stage build can compile both the adaptor and application while keeping build tools out of the final image.
 
-Configuration should also avoid several common mistakes. Images should not contain production credentials. Environment variables should not hold large structured documents when a mounted file would be clearer. ConfigMaps should not store passwords or tokens. Secrets should not be printed in startup logs. Startup scripts should not silently overwrite invalid settings. A platform should fail visibly when configuration is wrong because a misconfigured but running container can be harder to diagnose than a container that exits with a clear error.
-## Logging
-Container logging should start with standard output and standard error. A platform can automatically capture those streams, attach metadata, and make the logs available through commands, APIs, or a central logging pipeline. Applications that write only to private files inside the container are harder to inspect, rotate, ship, and correlate.
+The adaptor should:
+- Read a default template, mounted overrides, and permitted environment variables
+- Validate names, types, ranges, and required values
+- Write the generated file with restrictive permissions
+- Avoid logging secret values
+- Fail before the application starts if configuration is invalid
+- Replace itself with the application process so signals reach the application correctly
 
-An application should write normal event logs to standard output and errors to standard error when that separation is useful. The runtime can then collect logs without knowing the application framework. Docker logging drivers capture container output. Kubernetes expects containers to write to standard output and standard error, and a node-level agent commonly forwards those logs to central storage.
+A dedicated entrypoint program is safer than a long shell expression that backgrounds processes or obscures exit codes. On Kubernetes, an init container can generate configuration into a shared `emptyDir` volume before the main container starts. The Pod should remain unready until the application has loaded valid settings.
 
-This model changes application design. Instead of configuring each component to write to a different local file path, each component should send meaningful, structured log lines to the console. A JSON log format is often easier to query than plain text because it can carry fields such as timestamp, level, component, request ID, trace ID, user session, route, status code, and latency. Even when plain text remains necessary, logs should contain enough context to support troubleshooting without opening a shell in the container.
+This adaptor pattern adds code and operational risk. Native framework configuration remains preferable because it usually handles parsing, precedence, validation, and reload behaviour more reliably. Teams should not duplicate configuration mechanisms that the application platform already supplies.
 
-The sample application pattern uses several components, including a web front end, an API that fetches data, and an access-log API. Each component should expose logs through the same container mechanism despite using different languages. The platform then sees a consistent stream from every container rather than unrelated framework-specific files.
+An adaptor also needs atomic output. Writing directly over the target file can leave partial data if the process stops halfway. The adaptor can write a temporary file on the same filesystem, set its mode and ownership, validate the completed content, then rename it over the target. The application should not start until that operation succeeds. If several containers share storage, each instance should generate its own local file or use coordination that prevents concurrent writers.
+### Promoting the same image
+Separating configuration from code supports image promotion. A build pipeline creates an image once, scans and tests it, signs or attests it where required, and deploys the same digest to each environment. Deployment definitions provide environment-specific settings. Rebuilding the image for production would produce a different artefact and weaken the evidence gathered during testing.
 
-Some applications or frameworks still write to file sinks. When the application cannot be changed easily, the image can include a relay process. A relay tails one or more application log files and writes the content to standard output or standard error. That keeps platform logging consistent while allowing older applications to keep their existing file-based behaviour.
+Promotion does not prove that an application is secure or correct. Tests must cover the production configuration shape, dependency versions, permissions, networking, and failure modes. Operators should record the image digest, configuration version, secret version, and deployment revision so an incident can be traced to a precise release.
+## Application logging
+### The container logging contract
+Docker captures a container's standard output and standard error through its configured logging driver. Kubernetes follows the same basic application contract through the container runtime. The entrypoint process, and child processes that inherit its streams, should write operational events to those streams while running in the foreground.
 
-A log relay should not become a hidden dependency that masks failure. It should start predictably, handle missing files where appropriate, and exit when its required log source cannot be read. The container command can start both the application and the relay, but teams should avoid complex shell logic that becomes difficult to test. If multiple long-running processes must share one container, the image needs clear process supervision or a deliberate sidecar pattern.
+An application that writes only to an internal file, syslog, the Windows Event Log, or ETW can appear silent to the platform's normal container-log pipeline. Native console output is therefore the preferred design. Most modern logging frameworks can select a console sink and adjust severity through configuration.
 
-File-based logging also needs careful storage behaviour. Container filesystems are ephemeral and can disappear when a container restarts or moves. Local files can fill disks if the runtime does not rotate them. Central log collection reduces that risk, but it does not remove the need for retention policies, sampling decisions, redaction, and storage limits.
+Useful logs require useful application events. A platform cannot infer a request identifier, business failure, cache miss, dependency timeout, or authorisation decision if the code never records it. At the same time, excessive debug output increases cost, hides important events, and can disclose data. Production defaults should usually record informational lifecycle events, warnings, and errors. Temporary diagnostic changes should be time-bounded and reversible.
 
-Centralised logging becomes essential once an application has several replicas or components. Without it, operators must identify which node and container handled a request before they can find the relevant logs. A logging stack collects records from all containers, stores them in a searchable system, and provides a user interface for filtering, dashboards, and incident analysis.
+Structured, one-event-per-line JSON works well for distributed systems. Each event should use stable field names and include relevant context, such as:
+- Timestamp with time zone
+- Severity
+- Service and version
+- Environment or cluster identifier
+- Request, trace, or correlation identifier
+- Event name or code
+- Outcome and duration
+- Dependency name when relevant
 
-A traditional EFK stack uses Elasticsearch, Fluentd, and Kibana. Many current platforms use variations such as Fluent Bit, OpenSearch, OpenSearch Dashboards, Loki, or managed cloud logging. The exact product matters less than the architecture. A node-level collector should harvest container logs, enrich them with metadata, forward them to durable storage, and make them searchable by application, component, environment, container, Pod, namespace, level, request ID, and time range.
+The application should not log passwords, API keys, session tokens, private data, or complete request bodies by default. Redaction belongs close to the logging call and should undergo tests. Untrusted values need encoding or structured fields so attackers cannot forge extra log lines.
+### Log levels and configuration
+Framework and application logs often need different thresholds. A Java service may suppress routine framework messages at `WARN` while retaining its own events at `INFO`. A Node.js service may enable `DEBUG` briefly for a component under investigation. The effective configuration should remain consistent across replicas so an operator can compare like with like.
 
-Kubernetes logging commonly uses a DaemonSet for a collector so that each node runs one logging agent. The agent reads container log files produced by the runtime and forwards entries to the chosen backend. This avoids changing every application. It also ensures that newly scheduled Pods receive logging automatically once the collector runs on the node.
+Changing a log level does not require rebuilding an image. A mounted configuration file, environment variable, or platform-specific dynamic setting can control it. If the framework reads the level only at startup, a rolling restart applies the change. A diagnostic level should expire or be returned to its normal value after the investigation.
+### Relaying file-based logs
+An application that cannot write to the console may need a relay. The relay follows a file or subscribes to an operating-system log source, then writes each entry to its own standard output. Microsoft Log Monitor supports several Windows log sources for Windows containers. A Linux container can use a suitable relay utility when application changes are impossible.
 
-Central logging must protect sensitive data. Logs often contain request parameters, headers, tokens, identifiers, and exception details. Applications should avoid logging secrets and personal information. Logging pipelines should support access control, retention limits, and redaction where necessary. Debug logging should be temporary and controlled because it can create large volumes and leak details that normal production logs should not expose.
+Running the application in the background and a `tail` process in the foreground has serious limitations. Docker then observes the relay as the initial process. An application crash may leave the relay and container running, while a relay crash may stop a healthy application container. Shell wrappers can also mishandle termination signals, orphan child processes, and lose the application's exit status. A purpose-built supervisor can coordinate both processes, but changing the application to use console logging remains cleaner.
 
-Logging should connect with metrics and traces where possible. Logs explain what happened, metrics show rates and trends, and traces show how one request moved through services. A container platform does not need every application to use the same library, but it does need a shared correlation convention. A request ID from the proxy or web front end should travel to downstream APIs and appear in each log record. That convention turns separate component logs into a single story during incident response.
+Kubernetes can place a logging sidecar beside the application and share a volume between them. The application writes a file, and the sidecar streams it to standard output. This design lets Kubernetes observe each process separately, but it duplicates I/O, consumes additional resources, and can duplicate records if rotation and checkpoints are wrong. Kubernetes-native sidecars improve lifecycle ordering, yet the design still needs back-pressure, rotation, and failure tests.
+### Central collection
+Local container logs do not provide durable, cluster-wide investigation. Containers disappear, nodes fail, and replicas spread events across machines. A central pipeline normally contains:
+1. A collector on each node or a platform integration
+2. Parsers and filters that normalise records and attach metadata
+3. Durable storage with retention and access controls
+4. Search, dashboards, and alerting
 
-A useful production logging model has these properties:
-- Applications log to standard output and standard error.
-- Log lines carry enough context to correlate events across components.
-- The platform collects logs without manual container access.
-- The central store supports search, filtering, dashboards, and retention policies.
-- Logging does not require separate application images per environment.
-- Sensitive data is excluded or protected.
+Fluent Bit or Fluentd can collect records and forward them to Elasticsearch and Kibana, OpenSearch, a cloud service, or another supported destination. Elasticsearch is one possible store, not a requirement. The data model, query needs, throughput, retention, cost, and licensing should drive the choice.
 
-The main goal is operational visibility. A production platform should show what the application is doing, which version is running, which requests failed, and whether failures concentrate in one component, node, or dependency.
-### Log structure and collection flow
-A useful log line is more than a message. It identifies the source component, severity, time, build version, environment, request or correlation ID, and the event that occurred. For an HTTP service, it can record method, path, status, duration, and client category without exposing sensitive data. Consistent fields let teams query across components, for example to follow one request from the web front end to the API and then to the access-log service.
+In Kubernetes, a node-level collector commonly runs as a DaemonSet and reads container logs exposed by the runtime. It enriches each record with namespace, Pod, container, node, image, and label metadata before forwarding it. The implementation must match the cluster's container runtime and managed-service architecture. Direct host-path access is privileged and should be read-only, narrowly scoped, and granted only when the collector requires it.
 
-The collection flow should be predictable. The application writes to standard output or standard error. The container runtime captures those streams. Docker or the Kubernetes node stores the stream in a runtime-specific log location. A collector reads the node logs, adds metadata such as namespace, Pod, container, image, and labels, and forwards the records to central storage. Search and dashboards then sit on top of that store.
+The collector's service account needs only the Kubernetes metadata permissions required for enrichment. Separate indexes, streams, or tenants can isolate application logs from control-plane logs and restrict access by team or sensitivity. Retention and rotation limits must apply at the node and central store so a noisy service cannot exhaust disk capacity.
 
-This architecture means applications do not need to know where central logging runs. A local Compose environment can use `docker logs` or a lightweight collector. A Kubernetes environment can use a DaemonSet collector. A managed cloud environment can forward logs to the provider's logging service. The image remains the same because the platform, not the application, owns the shipping mechanism.
+A central system should preserve the original event, prevent silent loss, and expose delivery failures. Buffering protects against temporary store outages, but an unbounded buffer can fill a node. Sampling can control high-volume events, though errors and security-relevant events may require complete retention. Clock synchronisation, consistent timestamps, and correlation identifiers allow operators to reconstruct a request across services.
 
-Hidden log sinks deserve special attention during migration. Some web servers, libraries, and legacy frameworks write access logs, error logs, or audit records to files even when application logs go to the console. Those files can mislead operators because the platform appears to collect logs while important evidence stays inside the container. A production review should check every logging path and either redirect it to standard streams or deliberately collect it.
+Parsing should happen deliberately. A collector that guesses formats can split multiline stack traces, misread timestamps, or discard fields after an application update. One JSON object per line avoids much of this ambiguity. When an older application emits multiline records, the collector needs a tested parser and a maximum record size. Schema changes should remain backward compatible long enough for stored dashboards and alerts to continue working.
 
-Central logging should support incident response. Operators need to filter by time, deployment, component, version, and severity. They need to search all replicas at once. They need enough retention to investigate delayed reports. They also need limits. Excessive debug logs can increase cost and slow searches. A good platform combines log levels, sampling where suitable, and retention policies that match operational and compliance needs.
-## Health, readiness, and dependency checks
-A platform can keep an application available only when the application tells the truth about its state. A running process is not always a healthy service. It may be deadlocked, unable to reach a database, stuck during startup, or serving errors while the process still exists. Health checks expose the difference between a process that exists and a component that can perform useful work.
+Back-pressure needs an explicit policy. A collector may buffer, block, sample, or drop when the destination cannot keep up. Blocking an application's output can eventually stall the process, while dropping silently removes evidence. The selected collector should publish its own queue depth, retry count, rejected records, and storage use. Alerts should fire before a full buffer begins losing events.
 
-Health checks usually answer several different questions:
-- Has the process started?
-- Can the application respond to a basic request?
-- Is the application ready to receive traffic?
-- Are critical dependencies available?
-- Should the platform restart this container?
+The Elasticsearch, Fluent Bit, and Kibana pattern demonstrates the flow. Fluent Bit tails runtime-managed files on each node, attaches workload metadata, and sends application and platform events to separate destinations or indexes. Elasticsearch stores searchable records, and Kibana provides queries and dashboards. A production deployment needs authentication, TLS, persistent storage, replicas, lifecycle policies, capacity limits, and tested recovery. A single Elasticsearch Pod with ephemeral storage is suitable only for a demonstration.
 
-A simple Docker `HEALTHCHECK` instruction runs a command inside the container. The command returns an exit code. A zero exit code means healthy, a non-zero code means unhealthy, and Docker records that state. There can be only one `HEALTHCHECK` instruction in a Dockerfile, although the command can call a script that performs several checks.
+Logs form one part of observability. Metrics show rates, saturation, and trends. Traces show a request's path across components. Logs provide detailed events. Production operations need all three, along with deployment events and platform state.
+## Health, readiness, and self-healing
+### Process state is not application health
+A running process can still reject every request, deadlock, exhaust a worker pool, or serve corrupt responses. Container status alone therefore gives an incomplete signal. Docker health checks and Kubernetes probes let the platform test application behaviour.
 
-A basic health check might use `curl` to request an HTTP endpoint. This works well for simple web services and clearly shows whether the application can answer within a timeout. The image must contain the tool used by the check. Minimal images often exclude `curl`, so teams may need a small custom probe utility or an endpoint that a platform can call from outside the container.
+Self-healing means that the platform performs a bounded recovery action when a trusted signal fails. It does not repair defective code or protect in-memory data. A restart can clear a transient fault, but it can also erase ephemeral state, repeat work, or create a restart loop. Durable data must live outside the container, and handlers should tolerate retries where the business operation permits them.
 
-Health checks should be cheap, fast, and reliable. They should not perform heavy queries or depend on slow external systems unless the check is specifically about readiness. A liveness check that fails because a downstream service is temporarily unavailable can cause restart loops. Restarting a healthy application does not fix an external outage. It can increase load and make the incident worse.
+Health endpoints should be cheap, local, side-effect free, and safe under frequent execution. They should not expose configuration, stack traces, credentials, or internal topology. Separate detailed diagnostic endpoints can require authentication and network restrictions.
+### Docker health checks
+A Dockerfile `HEALTHCHECK` defines a command that runs inside the container. The command returns exit code `0` for success and `1` for failure. Exit code `2` is reserved. Docker tracks `starting`, `healthy`, and `unhealthy` states and retains recent check output for inspection.
 
-Readiness checks answer a different question. They tell the platform whether the container should receive traffic now. A service can be alive but not ready because it is starting, warming a cache, applying migrations, connecting to dependencies, or draining work before shutdown. A readiness check should fail until the component can handle requests safely. The platform can then withhold traffic without killing the container.
+The main controls are:
 
-Dependency checks are especially important for distributed applications. A web front end may need an API. An API may need a database, object store, identity provider, or message broker. Some dependencies must be present before the application starts. Others can be optional or degraded. The application should distinguish these cases. A required dependency can block readiness. An optional dependency might only change a feature flag or show a degraded state.
+| Control | Purpose |
+| --- | --- |
+| `interval` | Time between normal checks |
+| `timeout` | Maximum duration of one check |
+| `retries` | Consecutive failures required before the container becomes unhealthy |
+| `start_period` | Initialisation window before failures count towards `retries` |
+| `start_interval` | Check frequency during the start period on supported Docker versions |
 
-Legacy applications can use the same loader pattern for health and readiness. A small utility can call endpoints, open sockets, test files, or inspect processes. A startup wrapper can wait for dependencies before launching the main process. A health command can report whether the main application still responds. This approach is useful when the original application has no native health endpoint.
+If `retries` equals three, the third consecutive counted failure marks the container unhealthy. A successful check resets the consecutive-failure count. A standalone Docker Engine records the unhealthy state and emits an event, but the health status alone does not restart the container. An orchestrator or external controller decides how to respond.
 
-Docker Compose supports health checks in service definitions, and it can use health conditions to order startup in some dependency models. Teams should not confuse startup ordering with production self-healing. A standalone Docker Engine marks a container unhealthy, but it does not automatically restart it simply because the health check fails. Restart policies react to process exits. Orchestrators such as Kubernetes and Swarm can use health signals to restart, reschedule, or stop sending traffic when they are configured to do so.
+An HTTP check can use `curl`, but installing a large diagnostic package only for a probe increases image size and maintenance. A small static probe binary or a script using the application's existing runtime may reduce extra dependencies. For Kubernetes, distroless images can expose an HTTP endpoint that the kubelet checks without adding a client package to the image itself.
 
-Kubernetes uses probes rather than Dockerfile `HEALTHCHECK` instructions as the primary health model. The kubelet can run liveness, readiness, and startup probes. A liveness probe can restart a container when it fails. A readiness probe can remove a Pod from Service endpoints so it stops receiving traffic. A startup probe can protect slow-starting applications from premature liveness failures. Kubernetes can run probes through HTTP, TCP, gRPC, or commands, depending on the application and cluster version.
+A custom probe must remain simpler than the application. Complex probe code creates another failure path. It should apply a strict timeout, handle connection errors, produce concise output, and avoid remote calls that consume rate limits.
+### Kubernetes probe types
+Kubernetes assigns distinct meanings and actions to three probes:
 
-This difference matters. A Dockerfile health check can help local Docker workflows and Swarm-style systems, but Kubernetes probe definitions belong in the Pod specification. Production teams should define the checks in the deployment model that the platform actually uses.
+| Probe | Question | Failure effect |
+| --- | --- | --- |
+| Startup | Has the application completed startup? | Kubernetes suppresses liveness and readiness checks until startup succeeds. Repeated failure restarts the container according to policy. |
+| Readiness | Can the application accept traffic now? | Kubernetes marks the Pod unready and removes it from eligible Service endpoints. The container keeps running. |
+| Liveness | Is the application stuck and unlikely to recover without a restart? | The kubelet restarts the container after the configured failure threshold. |
 
-A strong health model has these practices:
-- Liveness checks identify unrecoverable application failure.
-- Readiness checks prevent traffic from reaching unprepared containers.
-- Startup checks allow slow applications to initialise safely.
-- Dependency checks distinguish required and optional services.
-- Probe timeouts and failure thresholds avoid false positives.
-- Checks produce useful logs when they fail.
-- The platform response matches the type of failure.
+The kubelet performs each probe. An `exec` probe runs a command in the container. HTTP, TCP, and gRPC probes make network checks according to their respective rules. An HTTP probe does not require `curl` in the image because the kubelet sends the request to the Pod address.
 
-Self-healing relies on honest signals and sensible reactions. Restarting a broken process can restore service. Restarting an application because its database is briefly slow can create more damage. Production checks should measure the right state and give the platform enough information to act proportionately.
-### Designing checks that do not cause harm
-A health endpoint should return a clear status and complete quickly. It should avoid work that creates load during an outage. A liveness endpoint can check an in-memory flag, the main event loop, or a lightweight internal operation. It should not require every downstream dependency to be perfect. Its purpose is to tell the platform whether restarting this container is likely to help.
+Probe controls include `initialDelaySeconds`, `periodSeconds`, `timeoutSeconds`, `successThreshold`, and `failureThreshold`. Kubernetes acts when the configured number of consecutive results reaches the threshold. A `failureThreshold` of two means two consecutive failures, not three.
 
-A readiness endpoint can be stricter. It can check that required dependencies are reachable, migrations have completed, caches have warmed, and the service can accept requests. When readiness fails, the platform should stop sending new traffic but allow the container to keep running. This is useful during deployments, rolling updates, dependency interruptions, and graceful shutdown.
+A startup probe suits slow-starting applications. It gives the process a bounded initialisation period without weakening liveness for the rest of its life. Using a fixed sleep in an entrypoint delays every start and cannot report early success. A startup probe observes actual progress and lets normal checks begin as soon as the application starts successfully.
+### Designing probe logic
+Liveness should usually test only the process's ability to make progress. It might verify that the event loop responds, an internal queue advances, or a local health handler can execute. It should not call a public third-party API. If that dependency reaches a rate limit or suffers an outage, a dependency-based liveness check can restart every replica, increase traffic to the failing service, and take an otherwise recoverable application offline.
 
-A startup probe prevents premature liveness failures. Some applications need extra time to compile templates, run first-time setup, or build caches. Without a startup probe, a liveness probe might kill the container before the application has a fair chance to start. With a startup probe, Kubernetes can wait for initial readiness and then begin normal liveness monitoring.
+Readiness can include dependencies that are essential for serving new requests, but it needs care. A brief dependency failure across all replicas can remove every endpoint and cause a complete outage. Cached or degraded responses may be better than unready status. The design should distinguish between an optional dependency, a critical dependency, and a condition that the application can handle through retries or circuit breaking.
 
-Dependency checks need judgement. A service that cannot reach its database may be unready because it cannot serve requests. A service that cannot reach an analytics endpoint may still serve users and record events for later delivery. A service that cannot reach an external image API may return cached content while reporting degraded status. These distinctions help the platform and operators choose the right action.
+A dependency check in the container startup command can fail fast when a required local file or schema is absent. It should not wait indefinitely for a network service. Bounded retry with exponential backoff and jitter avoids synchronised reconnect storms. In Kubernetes, startup and readiness probes normally express service availability more accurately than a long shell chain in the entrypoint.
 
-Probe parameters also matter. Too short a timeout can turn normal latency spikes into restarts. Too many retries can leave broken containers in rotation. Too frequent a check can add needless traffic. Too slow a check can delay recovery. Teams should test probe settings under load, during dependency outages, and during rolling updates.
+Probe endpoints should return success only when the stated condition holds. A readiness endpoint may return a non-success status during draining so the platform stops new traffic before termination. The application then handles `SIGTERM`, stops accepting work, completes or safely abandons in-flight requests, flushes essential buffers, and exits within the termination grace period.
+### Rollouts and recovery
+A Deployment performs a rolling update by creating new Pods and reducing old replicas according to its strategy. Readiness prevents traffic from reaching a new Pod before it can serve requests. `maxUnavailable`, `maxSurge`, readiness timing, and termination behaviour determine whether the rollout preserves capacity.
 
-Health failures should be observable. The check command or endpoint should log enough information to show why it failed, without flooding logs on every probe. Dashboards should show probe failure counts, restart counts, readiness transitions, and deployment events together. This helps operators distinguish a bad release from a dependency outage, an overloaded node, or a routing problem.
-## Routing and reverse proxies
-Production applications need a clean traffic entry point. A container platform may run many services on the same hosts or cluster. Each service may have several replicas, internal ports, and deployment versions. Clients should not need to know where containers run. A reverse proxy or ingress layer should accept incoming traffic, apply external policies, and route each request to the right component.
+Liveness failures restart a container in the same Pod. A Deployment may create a replacement Pod when a Pod disappears or cannot remain scheduled, but a liveness failure does not itself create a new Pod. The distinction affects identity, volumes, restart counts, and investigation.
 
-A reverse proxy sits between clients and application containers. It can route by host name, path, header, or other request attributes. It can terminate Transport Layer Security, enforce redirects, add or remove headers, cache responses, compress content, and balance traffic across replicas. It can also provide one public endpoint for several internal services.
+Operators should alert on repeated restarts, long unready periods, probe latency, and rollout stalls. A platform that repeatedly restarts a faulty component can hide symptoms while serving intermittent errors. Events, previous container logs, exit codes, and probe output should remain available long enough to identify the root cause.
 
-Nginx is a common reverse proxy. A basic containerised Nginx proxy can listen on a host port and forward requests to application containers by service name. In a Compose network, services can resolve each other by name. A proxy can route `/api` to one service, `/logs` to another, and static or front-end traffic to the web component. This keeps application containers focused on application logic and leaves external routing to infrastructure.
+Probe settings need load and failure testing. Aggressive intervals waste CPU and network capacity. Loose timeouts delay detection. A useful configuration allows normal latency variation, detects genuine failure within the service objective, and avoids correlated restarts across replicas. Randomised application retry behaviour further reduces recovery storms.
+### Failure scenarios
+Several failure cases clarify the probe boundaries. If a web handler enters a permanent internal failure state while its process stays alive, readiness can stop new traffic and liveness can restart the container. If one of three replicas fails readiness, the Service continues routing to the other two, provided they have enough capacity. When the failed replica recovers, a successful readiness result makes it eligible again.
 
-Static proxy configuration works when routes change rarely. The configuration file can be packaged with the proxy image or mounted at runtime. Runtime mounting is usually better because it avoids rebuilding the proxy image for every environment. The proxy configuration should be versioned with the application model, reviewed like other deployment code, and promoted through environments.
+If an access-count service stores its total only in memory, a liveness restart restores availability but resets the count. The restart exposes a state-design defect rather than fixing it. Durable counters need external storage, or the product must accept their loss. Similar concerns apply to queued work, local caches, temporary uploads, and transactions interrupted during termination.
 
-Dynamic reverse proxies reduce manual configuration. Traefik can watch Docker or Kubernetes metadata and configure routes from labels, annotations, or custom resources. A service can declare its routing requirements alongside its deployment definition. The proxy discovers the service and updates routes without a hand-written proxy file. This suits platforms where services appear, scale, and move frequently.
+If every replica uses a liveness probe that calls the same rate-limited public API every five seconds, the probes can exhaust the allowance. Each failed call then triggers restarts, which create more startup calls and prolong the outage. Liveness should stay local. A readiness signal can reflect an essential upstream dependency only when removing the replica helps and when the check itself does not worsen the dependency's load.
 
-Different reverse proxies suit different environments. Nginx is mature, fast, widely understood, and strong for static configuration. Traefik integrates well with dynamic container environments. HAProxy, Envoy, Caddy, Kong, and cloud load balancers also fit many production designs. The choice should reflect operational skill, observability needs, security features, protocol support, certificate management, and the platform's native integration.
+If startup normally takes between 20 and 90 seconds, a liveness probe with a 10-second initial delay can kill healthy instances before they finish. A startup probe can allow a bounded 120-second window, then hand control to a stricter liveness probe. The readiness probe can succeed later if warming a cache or joining a pool takes additional time.
 
-Routing should not hide service health. A proxy should send traffic only to healthy and ready backends. In Kubernetes, Services select ready Pods, and readiness probes influence endpoint membership. In other systems, the proxy or orchestrator may need explicit health-check configuration. A proxy that continues to route traffic to an unhealthy container can defeat the rest of the health model.
+A rollout can fail even when every probe is technically correct. New replicas may consume more memory, a database migration may be incompatible with old replicas, or a readiness endpoint may pass before caches warm. Pre-production tests should cover mixed-version operation, peak traffic, termination, rollback, dependency failure, and node disruption. Progress deadlines and availability budgets should stop a bad rollout before it removes the last sound replica.
+## Routing production traffic
+### Ports, services, and entry points
+Applications inside separate containers can listen on the same private port because each container has its own network namespace. A conflict occurs when two processes try to bind the same host IP, protocol, and port tuple. Publishing every application container directly to a fixed host port therefore limits scaling and exposes internal services unnecessarily.
 
-Kubernetes separates internal service discovery from external ingress. A Service exposes a stable endpoint for Pods inside the cluster and sometimes outside it, depending on the Service type. DNS records let workloads call Services by name. An Ingress object describes external HTTP or HTTPS routing rules. An Ingress does nothing on its own. The cluster must run an Ingress controller, such as ingress-nginx, Traefik, HAProxy, Kong, or a cloud provider controller, to implement the rules.
+A reverse proxy or gateway provides a small set of public entry points, usually ports 80 and 443, then routes requests to private backends. Routing rules can use the hostname, path, method, headers, or other protocol-specific attributes. The gateway can also terminate TLS, balance load, apply authentication, enforce rate limits, add security headers, and collect access logs.
 
-Modern Kubernetes Ingress resources use the `networking.k8s.io/v1` API. Older examples that use deprecated beta API versions should be updated. Ingress can route by host and path, and it can attach TLS configuration. Controller-specific annotations or resources often provide advanced behaviour such as rewrites, timeouts, rate limits, authentication, WebSocket support, and caching. Teams should document controller-specific features because they can reduce portability between clusters.
+The application network should expose only the gateway publicly. Internal APIs should use private networks or ClusterIP Services and network policies. Administrative dashboards need authentication and should not share unrestricted public exposure with application routes.
+### NGINX and static configuration
+NGINX can map virtual hosts and paths to upstream services. For example, one hostname can reach a website while `/api` reaches a separate application service. Upstream groups can balance requests across replicas. Proxy caching can reduce latency and backend load for cacheable responses.
 
-Transport Layer Security belongs in the routing design. A production platform should define where TLS terminates, how certificates renew, whether internal traffic also uses encryption, and how proxies forward client protocol information. Automatic certificate management can reduce risk, but the renewal process must be observable and tested.
+Caching needs an explicit policy. Personalised, authorised, or mutable responses can leak data or become stale when cached under an incomplete key. Operators should define cache keys, permitted status codes, freshness, invalidation, size limits, and bypass rules. Response headers should make cache behaviour observable.
 
-Caching also belongs at the proxy layer when responses can safely be reused. A proxy can cache slow or expensive responses, reduce load on application containers, and improve latency. Cache rules must respect privacy, authentication, invalidation, and freshness. APIs that return user-specific or sensitive data should not be cached without explicit controls.
+Static NGINX configuration must be regenerated or reloaded when routing rules change. A graceful reload can apply valid configuration without dropping established connections, so a full container restart is not inherently required. Upstream DNS behaviour also depends on the NGINX version and resolver configuration. Current releases can re-resolve configured upstream names in supported configurations, while a platform-aware controller can generate upstream state from an API.
 
-A strong routing model has these properties:
-- External clients use stable host names and paths.
-- Application containers avoid hard-coded public addresses.
-- Internal services communicate through platform service discovery.
-- The proxy or ingress controller routes only to ready backends.
-- TLS, redirects, headers, and caching are defined centrally.
-- Routing configuration lives in source control with the deployment model.
-- Controller-specific behaviour is documented.
+Configuration should undergo syntax validation before reload. Multiple gateway replicas prevent one bad process or node from becoming the only entry point. Health checks, connection draining, and disruption controls protect traffic during gateway updates.
+### Traefik and dynamic discovery
+Traefik can watch a provider such as Docker and build routers, services, and middleware from container or service labels. With `exposedByDefault` disabled, only workloads carrying an explicit enable label become routable. Host and path rules select a service, while middleware can redirect HTTP to HTTPS, strip a prefix, alter headers, or apply other policy.
 
-The result is a platform that can host several applications and components without exposing every container directly. Routing becomes an operational capability rather than scattered application code.
-### Proxy configuration in practice
-A static Nginx proxy can use an upstream block for each internal service and a server block for external routes. The proxy listens on a public port. It forwards requests to service names on the container network. In a Compose environment, those names come from services in the Compose file. In Kubernetes, the proxy or ingress controller targets Services rather than individual Pods. This gives the platform freedom to replace containers while clients keep using the same address.
+Dynamic discovery removes the need to edit a central routing file for every replica change. Traefik updates its backend set when the provider reports container lifecycle events. Application definitions then carry route metadata close to the workload, which improves deployment autonomy but also grants application authors influence over shared ingress behaviour. Label constraints and governance should restrict which workloads the gateway accepts.
 
-Traefik takes a more dynamic approach. In Docker, labels can describe routers, services, entry points, and TLS settings. In Kubernetes, Traefik can watch Ingress resources or its own custom resources. The proxy updates its routing table as the platform changes. This reduces manual reloads and supports environments where teams deploy many services frequently.
+Mounting `/var/run/docker.sock` into a proxy grants powerful access to the Docker API. Docker's default authorisation model gives an API client extensive control over the host, so a compromised proxy can become a host compromise. A production design should avoid a raw socket mount where possible. Alternatives include a protected API endpoint, an authorised socket proxy with a minimal method allowlist, SSH or mutually authenticated TLS, a rootless architecture, or a provider integration with narrower credentials. A read-only filesystem mount does not make Docker API operations read-only.
 
-Dynamic discovery is powerful, but it needs guardrails. Teams should control which containers or namespaces a proxy may watch. They should set safe defaults for exposure so an internal service does not become public by accident. They should review labels, annotations, and ingress resources as deployment code. They should also monitor proxy configuration because a wrong route can look like an application failure.
+Traefik can obtain and renew certificates through an ACME certificate resolver. Production deployments need durable, protected certificate state, high-availability planning, challenge configuration, renewal monitoring, and issuer rate-limit awareness. A self-signed default certificate helps local testing but does not provide public trust and should not train users to bypass browser warnings.
 
-Ingress controllers vary in behaviour. The core Ingress resource defines common routing concepts, but annotations and advanced features are controller-specific. A rewrite rule for one controller may not work in another. A timeout, body-size limit, WebSocket setting, or certificate annotation may also differ. Production documentation should state which controller implements the rules and which features depend on that controller.
+Sticky sessions can help an older stateful application during migration, but they reduce load-distribution freedom and complicate failover. External session storage or stateless request handling usually gives stronger resilience. Gateway features should support the application design rather than preserve avoidable local state indefinitely.
+### Kubernetes Services and Gateway API
+A Kubernetes Service selects a changing group of Pods and provides a stable endpoint. Readiness influences whether a Pod endpoint is eligible for normal Service traffic. A ClusterIP Service remains reachable only inside the cluster unless another mechanism exposes it. A LoadBalancer Service asks the environment to provision or configure an external load balancer, subject to provider support.
 
-Routing also interacts with deployment strategy. During a rolling update, readiness checks should add new Pods only after they are ready. Old Pods should remain in service until replacements can handle traffic. During shutdown, applications should fail readiness first, finish in-flight requests, and then exit. The proxy, Service, and application must all support that sequence to avoid dropped requests.
-## Application modelling
-Production behaviour depends on both the image and the application model. The image contains the application, default configuration, startup commands, health utilities, and logging behaviour. The model describes how the platform should run the image. It includes configuration objects, secrets, environment variables, mounts, networks, Services, probes, replicas, routing rules, and resource settings.
+The original Ingress API still works, but Kubernetes has frozen it and recommends Gateway API for new development. Gateway API separates infrastructure and application routing responsibilities:
+- `GatewayClass` identifies the controller and implementation.
+- `Gateway` defines listeners and the gateway instance.
+- `HTTPRoute` maps hosts, paths, headers, and other HTTP conditions to Services.
+- Other route kinds support additional protocols when the selected controller implements them.
 
-The image and model should complement each other. The image should provide predictable integration points. The model should connect those points to the platform. For example, an image might read `/app/config/config.toml`, expose `/healthz` and `/readyz`, and write logs to standard output. The Kubernetes model can mount a ConfigMap at that path, define liveness and readiness probes for those endpoints, create a Service, and attach an Ingress rule.
+This model lets a platform team own public addresses, listeners, TLS policy, and accepted namespaces while application teams own routes to their Services. Attachment rules create an explicit trust relationship between Gateways and Routes. Implementations vary, so teams should confirm conformance, supported features, upgrade policy, and security maintenance before selection.
 
-This split also clarifies responsibilities. Developers usually understand the application code, default configuration, health endpoints, and logging format. Operations or platform teams usually understand cluster objects, secrets, probes, policies, routing, certificates, scaling, and monitoring. Containers blur the boundary, so both sides should agree on clear contracts.
+The community ingress-nginx controller was retired on 24 March 2026. Its existing artefacts still run, but the project no longer publishes bug fixes or security updates. New deployments should use a maintained Gateway API implementation or another maintained ingress controller. Existing ingress-nginx users should inventory annotations and custom behaviour, select a supported replacement, test translated routes, and migrate without assuming exact feature equivalence.
 
-A practical production contract should specify:
-- Which environment variables the image accepts
-- Which configuration file paths the image reads
-- Which settings are safe defaults and which are required at runtime
-- Which ports the application listens on
-- Which endpoints report liveness and readiness
-- Which logs appear on standard output and standard error
-- Which dependencies block startup or readiness
-- Which routes expose the component externally
-- Which values are confidential and must come from Secrets
+An Ingress resource should not be confused with the retired ingress-nginx implementation. The stable Ingress API remains available, although it receives no new features. Organisations that retain it still need an actively maintained controller.
+### TLS and traffic policy
+TLS should protect public traffic with certificates from a trusted issuer. The gateway needs automated issuance and renewal, secure key storage, modern protocol settings, and alerts before expiry. Redirecting HTTP to HTTPS improves consistency, while HTTP Strict Transport Security requires careful rollout because clients cache it.
 
-Source control should hold the application model. Environment-specific overlays can define values for development, test, and production while keeping the core structure consistent. Teams can use Compose files, Kubernetes manifests, Helm charts, Kustomize overlays, Jsonnet, CDK-style tools, or managed platform definitions. The tool matters less than reviewability, repeatability, and clear promotion between environments.
+TLS termination at the gateway does not automatically secure traffic from the gateway to backends. The threat model determines whether internal traffic also needs TLS, mutual TLS, or a service mesh. Network policies should restrict which workloads can reach backends and the control plane.
 
-Container images should be immutable once built. Rebuilding an image for each environment undermines confidence because each environment then runs a different artefact. A better path builds once, scans once, tests once, and promotes the same digest through each environment while changing only platform-owned configuration and secrets.
+Rate limits protect finite capacity, but a per-source-IP rule may group many users behind one address or fail when a proxy obscures the client. The gateway must trust forwarded headers only from known upstream proxies. Authentication, request-size limits, timeouts, connection limits, and web application protections should align across every replica.
 
-The release process should make image identity visible. A mutable tag such as `latest` can hide which build runs in production. A versioned tag is better, and an immutable digest is stronger because it identifies the exact image content. Deployment records, logs, and dashboards should show the image version or digest so incident response can connect behaviour to a specific release.
+Routing configuration deserves the same review and deployment discipline as application code. A faulty wildcard host, path prefix, rewrite, or namespace attachment can expose the wrong service. Automated tests should verify positive routes, rejected routes, TLS names, redirects, headers, limits, and default-backend behaviour.
+### Request flow through a gateway
+A request for `https://gallery.example/api/image` first reaches the public load balancer and gateway listener on port 443. The gateway selects a certificate for `gallery.example`, completes TLS, and matches the host and `/api/image` path. A route then chooses the internal image API Service. The Service supplies an eligible Pod endpoint, and the gateway forwards the request with controlled forwarding headers and timeouts.
 
-Promotion should also cover configuration. A production failure can come from a bad image, a bad setting, a missing secret, a route change, or a probe change. Teams should review deployment-model changes with the same care as application code. A small change to a readiness probe or ingress rule can remove healthy containers from traffic or expose an internal endpoint. A rollback plan should therefore include both image rollback and configuration rollback.
+The gateway can return a cached public response when policy allows it. Otherwise, the Java API may return its own cached NASA data or contact the upstream service. The response travels back through the gateway, which records an access event and applies response headers. The browser never connects directly to the Java Pod, and the Pod does not publish a host port.
 
-Local development and production do not need identical platforms, but they need the same contract. Docker Compose can give developers a fast environment that exercises image defaults, mounted configuration, service names, logs, and health checks. Kubernetes can apply the same contracts with Deployments, Services, ConfigMaps, Secrets, probes, and Ingress. The bridge between the two is the container image interface. If the image reads the same paths, accepts the same variables, writes the same logs, and exposes the same ports, the surrounding platform can change without rewriting the application.
+A request for the website root follows a different route to the Go Service. A request with an unknown host should reach no application route and receive a controlled rejection. This deny-by-default behaviour prevents accidental exposure when a new service appears in the cluster.
 
-Operational documentation should focus on actions. It should tell a support engineer how to find the running image, view effective non-sensitive configuration, inspect logs, check readiness, identify dependencies, and trace a request through the proxy. It should also identify what not to do, such as rebuilding an image to change a URL, entering a production container to edit a file, or storing a token in a ConfigMap.
-## Production checklist
-A containerised application is ready for production when it satisfies the operational contract expected by its platform.
+The same flow supports multiple replicas. The route names a Service rather than a Pod address, so Pod replacement does not alter the public rule. Readiness changes update endpoint eligibility. The gateway implementation watches the platform API or resolves the stable service name, then balances traffic among available backends. Deployments can scale without allocating a new public port for each replica.
 
-Configuration:
-- The image contains safe defaults only.
-- Runtime settings override image defaults through files and environment variables.
-- The same image can run in every environment.
-- Secrets stay out of images and ordinary ConfigMaps.
-- Startup fails clearly when required configuration is missing or invalid.
+Path rewriting requires precision. If the public route removes an `/api` prefix before forwarding, tests must cover `/api`, `/api/`, encoded paths, repeated slashes, query strings, and paths that should not match. A loose prefix rule can shadow another service or bypass an authentication policy. Hostnames should use exact or carefully reviewed wildcard rules.
+### Production verification
+Production checks should exercise the assembled system rather than isolated images alone. A staging deployment can use the production topology, security context, probe timings, log collector, and gateway policy with non-production credentials and controlled dependencies. Tests should confirm that configuration reaches each component with the intended precedence and that secret values never appear in rendered manifests, process output, or logs.
 
-Logging:
-- The application writes useful logs to standard output and standard error.
-- Log records include component, level, time, request context, and version where practical.
-- File-only logs are relayed or replaced.
-- A central system collects, stores, searches, and retains logs.
-- Logs do not expose secrets or unnecessary personal information.
+Failure injection can stop a process, block a dependency, delay startup, fill a log buffer, and remove a node. The expected platform action should follow each signal. Readiness should divert traffic without erasing useful state. Liveness should restart only an instance that cannot recover. A collector outage should not consume all node storage. A gateway update should preserve established traffic and reject invalid configuration.
 
-Health and readiness:
-- Liveness checks detect failures that a restart can fix.
-- Readiness checks stop traffic until the component can serve requests.
-- Startup checks protect slow applications from premature restarts.
-- Dependency checks distinguish required, optional, and degraded states.
-- Kubernetes workloads define probes in the Pod specification.
-- Standalone Docker workloads do not assume health checks restart containers automatically.
+Release tests should also observe scaling. New replicas must become ready before receiving load, and terminating replicas must leave endpoint sets before they stop. Requests should retain correlation identifiers across gateway and service boundaries. Cached responses should preserve privacy and freshness rules. Certificate selection should succeed for every public hostname, while unknown hosts receive no application content.
 
-Routing:
-- A reverse proxy or ingress layer owns external traffic.
-- Services provide stable internal names and endpoints.
-- TLS, redirects, headers, and caching are defined deliberately.
-- Routes target ready backends only.
-- Ingress resources have a matching controller.
-- Deprecated Kubernetes API versions are updated.
+The verification record should capture evidence, including the image digest, manifest revision, configuration version, probe results, route tests, vulnerability status, and rollback outcome. Production approval then rests on a reproducible artefact and deployment model rather than on a successful local container run.
 
-Delivery:
-- The deployment model lives in source control.
-- Image tags or digests identify exactly what is running.
-- Environment promotion changes configuration, not binaries.
-- Rollback procedures include both image and configuration changes.
-- Operational dashboards show logs, health, traffic, and failure rates.
+Teams should repeat these checks after changes to runtime versions, base images, cluster networking, storage classes, or gateway controllers. Platform upgrades can alter defaults, API behaviour, security policy, and failure timing even when application code stays unchanged. Regular rehearsal keeps operational assumptions aligned with the deployed environment and its dependencies.
+## Production operating model
+A production-ready container application combines the four capabilities into one controlled release model.
+### Build and release
+- The pipeline builds once and promotes an immutable digest.
+- A multi-stage build keeps compilers, package managers, and temporary credentials out of the runtime image.
+- The image runs as a non-root user where feasible and contains only required runtime components.
+- Dependency, image, licence, and vulnerability checks run before promotion.
+- Deployment records link the image, configuration, secrets, and routing revision.
+- Rollback restores a compatible combination rather than only an older image.
+### Runtime configuration and identity
+- Non-sensitive defaults live with the image.
+- Environment-specific values come from managed configuration.
+- Secrets use dedicated secret mechanisms, encryption, least privilege, and rotation.
+- Startup validation rejects invalid settings without printing confidential values.
+- Service discovery uses stable platform names instead of replica IP addresses.
+- Configuration changes follow an auditable rollout or a tested reload path.
+### Observability
+- Applications emit structured events to standard output and standard error.
+- Log rotation and retention prevent local disk exhaustion.
+- Central collectors add workload metadata and report delivery failures.
+- Correlation identifiers connect logs, traces, and user-visible error responses.
+- Metrics cover request rates, errors, latency, saturation, queue depth, and probe outcomes.
+- Alerts identify user impact and sustained risk rather than every transient event.
+### Resilience
+- Startup probes protect slow initialisation.
+- Readiness reflects the ability to accept new traffic.
+- Liveness detects local deadlock or loss of progress without depending on remote public services.
+- Probe thresholds match normal latency and recovery behaviour.
+- The application handles termination signals and drains within its grace period.
+- Persistent state survives container and Pod replacement.
+- Replicas, disruption controls, and rollout settings preserve required capacity.
+### Network delivery
+- Only managed entry points publish public ports.
+- Private services use isolated networks, ClusterIP Services, and policy controls.
+- Gateways route by explicit host and path rules and reject unintended defaults.
+- Trusted certificates and automated renewal protect public names.
+- Cache, retry, timeout, and rate-limit policies account for idempotency and user identity.
+- Docker API access and Kubernetes service accounts receive the minimum necessary authority.
+- Gateway and controller components remain supported and receive security updates.
 
-Security and reliability should reinforce the same contract. An image should contain only what the application needs at runtime. Smaller images reduce attack surface and usually make deployments faster. Runtime containers should not need shell access for normal support tasks. If operators must enter a container to diagnose a routine issue, the image or platform model probably lacks an observable signal.
-
-The platform should also provide enough metadata to make operations traceable. Labels and annotations can identify the application, component, owner, environment, version, source repository, and support contact. Log collectors, metrics systems, and ingress controllers can use that metadata to organise data. Consistent metadata also makes clean-up safer because teams can identify which objects belong together.
-
-Resource settings complete the model even though they sit outside the original application code. CPU and memory requests help schedulers place workloads. Limits prevent one component from exhausting shared capacity. Readiness checks, resource settings, and scaling rules should align. A component that becomes slow under load may need more replicas, higher resource requests, back-pressure, or a better readiness policy.
-
-The final test is failure behaviour. A prepared containerised application should keep useful logs when a dependency fails, report unready when it cannot serve, avoid leaking secrets during diagnostics, recover from process failure, and return to service through the normal deployment model. It should not require a special rebuild, a manual file edit inside a container, or a private command known only to one engineer.
-
-Production containers work best when images are portable, platform models are explicit, and applications expose the signals the platform needs. Configuration, logging, health, and routing are not add-ons. They form the contract that lets a container platform run applications reliably.
+No single setting makes an application ready for production. Reliability emerges from consistent contracts between the application, image, runtime, and platform. Configuration defines intended behaviour, observability shows actual behaviour, probes provide bounded control signals, and routing connects only healthy services to users. Those contracts must remain secure, testable, and versioned throughout the release lifecycle.
