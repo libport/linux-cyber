@@ -16,7 +16,7 @@ Linux provides the operating-system foundation for much of platform engineering,
 - Terraform ([course link](https://www.pluralsight.com/paths/terraform)) 
 - Microservices Architecture ([course link](https://www.pluralsight.com/paths/microservices-architecture-new))
 - Observability and Monitoring Tools and Techniques ([course link](https://www.pluralsight.com/paths/observability-and-monitoring-tools-and-techniques))
-- :construction: :notebook: [IBM DevOps and Software Engineering Professional Certificate](IBM-DSE/README.md) ([course link](https://www.coursera.org/professional-certificates/devops-and-software-engineering))
+- :construction: :package: :notebook: [IBM DevOps and Software Engineering Professional Certificate](IBM-DSE/README.md) ([course link](https://www.coursera.org/professional-certificates/devops-and-software-engineering))
 ### Book Notes
 - UNIX and Linux System Administration Handbook, 5th edition, by Evi Nemeth, Garth Snyder, Trent R. Hein, Ben Whaley, and Dan Mackin. ([publisher page](https://www.admin.com/))
 - Modern Software Engineering, by David Farley ([publisher page](https://www.informit.com/store/modern-software-engineering-doing-what-works-to-build-9780137314911))
