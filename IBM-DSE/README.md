@@ -14,7 +14,7 @@ This course includes the following hands-on projects:
 - [Introduction to DevOps](Introduction%20to%20DevOps.md)
 - [Introduction to Cloud Computing](Introduction%20to%20Cloud%20Computing.md)
 - [Introduction to Agile Development and Scrum](Introduction%20to%20Agile%20Development%20and%20Scrum.md) ( :package: [Final Project](projects/Introduction%20to%20Agile%20Development%20and%20Scrum%20Final%20Project.md) )
-- Introduction to Software Engineering
+- [Introduction to Software Engineering](Introduction%20to%20Software%20Engineering.md)
 - Getting Started with Git and GitHub
 - Hands-on Introduction to Linux Commands and Shell Scripting
 - Python for Data Science, AI & Development
