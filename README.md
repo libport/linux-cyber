@@ -6,6 +6,7 @@ This programme is designed for mastery in real-time intelligence informed, threa
 Linux provides the operating-system foundation for much of platform engineering, including cloud servers, containers, Kubernetes nodes, CI/CD runners, networking, and observability systems. Platform engineers automate and standardize these Linux-based capabilities into secure, reliable self-service platforms so application developers can deploy and operate software without managing low-level infrastructure directly.
 ### Course Notes and Project Files
 - :notebook: [Red Hat Certified System Administrator](RHCSA/README.md) ([course link](https://www.pluralsight.com/paths/rhcsa-red-hat-certified-system-administrator-ex200)) 
+- Shell Scripting with Bash ([course link](https://www.pluralsight.com/courses/bash-shell-scripting))
 - :notebook: [Red Hat Certified Engineer](RHCE/README.md) ([course link](https://www.pluralsight.com/paths/rhce-red-hat-certified-engineer-ex294)) 
 - :notebook: [Configuration Management Using Ansible](ansible/README.md) ([course link](https://www.pluralsight.com/paths/configuration-management-using-ansible)) 
 - :notebook: [Red Hat Certified Specialist in Linux Diagnostics and Troubleshooting](RHCSLDT/README.md) ([course link](https://www.pluralsight.com/paths/red-hat-certified-specialist-in-linux-diagnostics-and-troubleshooting-ex342)) 
@@ -28,6 +29,7 @@ Cybersecurity is the practice of protecting systems, networks, and data from una
 ### Course Notes and Project Files
 - :package: :notebook: [IBM Cybersecurity Analyst Professional Certificate](IBM-CySA/README.md) ([course link](https://www.coursera.org/professional-certificates/ibm-cybersecurity-analyst))
 - :notebook: [TCM Security Practical OSINT Research Professional](TS-PORP/README.md) ([course link](https://certifications.tcm-sec.com/porp/))
+- Bash Scripting for Security Operations ([course link](https://www.pluralsight.com/paths/bash-scripting-for-security-operations))
 - Splunk Search Expert Specialization ([course link](https://www.coursera.org/specializations/splunk-search-expert))
 - LPIC-3 Exam 303: Security ([course link](https://www.pluralsight.com/courses/lpic-3-exam-303-security))
 - Red Hat Certified Specialist in Security: Linux ([RH Doc](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html-single/security_hardening/index))

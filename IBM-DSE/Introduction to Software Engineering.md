@@ -127,3 +127,86 @@ A software stack combines technologies that support an application. A simple thr
 Common web stacks include LAMP with Linux, Apache, MySQL, and PHP, and JavaScript-centred stacks such as MEAN, MERN, and MEVN. These pair MongoDB, Express, and Node.js with Angular, React, or Vue. Other combinations use Django and Python, Ruby on Rails, or ASP.NET. Teams can replace components when interfaces and constraints permit.
 
 No stack remains best for every workload. Teams should compare data models, consistency needs, scale, latency, security, hosting, portability, ecosystem maturity, operational skills, and long-term support. MongoDB can support large systems and structured documents, while relational databases can also store semi-structured data. Framework size, age, or language uniformity alone cannot establish performance, flexibility, or suitability.
+## Basics of Programming
+### Compilers, interpreters, and execution
+Programming languages let developers express instructions in human-readable forms. Toolchains and runtimes ultimately cause processors to execute binary machine instructions.
+
+"Compiled" and "interpreted" describe implementation strategies, not exclusive language classes. A compiler translates source before or during execution into native code, object files, bytecode, or another intermediate form. An interpreter executes source or an intermediate representation through a runtime. Linkers and packagers may produce an executable, several files, or an application bundle.
+
+Modern implementations often combine strategies. CPython compiles Python to bytecode and executes it in a virtual machine. Java normally compiles to Java Virtual Machine bytecode, which a runtime can interpret or compile just in time. JavaScript engines use just-in-time compilation in browsers and servers. C and C++ commonly compile ahead of time to native code. C# is a distinct language that normally targets .NET.
+
+Developers consider speed, memory use, deployment, portability, libraries, safety tools, and team expertise. Compilation can detect some errors early but cannot ensure correctness. Interpretation can shorten feedback cycles without confining a language to small scripts. Android combines a Linux-based kernel, native daemons and libraries, a runtime, framework code, system services, and applications rather than using Java alone.
+### High-level, query, and assembly languages
+High-level languages hide hardware details and provide abstractions for data, control flow, and program structure. Low-level languages expose a processor's instruction set and storage model. ARM, MIPS, and x86 name instruction-set architectures with associated assembly syntaxes.
+
+An assembler translates assembly instructions for a target architecture. Source lines can contain a label, mnemonic, operands, and a comment. Directives guide the assembler without necessarily producing machine instructions. Pseudo-instructions and macros may expand into several instructions, so assembly source does not always map one-to-one to machine instructions.
+
+Query languages retrieve or change data and administer databases. SQL supports `SELECT`, data manipulation with `INSERT`, `UPDATE`, and `DELETE`, schema definition with `CREATE` and `ALTER`, and access control. In CRUD terminology, creating a record usually maps to `INSERT`, not SQL's schema-level `CREATE`.
+
+Relational databases organise data around relations and commonly use SQL. "NoSQL" covers several alternatives, including document, key-value, wide-column, and graph models. These systems may use flexible schemas, explicit schemas, or validation rules. Relational systems can also store and query JSON, so structured and unstructured data do not form a strict SQL-NoSQL boundary.
+### Algorithms, pseudocode, and flowcharts
+An algorithm defines an ordered method for solving a problem or completing a task. Pseudocode expresses that logic in concise, language-independent statements. It lets participants review decisions before developers choose a language. Pseudocode has no universal syntax or page limit.
+
+A flowchart represents control flow with standardised symbols and connecting lines. Common symbols include a terminal for a start or end, a rectangle for a process, a diamond for a decision, and a parallelogram for data. Colour remains optional. Flowcharts clarify branching, while pseudocode often handles detailed algorithms compactly. Complexity and audience should determine the format.
+
+These techniques support design and documentation, but they do not constitute the only forms of code organisation. Developers also use modules, functions, types, naming conventions, tests, and source directories to keep software readable, maintainable, and scalable.
+### Control flow
+Programs commonly combine sequence, selection, and iteration. A Boolean expression evaluates to `true` or `false`, although some languages also convert other values to Boolean conditions. A variable names or refers to a value that can change. It need not serve as a function parameter.
+
+Selection chooses a path. An `if` runs its body when its condition holds, and an optional `else` provides an alternative. A `switch` or `match` selects among cases under language-specific rules. A `goto` transfers control directly, but structured constructs usually express intent more clearly.
+
+Iteration repeats work. A `while` loop tests before its body, while a `do-while` loop tests afterwards and therefore runs its body at least once. A `for` loop may use an initialiser, condition, and update, or it may iterate over a range or collection. `break`, `return`, and exceptions can end iteration early. Language rules, not one universal three-loop model, determine the available constructs.
+### Identifiers, values, and collections
+An identifier names a program element such as a variable, constant, function, method, class, or interface. Constants and variables are named elements rather than types of identifier. A constant prevents or discourages reassignment according to the language, while a variable can receive another value during execution. Meaningful names improve readability and let developers update a shared value in one place. Declaration, initialisation, scope, mutability, and type rules vary by language.
+
+Collections hold multiple values. Languages provide arrays, dynamic arrays, lists, maps, sets, tuples, and other structures. Many languages use zero-based array indexing, but neither zero-based indexing nor fixed size applies universally. In C++, `std::array` has a fixed extent and `std::vector` manages a contiguous, dynamically sized sequence. A vector may reserve spare capacity and reallocate as it grows, but indexed access remains constant-time.
+### Functions, objects, and programming styles
+A function packages callable behaviour for reuse, testing, and composition. It may accept arguments, return a value, or cause side effects, but none is required. Languages distinguish functions, methods, procedures, subroutines, and modules in different ways. C and C++ require a declaration before a call when the definition appears later.
+
+Procedural programming organises computation around operations and control flow. Object-oriented programming groups related state and behaviour in objects. Classes or prototypes often define them. Fields or attributes store state, and methods provide behaviour. Encapsulation, composition, and inheritance can model a domain effectively, but excessive hierarchies and boilerplate can reduce flexibility. Many systems combine procedural, object-oriented, and functional techniques. The problem, ecosystem, and maintainability needs should guide the choice.
+## Software Architecture, Design, and Patterns
+### Architecture and design decisions
+Software architecture describes a system's fundamental structures, interactions, operating environment, and guiding principles. It records significant decisions that shape implementation and often become costly to reverse. Architecture addresses functional responsibilities and quality attributes such as performance, scalability, availability, security, interoperability, maintainability, and operability.
+
+Effective architecture balances stakeholder concerns, exposes trade-offs, and guides technology choices and production topology. Requirements should determine the stack. Architecture evolves during iterative development as teams test assumptions and learn from operation.
+
+Useful artefacts include architecture descriptions, decision records, interface contracts, architectural and deployment diagrams, and selected UML models. A software design document may consolidate requirements, assumptions, constraints, dependencies, interfaces, and implementation guidance. Teams should maintain only artefacts that support decisions, communication, construction, or operation.
+### Structure, behaviour, and UML
+Structured design decomposes a problem into cohesive modules with clear responsibilities and explicit, limited dependencies. This combination reduces the effect of change.
+
+Behavioural models represent states, events, activities, and interactions. UML provides a standard graphical language for modelling structure and behaviour independently of a programming language. Common diagrams include:
+- A class diagram shows classes, attributes, operations, and relationships.
+- A state machine diagram shows states, transitions, triggers, and effects.
+- A sequence diagram, which is an interaction diagram, shows messages between participants over time.
+
+Diagrams clarify scope and support onboarding, but they do not automatically save time or money. Obsolete diagrams mislead, so teams should align important models with implementation.
+
+Object-oriented analysis and design models a domain through collaborating objects. A class defines a type. An object is an instance with state in attributes and behaviour in methods. Class diagrams show attributes, operations, and relationships. Inheritance can reuse behaviour but cannot guarantee safe parent substitution. Analysts can use object models independently of implementation language, although they align naturally with object-oriented languages.
+### Components, services, and distributed systems
+A software component encapsulates a capability behind defined interfaces. A sound contract can support reuse, replacement, extension, and testing. Components usually depend on other components, so independence means controlling dependencies rather than removing them. An API defines an interface or contract. It does not, by itself, constitute a component. A data access component can hide persistence details from the rest of an application.
+
+A service exposes a capability through a network-accessible contract and may support independent deployment and scaling. A platform may run zero, one, or many service instances according to demand and availability goals. Service-oriented architecture organises systems around interoperable services, while microservices divide a domain into smaller, independently deployable services aligned with business capabilities. Neither style requires every service to contain components made from objects.
+
+Distributed systems coordinate processes across networked computers. Distribution adds network latency, partial failures, concurrency, data consistency challenges, security boundaries, and operational complexity. Replication, redundancy, health checks, timeouts, retries with backoff, idempotency, and failover can improve resilience. Architects must design for these properties because distribution does not automatically provide fault tolerance, scalability, or low latency.
+### Common architecture styles
+| Style | Organisation | Principal considerations |
+| --- | --- | --- |
+| Two-tier client-server | Clients request data or functions from a server | Simple separation can become a scaling or coupling constraint |
+| N-tier | Logical layers divide responsibilities, and physical tiers host them | Strict designs use adjacent tiers, while relaxed designs allow selected tier skipping |
+| Peer-to-peer | Peers can both provide and consume resources | Decentralisation improves resource sharing but complicates coordination, trust, and consistency |
+| Event-driven | Producers publish events, and consumers subscribe and react | Asynchronous coupling requires decisions about ordering, duplication, delivery, and recovery |
+| Microservices | Independently deployable services own bounded capabilities | Independent scaling adds network, observability, deployment, and data consistency costs |
+
+Patterns can coexist at different scopes. A peer-to-peer system may still use coordination services, and a three-tier application may use events or microservices. An API gateway routes client requests to back-end services and can centralise authentication, throttling, caching, and observability. Services may coordinate workflows through central orchestration or decentralised choreography.
+### Environments and hosting models
+An application environment combines code, runtimes, libraries, configuration, networks, compute, memory, and storage. Development supports active coding, test or quality assurance supports verification, staging approximates important production characteristics, and production serves real users. Strong environment parity reduces deployment surprises. Production must satisfy workload, security, reliability, scalability, privacy, and recovery requirements, but pre-production environments should reproduce the characteristics needed for valid testing.
+
+Organisations can operate infrastructure on-premises, use cloud services, or combine them. On-premises hosting gives an organisation direct operational responsibility for facilities, hardware, software, maintenance, and controls. Cloud providers and customers divide responsibilities according to the service model.
+
+The NIST cloud definition identifies private, community, public, and hybrid deployment models. A private cloud serves one organisation, a community cloud serves organisations with shared concerns, a public cloud serves multiple customers through a provider, and a hybrid cloud connects two or more distinct cloud infrastructures. No model guarantees lower cost, stronger security, or greater flexibility. Workload, architecture, controls, skills, regulation, utilisation, and pricing determine the outcome.
+### Production infrastructure and release practices
+Production systems may use firewalls, load balancers, web servers, application services, proxies, database servers, caches, queues, and replicas. A firewall enforces traffic policy between networks or hosts but cannot replace layered security. A load balancer distributes requests across available back ends, often using health information. It cannot prevent every overload or application failure.
+
+A web server handles HTTP or HTTPS content and requests. An application service runs domain or business logic. A forward or reverse proxy can route requests, terminate encryption, cache responses, or enforce policy. A database server runs a database management system that stores, queries, protects, and manages data. Replication can support availability or read scaling, while tested backups and recovery procedures protect against corruption, deletion, and wider failures. Each system should include only the components its requirements justify.
+
+Deployment planning should define expected load, regions, latency, data flows, retention, privacy, identity, authorisation, availability targets, service level objectives, logging, monitoring, and rollback. Network calls add delay and failure modes, so distributed designs require explicit budgets and controls. Automated tests support releases, but test-driven development remains one option rather than a universal requirement. A canary release sends limited production traffic to a candidate version, compares it with the current version, and expands or reverses the rollout according to measured results.
