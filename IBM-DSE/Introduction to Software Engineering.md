@@ -210,3 +210,60 @@ Production systems may use firewalls, load balancers, web servers, application s
 A web server handles HTTP or HTTPS content and requests. An application service runs domain or business logic. A forward or reverse proxy can route requests, terminate encryption, cache responses, or enforce policy. A database server runs a database management system that stores, queries, protects, and manages data. Replication can support availability or read scaling, while tested backups and recovery procedures protect against corruption, deletion, and wider failures. Each system should include only the components its requirements justify.
 
 Deployment planning should define expected load, regions, latency, data flows, retention, privacy, identity, authorisation, availability targets, service level objectives, logging, monitoring, and rollback. Network calls add delay and failure modes, so distributed designs require explicit budgets and controls. Automated tests support releases, but test-driven development remains one option rather than a universal requirement. A canary release sends limited production traffic to a candidate version, compares it with the current version, and expands or reverses the rollout according to measured results.
+## Job Opportunities and Skillsets in Software Engineering
+Software engineers design, build, test, deploy, maintain, and improve software systems. Their work ranges from user-facing applications to operating systems, cloud platforms, embedded devices, games, data services, and security controls. The discipline includes far more than front-end and back-end development, and role boundaries vary between organisations.
+
+Engineers usually work in cross-functional teams with product managers, designers, testers, security specialists, operations staff, and other engineers. They translate user and organisational needs into reliable software while balancing quality, security, accessibility, performance, cost, and delivery time.
+### Roles and specialisations
+| Role | Typical focus |
+| --- | --- |
+| Front-end engineer | Builds accessible, responsive interfaces for browsers or other client applications, and manages usability, compatibility, and client performance. |
+| Back-end engineer | Develops services, business logic, data access, APIs, and distributed systems. Network engineering remains a separate speciality, although the work can overlap. |
+| Full-stack engineer | Works across client and server components, usually within a defined product and technology stack. |
+| Mobile engineer | Builds applications for mobile operating systems. Separate back-end services often support those applications. |
+| Platform, DevOps, or reliability engineer | Improves delivery infrastructure, automation, observability, resilience, and operational safety. DevOps describes shared culture and practices, although some organisations also use it as a job title. |
+| Quality engineer or tester | Plans and automates tests, investigates risks and defects, and assesses functionality, usability, and reliability. Quality remains a whole-team responsibility. |
+| Integration engineer | Connects systems through APIs, middleware, messaging, and data flows. Embedded and firmware engineers instead develop software that interacts closely with hardware. |
+| Security engineer | Designs controls, reviews architecture and code, models threats, monitors risk, and supports remediation. Penetration testing forms one authorised security activity, not the entire role. |
+
+Game, data, machine learning, desktop, systems, and site reliability engineering add further specialisations. Engineers should select tools and languages according to the system, team, and role instead of following popularity alone.
+### Daily work
+Daily work changes with the product's stage and the engineer's seniority. An engineer may clarify requirements, propose a design, write or review code, benchmark an optimisation, investigate a production fault, improve tests, document a decision, or help deploy a release. Stand-ups and planning meetings coordinate work, while code review helps teams detect defects, share knowledge, and maintain standards.
+
+Work usually moves through recurring stages: discovery and requirements, architecture and design, implementation, verification, release, and operation. Teams revisit earlier decisions as evidence changes. A typical day might start with messages and a stand-up, continue with a merge request and performance benchmark, and then shift to a small product prototype or an urgent defect. Automated tests and monitoring reduce risk, but engineers still need careful review and operational judgement. Some roles include rostered on-call support. Employers should define that responsibility, compensate it appropriately, and avoid treating sustained overtime as a normal release practice.
+
+Junior engineers commonly deliver bounded changes with guidance. Experienced engineers handle greater ambiguity, coordinate work across components, review designs, mentor colleagues, and improve technical direction. Seniority reflects judgement, scope, influence, and sustained results, not only coding speed.
+### Capabilities
+Technical capability includes programming, algorithms, data structures, version control, testing, debugging, system design, databases, security, deployment, monitoring, and documentation. The required depth depends on the role. Systematic debugging deserves particular attention because engineers spend substantial time understanding existing behaviour and failures.
+
+Communication, teamwork, analysis, time management, adaptability, and constructive feedback also shape engineering outcomes. Engineers can learn and assess these capabilities because they are not fixed personality traits. Strong engineers explain trade-offs, seek context, listen to specialists, raise risks early, and accept review without treating disagreement as a personal attack.
+
+Engineers maintain their skills by reading primary documentation, studying established systems, discussing changes with colleagues, taking focused courses, and building projects that require new knowledge. They should evaluate new technology against user needs, maintenance cost, security, team capability, and long-term support.
+### Entry and career development
+People enter software engineering through university degrees, vocational education, coding programs, apprenticeships, self-directed study, or transitions from other fields. Many employers still use a relevant bachelor's degree as a typical entry requirement, particularly for specialised work, but hiring standards differ. Demonstrated ability, sound projects, internships, work samples, and experience can support alternative pathways.
+
+Aspiring engineers benefit from choosing a broad domain, studying relevant job descriptions, and building complete projects that show design, implementation, testing, documentation, and deployment. Regular practice builds fluency. Failed experiments also expose gaps and strengthen problem-solving when candidates examine the cause and revise their approach. A job search can proceed alongside further learning because no candidate meets every listed preference.
+
+Public portfolios should protect confidential information, respect licences, and explain each contributor's work accurately.
+
+Career structures differ across organisations. An individual-contributor ladder may include junior engineer, engineer, senior engineer, staff engineer, and principal engineer. A management path may progress from engineering manager to director and executive roles. Technical leads coordinate technical decisions but do not always manage staff. Engineers can also move into architecture, product, developer relations, consulting, security, data, research, or entrepreneurship. A chief technology officer role represents one executive destination, not the standard endpoint.
+### Employment and working conditions
+Software engineers work in technology companies, finance, government, manufacturing, education, health, consulting, and many other sectors. They may work as employees, contractors, freelancers, founders, or open-source contributors. Remote work, flexible hours, and release schedules depend on the employer, system, security requirements, industrial arrangements, and local law.
+
+Current US projections estimate 15 per cent employment growth for software developers, quality assurance analysts, and testers from 2024 to 2034, with about 129,200 openings each year. These figures do not describe Australia or every individual speciality. Pay also varies sharply by location, experience, sector, employment model, and total compensation, so a single global salary range misleads candidates.
+### Inclusion
+Women remain substantially underrepresented in Australian software engineering. Current occupation data show that women hold 16.5 per cent of software engineering roles. Employers should address recruitment, pay, promotion, safety, sponsorship, and retention instead of shifting unpaid inclusion work onto underrepresented staff.
+
+Candidates can assess whether an employer publishes credible workforce data, supports flexible work, responds to misconduct, recognises inclusion work, and promotes people fairly. Mentors, sponsors, professional networks, and trusted colleagues can strengthen career development. Engineers who encounter exclusion should document concerns, use safe reporting channels where available, seek support, and consider other workplaces when an organisation refuses to improve.
+### Professional ethics
+The ACM and IEEE Computer Society's Software Engineering Code of Ethics places the public interest at the centre of professional conduct. It applies across specification, analysis, design, development, testing, deployment, maintenance, management, education, and policy. Its eight principles require engineers to:
+1. Public - act consistently with the public interest, including safety, fairness, accessibility, and privacy.
+2. Client and employer - serve legitimate interests only when they remain consistent with the public interest, and protect confidentiality appropriately.
+3. Product - ensure that software and related changes meet the highest attainable professional standards.
+4. Judgment - maintain integrity, independence, objectivity, and honesty in professional decisions.
+5. Management - lead ethical development and maintenance, manage risk, set realistic expectations, and support fair working conditions.
+6. Profession - advance the profession's integrity and reputation in ways consistent with the public interest.
+7. Colleagues - treat colleagues fairly, credit their work, support their development, and raise serious ethical concerns.
+8. Self - pursue lifelong learning, improve professional practice, and promote an ethical approach to software engineering.
+
+The code guides judgement but cannot resolve every conflict automatically. Engineers must investigate context, consider affected people, disclose relevant risks and conflicts, seek expert advice when needed, and remain accountable for their decisions.
